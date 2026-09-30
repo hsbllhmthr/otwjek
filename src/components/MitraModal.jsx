@@ -7,7 +7,7 @@ export default function MitraModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   const handleApplyWhatsApp = () => {
-    const text = `Halo Admin SheRide, saya berminat mendaftar sebagai *Mitra Pengemudi Perempuan (Driver Wanita)*.
+    const text = `Halo Admin OTWJek, saya berminat mendaftar sebagai *Mitra Pengemudi Perempuan (Driver Wanita)*.
 
 🌸 *Nama Lengkap*: 
 🛵 *Tipe Kendaraan*: [Motor / Mobil]
@@ -26,7 +26,7 @@ Mohon informasi langkah pendaftaran dan verifikasi identitas selanjutnya. Terima
         <div className="modal-header">
           <div className="modal-title-wrap">
             <span className="modal-tag">Kemitraan Khusus Perempuan</span>
-            <h2 className="modal-heading">Gabung Jadi Mitra Pengemudi SheRide</h2>
+            <h2 className="modal-heading">Gabung Jadi Mitra Pengemudi OTWJek</h2>
           </div>
           <button className="btn-close-modal" onClick={onClose}>
             <X size={20} />

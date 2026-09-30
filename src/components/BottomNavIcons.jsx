@@ -8,7 +8,7 @@ import React from 'react';
  */
 
 export function HomeNavIcon({ size = 25, className = '', active = false }) {
-  const color = active ? '#E15B88' : '#9CA3AF';
+  const color = active ? '#FF337F' : '#9CA3AF';
   return (
     <svg
       width={size}
@@ -27,7 +27,7 @@ export function HomeNavIcon({ size = 25, className = '', active = false }) {
 }
 
 export function CompassNavIcon({ size = 25, className = '', active = false }) {
-  const color = active ? '#E15B88' : '#9CA3AF';
+  const color = active ? '#FF337F' : '#9CA3AF';
   return (
     <svg
       width={size}
@@ -53,7 +53,7 @@ export function CompassNavIcon({ size = 25, className = '', active = false }) {
 }
 
 export function ActivityNavIcon({ size = 25, className = '', active = false }) {
-  const color = active ? '#E15B88' : '#9CA3AF';
+  const color = active ? '#FF337F' : '#9CA3AF';
   return (
     <svg
       width={size}
@@ -72,7 +72,7 @@ export function ActivityNavIcon({ size = 25, className = '', active = false }) {
 }
 
 export function ProfileNavIcon({ size = 25, className = '', active = false }) {
-  const color = active ? '#E15B88' : '#9CA3AF';
+  const color = active ? '#FF337F' : '#9CA3AF';
   return (
     <svg
       width={size}

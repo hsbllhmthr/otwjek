@@ -15,7 +15,7 @@ export default function DriverCatalogModal({
       <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <div>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#00B14F', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#FF337F', textTransform: 'uppercase' }}>
               GrabNow · Mitra Khusus Perempuan
             </span>
             <h3 style={{ fontSize: 16, fontWeight: 800, color: '#1C1C1E', margin: '2px 0 0' }}>
@@ -47,8 +47,8 @@ export default function DriverCatalogModal({
             onClose();
           }}
           style={{
-            border: !selectedDriver ? '2px solid #00B14F' : '1px solid #E5E7EB',
-            background: !selectedDriver ? '#EBF8F0' : '#FFFFFF',
+            border: !selectedDriver ? '2px solid #FF337F' : '1px solid #E5E7EB',
+            background: !selectedDriver ? '#FDF2F8' : '#FFFFFF',
             borderRadius: 12,
             padding: 12,
             marginBottom: 10,
@@ -64,7 +64,7 @@ export default function DriverCatalogModal({
                 width: 38,
                 height: 38,
                 borderRadius: '50%',
-                background: '#00B14F',
+                background: '#FF337F',
                 color: 'white',
                 display: 'flex',
                 alignItems: 'center',
@@ -78,7 +78,7 @@ export default function DriverCatalogModal({
               <div style={{ fontSize: 11, color: '#8E8E93' }}>Dicarikan admin dengan estimasi jemput tercepat</div>
             </div>
           </div>
-          {!selectedDriver && <Check size={18} color="#00B14F" />}
+          {!selectedDriver && <Check size={18} color="#FF337F" />}
         </div>
 
         {/* Driver List */}
@@ -93,8 +93,8 @@ export default function DriverCatalogModal({
                   onClose();
                 }}
                 style={{
-                  border: isSelected ? '2px solid #00B14F' : '1px solid #E5E7EB',
-                  background: isSelected ? '#EBF8F0' : '#FFFFFF',
+                  border: isSelected ? '2px solid #FF337F' : '1px solid #E5E7EB',
+                  background: isSelected ? '#FDF2F8' : '#FFFFFF',
                   borderRadius: 12,
                   padding: 12,
                   cursor: 'pointer',
@@ -116,7 +116,7 @@ export default function DriverCatalogModal({
                         <Star size={11} fill="#F5A623" /> {driver.rating}
                       </span>
                     </div>
-                    <div style={{ fontSize: 11, color: '#00B14F', fontWeight: 600 }}>
+                    <div style={{ fontSize: 11, color: '#FF337F', fontWeight: 600 }}>
                       {driver.vehicleModel} · {driver.plateNumber}
                     </div>
                     <div style={{ fontSize: 10, color: '#8E8E93', marginTop: 2 }}>
@@ -126,11 +126,11 @@ export default function DriverCatalogModal({
                 </div>
 
                 {isSelected ? (
-                  <Check size={18} color="#00B14F" style={{ marginTop: 4 }} />
+                  <Check size={18} color="#FF337F" style={{ marginTop: 4 }} />
                 ) : (
                   <button
                     style={{
-                      background: '#00B14F',
+                      background: '#FF337F',
                       color: 'white',
                       border: 'none',
                       padding: '4px 10px',

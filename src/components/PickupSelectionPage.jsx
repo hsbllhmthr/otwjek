@@ -15,13 +15,16 @@ import { POPULAR_LOCATIONS } from '../data/popularLocations.js';
 import { searchNominatim, reverseGeocodeNominatim, calculateHaversineDistance } from '../utils/geoUtils.js';
 
 export default function PickupSelectionPage({
+  targetMode = 'pickup',
   pickup,
   dropoff,
   driverNotes = '',
   onBack,
   onConfirmPickup,
+  onConfirmDestination,
   selectedVehicleType = 'bike'
 }) {
+  const isDestination = targetMode === 'destination';
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const pinTipRef = useRef(null);
@@ -30,12 +33,14 @@ export default function PickupSelectionPage({
   const isProgrammaticMoveRef = useRef(false);
   const [isMapMoving, setIsMapMoving] = useState(false);
 
-  // Dynamic base coordinates from user's live tracked pickup or default (Indo Mode Tamalate)
-  const baseLat = pickup?.lat || -5.1843;
-  const baseLng = pickup?.lng || 119.4182;
-  const baseName = pickup?.name || 'Indo Mode Tamalate';
-  const baseAddress = pickup?.address || 'Mangasa, Tamalate, Kota Makassar';
-  const baseFullAddress = pickup?.fullAddress || pickup?.address || 'Jl. Sultan Alauddin, Mangasa, Tamalate, Kota Makassar';
+  // Dynamic base coordinates: use dropoff if in destination mode, else pickup
+  const baseLat = isDestination ? (dropoff?.lat || -5.1477) : (pickup?.lat || -5.1843);
+  const baseLng = isDestination ? (dropoff?.lng || 119.4327) : (pickup?.lng || 119.4182);
+  const baseName = isDestination ? (dropoff?.name || 'Mall Ratu Indah') : (pickup?.name || 'Indo Mode Tamalate');
+  const baseAddress = isDestination ? (dropoff?.address || 'Jl. DR. Ratulangi No.35, Mamajang') : (pickup?.address || 'Mangasa, Tamalate, Kota Makassar');
+  const baseFullAddress = isDestination
+    ? (dropoff?.fullAddress || dropoff?.address || 'Jl. DR. Ratulangi No.35, Mamajang')
+    : (pickup?.fullAddress || pickup?.address || 'Jl. Sultan Alauddin, Mangasa, Tamalate, Kota Makassar');
 
   // Initial locations (no Home)
   const initialPickups = [
@@ -431,15 +436,24 @@ export default function PickupSelectionPage({
   };
 
   const handleConfirm = () => {
-    onConfirmPickup(
-      {
+    if (isDestination && onConfirmDestination) {
+      onConfirmDestination({
         name: selectedPickup.name,
         address: selectedPickup.fullAddress || selectedPickup.address,
         lat: selectedPickup.lat,
         lng: selectedPickup.lng
-      },
-      currentNotes
-    );
+      });
+    } else {
+      onConfirmPickup(
+        {
+          name: selectedPickup.name,
+          address: selectedPickup.fullAddress || selectedPickup.address,
+          lat: selectedPickup.lat,
+          lng: selectedPickup.lng
+        },
+        currentNotes
+      );
+    }
   };
 
   const displayPickupList = [
@@ -459,8 +473,8 @@ export default function PickupSelectionPage({
             <svg width="42" height="52" viewBox="0 0 42 52" fill="none" xmlns="http://www.w3.org/2000/svg">
               <defs>
                 <linearGradient id="pinBodyGrad" x1="21" y1="2" x2="21" y2="50" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stopColor="#00B14F" />
-                  <stop offset="100%" stopColor="#065F46" />
+                  <stop offset="0%" stopColor="#FF337F" />
+                  <stop offset="100%" stopColor="#BE185D" />
                 </linearGradient>
                 <filter id="pinShadowFilter" x="0" y="0" width="42" height="52" filterUnits="userSpaceOnUse">
                   <feDropShadow dx="0" dy="3.5" stdDeviation="3.5" floodColor="#000000" floodOpacity="0.32" />
@@ -477,8 +491,8 @@ export default function PickupSelectionPage({
               />
               {/* White Inner Circle */}
               <circle cx="21" cy="20" r="7.5" fill="#FFFFFF" />
-              {/* Dark Forest Core Dot */}
-              <circle cx="21" cy="20" r="3.6" fill="#074F3B" />
+              {/* Core Dot */}
+              <circle cx="21" cy="20" r="3.6" fill="#831843" />
             </svg>
           </div>
         </div>
@@ -501,11 +515,18 @@ export default function PickupSelectionPage({
           <ArrowLeft size={22} color="#1C1C1E" strokeWidth={2.4} />
         </button>
 
-        {/* Floating Pill: [Blue Dot] Pick up at? */}
+        {/* Floating Pill: [Dot] Pick up at? / Drop off at? */}
         <div className="pickup-search-pill">
           <div className="pickup-target-blue-dot">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <circle cx="8" cy="8" r="6" stroke="#007AFF" strokeWidth="3" fill="#FFFFFF" />
+              <circle
+                cx="8"
+                cy="8"
+                r="6"
+                stroke="#FF337F"
+                strokeWidth="3"
+                fill="#FFFFFF"
+              />
             </svg>
           </div>
 
@@ -516,7 +537,11 @@ export default function PickupSelectionPage({
               isResolvingAddress
                 ? 'Membaca lokasi...'
                 : selectedPickup?.name
-                ? `Pick up at ${selectedPickup.name}`
+                ? isDestination
+                  ? `Drop off at ${selectedPickup.name}`
+                  : `Pick up at ${selectedPickup.name}`
+                : isDestination
+                ? 'Where to?'
                 : 'Pick up at?'
             }
             value={searchQuery}
@@ -642,7 +667,7 @@ export default function PickupSelectionPage({
                 }}
               >
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <circle cx="10" cy="10" r="10" fill="#007AFF" />
+                  <circle cx="10" cy="10" r="10" fill="#FF337F" />
                   <path
                     d="M10 5.5V14.5M5.5 10H14.5"
                     stroke="#FFFFFF"
@@ -681,12 +706,12 @@ export default function PickupSelectionPage({
                     width="15"
                     height="15"
                     rx="3.5"
-                    stroke="#007AFF"
+                    stroke="#FF337F"
                     strokeWidth="1.8"
                   />
                   <path
                     d="M12.2 4.8L15.2 7.8L8.2 14.8H5.2V11.8L12.2 4.8Z"
-                    stroke="#007AFF"
+                    stroke="#FF337F"
                     strokeWidth="1.8"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -697,13 +722,13 @@ export default function PickupSelectionPage({
           )}
         </div>
 
-        {/* Big Green CTA: Choose this pickup */}
+        {/* Big CTA: Choose this pickup / destination */}
         <button
           type="button"
           className="btn-choose-this-pickup"
           onClick={handleConfirm}
         >
-          Choose this pickup
+          {isDestination ? 'Choose this destination' : 'Choose this pickup'}
         </button>
       </div>
 

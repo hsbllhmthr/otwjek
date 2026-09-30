@@ -123,7 +123,7 @@ export default function MapEngine({
 
     if (showRoute && routePolyline && routePolyline.length > 1) {
       routeLineRef.current = L.polyline(routePolyline, {
-        color: '#00B14F', // Grab signature green route line
+        color: '#FF337F', // Feminine pink route line
         weight: 6,
         opacity: 0.9,
         lineCap: 'round',

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   ArrowLeft,
   ArrowUpDown,
@@ -29,7 +29,7 @@ function RedLocationPin({ size = 20 }) {
   );
 }
 
-// Green Destination Ring (matching reference Image 2)
+// Pink Destination Ring (Feminine Theme)
 function GreenDestinationRing({ size = 18 }) {
   return (
     <div
@@ -37,7 +37,7 @@ function GreenDestinationRing({ size = 18 }) {
         width: size,
         height: size,
         borderRadius: '50%',
-        border: '3.5px solid #00B14F',
+        border: '3.5px solid #FF337F',
         backgroundColor: '#FFFFFF',
         boxSizing: 'border-box',
         flexShrink: 0
@@ -46,7 +46,7 @@ function GreenDestinationRing({ size = 18 }) {
   );
 }
 
-// Green Folded Map Icon (matching reference Image 2 "Select on map")
+// Pink Folded Map Icon (matching reference Image 2 "Select on map")
 function GreenFoldedMapIcon({ size = 16 }) {
   return (
     <svg
@@ -54,7 +54,7 @@ function GreenFoldedMapIcon({ size = 16 }) {
       height={size}
       viewBox="0 0 24 24"
       fill="none"
-      stroke="#00B14F"
+      stroke="#FF337F"
       strokeWidth="2.2"
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -152,6 +152,22 @@ export default function SendPackagePage({
     }, 2800);
   };
 
+  // Sync pickupQuery whenever userLocation changes (e.g. returning from map pickup selection)
+  useEffect(() => {
+    if (userLocation && userLocation !== 'Current location') {
+      setPickupQuery(userLocation);
+    }
+  }, [userLocation]);
+
+  // Focus destination input when returning to SendPackagePage
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setActiveField('destination');
+      destinationInputRef.current?.focus();
+    }, 250);
+    return () => clearTimeout(timer);
+  }, []);
+
   const performSearch = (val) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
@@ -228,7 +244,7 @@ export default function SendPackagePage({
       {/* Toast Notification */}
       {toastMessage && (
         <div className="ridego-toast-banner">
-          <CheckCircle2 size={16} color="#00B14F" />
+          <CheckCircle2 size={16} color="#FF337F" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -266,9 +282,21 @@ export default function SendPackagePage({
           <div className="whereto-ref2-route-body">
             {/* Left Icons with Dotted Connector (Bulat di atas, Pin point di bawah) */}
             <div className="whereto-ref2-route-indicators">
-              <GreenDestinationRing size={16} />
+              <div
+                style={{ cursor: 'pointer' }}
+                onClick={() => onOpenMap && onOpenMap('pickup')}
+                title="Pilih titik ambil barang di peta"
+              >
+                <GreenDestinationRing size={16} />
+              </div>
               <div className="whereto-ref2-route-dash" />
-              <RedLocationPin size={18} />
+              <div
+                style={{ cursor: 'pointer' }}
+                onClick={() => onOpenMap && onOpenMap('destination')}
+                title="Pilih titik antar di peta"
+              >
+                <RedLocationPin size={18} />
+              </div>
             </div>
 
             {/* Inputs: Pick up item at? and Deliver to? */}
@@ -364,7 +392,7 @@ export default function SendPackagePage({
           <button
             type="button"
             className="whereto-ref2-action-btn"
-            onClick={onOpenMap}
+            onClick={() => onOpenMap && onOpenMap(activeField || 'destination')}
           >
             <GreenFoldedMapIcon size={16} />
             <span>Select on map</span>
@@ -388,7 +416,7 @@ export default function SendPackagePage({
               className="whereto-ref2-suggest-item"
               onClick={() => handleSelectLocation(loc)}
             >
-              <div className="whereto-history-pin-icon" style={{ background: '#00B14F' }}>
+              <div className="whereto-history-pin-icon" style={{ background: '#FF337F' }}>
                 <Package size={17} color="#FFFFFF" />
               </div>
               <div className="whereto-ref2-suggest-details">

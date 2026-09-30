@@ -16,10 +16,7 @@ export default function Screen3SuggestedRides({
   durationMinutes = 18
 }) {
   const [selectedRideId, setSelectedRideId] = useState('protect');
-  const [selectedAdminId, setSelectedAdminId] = useState('admin-1');
   const [showAllRides, setShowAllRides] = useState(false);
-
-  const currentAdmin = ADMINS.find(a => a.id === selectedAdminId) || ADMINS[0];
 
   // Ride types
   const baseFare = fareBreakdown?.totalFare || 18000;
@@ -62,8 +59,13 @@ export default function Screen3SuggestedRides({
 
   const currentRide = rideOptions.find(r => r.id === selectedRideId) || rideOptions[0];
 
-  // Handle Book via WhatsApp
+  // Handle Book via WhatsApp — Auto-rotasi 4 admin di latar belakang
   const handleBookWhatsApp = () => {
+    const lastIdx = parseInt(localStorage.getItem('last_admin_dispatch_index') || '-1', 10);
+    const nextIdx = (lastIdx + 1) % ADMINS.length;
+    localStorage.setItem('last_admin_dispatch_index', nextIdx.toString());
+    const targetAdmin = ADMINS[nextIdx] || ADMINS[0];
+
     const message = formatBookingMessage({
       serviceType: currentRide.id === 'send' ? 'send' : 'ride',
       vehicleType: currentRide.id === 'car' ? 'mobil' : 'motor',
@@ -74,10 +76,11 @@ export default function Screen3SuggestedRides({
       customerName: 'Pelanggan Perempuan',
       customerNotes: driverNotes || '',
       driverName: selectedDriver?.name || 'Acak (Dicarikan Admin)',
-      packageDetails: currentRide.id === 'send' ? 'Paket / Makanan' : ''
+      packageDetails: currentRide.id === 'send' ? 'Paket / Makanan' : '',
+      paymentMethod: 'cash'
     });
 
-    const url = buildWhatsAppLink(currentAdmin.phone, message);
+    const url = buildWhatsAppLink(targetAdmin.phone, message);
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
@@ -109,7 +112,7 @@ export default function Screen3SuggestedRides({
         </span>
         <ChevronRight size={14} />
         <div style={{ width: 1, height: 14, background: '#E5E7EB', margin: '0 4px' }} />
-        <Plus size={15} style={{ color: '#00B14F', cursor: 'pointer' }} />
+        <Plus size={15} style={{ color: '#FF337F', cursor: 'pointer' }} />
       </div>
 
       {/* Bottom Sheet Card */}
@@ -162,7 +165,7 @@ export default function Screen3SuggestedRides({
         {/* Selected Driver Banner (if any) */}
         {selectedDriver && (
           <div className="selected-driver-strip">
-            <UserCheck size={14} color="#00B14F" />
+            <UserCheck size={14} color="#FF337F" />
             <span>Driver Pilihan: <strong>{selectedDriver.name}</strong> ({selectedDriver.vehicleModel})</span>
           </div>
         )}
@@ -182,15 +185,6 @@ export default function Screen3SuggestedRides({
           <div className="safety-badge-pill">
             <ShieldCheck size={14} />
             <span>AMAN DIJALAN</span>
-          </div>
-
-          <div
-            className="admin-switch-pill"
-            onClick={() => setSelectedAdminId(selectedAdminId === 'admin-1' ? 'admin-2' : 'admin-1')}
-            title="Klik untuk ganti Admin WhatsApp"
-          >
-            <span>Dispatcher: {currentAdmin.name}</span>
-            <MoreHorizontal size={14} style={{ color: '#8E8E93' }} />
           </div>
         </div>
 

@@ -59,7 +59,7 @@ export default function WhatsAppDispatcher({
       <div className="admin-selector-section">
         <div className="admin-section-header">
           <span className="admin-title">Pilih Dispatcher WhatsApp Admin:</span>
-          <span className="live-status-tag">🟢 Keduanya Online</span>
+          <span className="live-status-tag">🟢 {ADMINS.length} Admin Siap</span>
         </div>
 
         <div className="admins-grid">
@@ -130,7 +130,7 @@ export default function WhatsAppDispatcher({
 
         <div className="secondary-buttons-row">
           <button className="btn-secondary btn-copy" onClick={handleCopyMessage}>
-            {isCopied ? <Check size={14} color="#1B8A5A" /> : <Copy size={14} />}
+            {isCopied ? <Check size={14} color="var(--primary)" /> : <Copy size={14} />}
             <span>{isCopied ? 'Tersalin!' : 'Salin Format Pesan'}</span>
           </button>
 
@@ -194,6 +194,7 @@ export default function WhatsAppDispatcher({
         .admins-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
+          grid-template-rows: auto auto;
           gap: 8px;
         }
 
@@ -243,10 +244,11 @@ export default function WhatsAppDispatcher({
         .admin-badge {
           font-size: 9px;
           font-weight: 700;
-          background: #F1EFF5;
-          color: var(--secondary);
+          background: var(--primary-light);
+          color: var(--primary);
           padding: 1px 5px;
           border-radius: 99px;
+          white-space: nowrap;
         }
 
         .admin-role {

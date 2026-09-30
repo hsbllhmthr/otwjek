@@ -7,6 +7,7 @@ import SendPackagePage from './components/SendPackagePage.jsx';
 import DeliveryDetailsPage from './components/DeliveryDetailsPage.jsx';
 import PickupSelectionPage from './components/PickupSelectionPage.jsx';
 import RideConfirmationPage from './components/RideConfirmationPage.jsx';
+import PaymentMethodsPage from './components/PaymentMethodsPage.jsx';
 import BottomNavBar from './components/BottomNavBar.jsx';
 import { ActivityView, MessageView, AccountView, PaymentView } from './components/SecondaryViews.jsx';
 
@@ -16,6 +17,7 @@ import { calculateFare, formatRupiah } from './utils/fareCalculator.js';
 import { fetchOSRMRoute, searchNominatim, reverseGeocodeNominatim, calculateHaversineDistance } from './utils/geoUtils.js';
 import { buildWhatsAppLink, formatBookingMessage } from './utils/whatsappTemplate.js';
 import { ADMINS } from './data/admins.js';
+import RideDetailsPage from './components/RideDetailsPage.jsx';
 
 import {
   ChevronLeft,
@@ -37,6 +39,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('ride'); // 'ride' | 'send'
   const [timeMode, setTimeMode] = useState('now'); // 'now' | 'later'
   const [selectedVehicleType, setSelectedVehicleType] = useState('bike'); // 'bike' | 'car' | 'express'
+  const [paymentMethod, setPaymentMethod] = useState('cash'); // 'cash' | 'qris'
 
   // Location tracking states
   const [isLocationTrackingActive, setIsLocationTrackingActive] = useState(false);
@@ -56,11 +59,13 @@ export default function App() {
   const [isDriverCatalogOpen, setIsDriverCatalogOpen] = useState(false);
   const [selectedAdminId, setSelectedAdminId] = useState('admin-1');
   const [showAllRides, setShowAllRides] = useState(true);
+  const [activeRideBooking, setActiveRideBooking] = useState(null);
 
   // Routing metrics
   const [distanceKm, setDistanceKm] = useState(3.8);
   const [durationMinutes, setDurationMinutes] = useState(18);
   const [routePolyline, setRoutePolyline] = useState([]);
+  const [mapSelectionMode, setMapSelectionMode] = useState('pickup'); // 'pickup' | 'destination'
 
   // Floating Card Interactive Input & Autocomplete State
   const [pickupInput, setPickupInput] = useState(DEFAULT_PICKUP.name);
@@ -379,27 +384,51 @@ export default function App() {
 
   const currentRide = rideOptions.find((r) => r.id === selectedRideId) || rideOptions[0];
 
-  // Booking via WhatsApp
+  // Booking via WhatsApp / Ride Details Page (Fitur Motor & Mobil)
   const handleBookWhatsApp = (bookingDetails = {}) => {
     const isSend = bookingDetails?.serviceType === 'send' || (!bookingDetails?.serviceType && activeTab === 'send');
     const ride = bookingDetails?.ride || currentRide;
     const pkgData = bookingDetails?.packageData || null;
+    const pMethod = bookingDetails?.paymentMethod || paymentMethod || 'cash';
+
+    // Jika fitur motor atau mobil (ride), buka halaman baru Ride Details (sesuai gambar referensi)
+    if (!isSend) {
+      setActiveRideBooking({
+        ride,
+        pickup,
+        dropoff,
+        distanceKm,
+        durationMinutes,
+        paymentMethod: pMethod,
+        driverNotes: driverNotes || '',
+        selectedDriver
+      });
+      setCurrentView('ride-details');
+      return;
+    }
+
+    // Untuk fitur paket (send), langsung teruskan ke WhatsApp Admin dengan rotasi 4 admin
+    const lastIdx = parseInt(localStorage.getItem('last_admin_dispatch_index') || '-1', 10);
+    const nextIdx = (lastIdx + 1) % ADMINS.length;
+    localStorage.setItem('last_admin_dispatch_index', nextIdx.toString());
+    const targetAdmin = ADMINS[nextIdx] || ADMINS[0];
 
     const message = formatBookingMessage({
-      serviceType: isSend ? 'send' : 'ride',
+      serviceType: 'send',
       vehicleType: ride.id?.includes('car') ? 'mobil' : 'motor',
-      pickupAddress: pickup?.name || pickup?.address || 'Titik Jemput',
-      dropoffAddress: dropoff?.name || dropoff?.address || 'Titik Tujuan',
+      pickupAddress: pickup?.name || pickup?.address || 'Titik Jemput di Peta',
+      dropoffAddress: dropoff?.name || dropoff?.address || 'Titik Tujuan di Peta',
       distanceKm,
       formattedFare: formatRupiah(ride.price),
-      customerName: 'Pelanggan Perempuan',
+      customerName: 'Pelanggan SheRide',
       customerNotes: pkgData?.specialNotes || driverNotes || '',
       driverName: selectedDriver?.name || 'Acak (Dicarikan Admin)',
       packageDetails: isSend ? (pkgData?.itemName || 'Paket / Makanan') : '',
-      packageInfo: isSend ? pkgData : null
+      packageInfo: isSend ? pkgData : null,
+      paymentMethod: pMethod
     });
 
-    const url = buildWhatsAppLink(currentAdmin.phone, message);
+    const url = buildWhatsAppLink(targetAdmin.phone, message);
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
@@ -475,11 +504,12 @@ export default function App() {
       }
     }
 
-    // Navigate to Delivery Details screen if in express/send package mode, otherwise to pickup selection
+    // Navigate to Delivery Details screen if in express/send package mode, otherwise directly to 'ride' (Book with cash)
     if (options.vehicleType === 'express' || currentView === 'send-package' || options.fromSendPackage) {
       setCurrentView('delivery-details');
     } else {
-      setCurrentView('pickup-selection');
+      // Directly proceed to the "Book with Cash" page
+      setCurrentView('ride');
     }
   };
 
@@ -496,7 +526,33 @@ export default function App() {
     if (notes !== undefined && notes !== null) {
       setDriverNotes(notes);
     }
-    setCurrentView('ride');
+
+    // For express (kirim paket), return to 'send-package'
+    // For motor (bike) and mobil (car), return to 'where-to'
+    if (selectedVehicleType === 'express') {
+      setCurrentView('send-package');
+    } else {
+      setCurrentView('where-to');
+    }
+  };
+
+  const handleConfirmDestinationFromMap = (selectedDest) => {
+    if (selectedDest) {
+      setDropoff({
+        name: selectedDest.name,
+        address: selectedDest.fullAddress || selectedDest.address,
+        fullAddress: selectedDest.fullAddress || selectedDest.address,
+        lat: selectedDest.lat,
+        lng: selectedDest.lng
+      });
+      setSearchDestinationQuery(selectedDest.name);
+    }
+    // For express (send package), proceed to delivery details; otherwise to ride (Book with cash)
+    if (selectedVehicleType === 'express') {
+      setCurrentView('delivery-details');
+    } else {
+      setCurrentView('ride');
+    }
   };
 
   const handleSelectService = (serviceId, query, vehicleType) => {
@@ -578,7 +634,10 @@ export default function App() {
         <div className="bolt-app-shell">
           <WhereToPage
             onBack={() => setCurrentView('home')}
-            onOpenMap={() => setCurrentView('pickup-selection')}
+            onOpenMap={(mode = 'destination') => {
+              setMapSelectionMode(mode);
+              setCurrentView('pickup-selection');
+            }}
             onSelectDestination={handleSelectDestinationFromWhereTo}
             onSelectPickup={(newPickup) => {
               setPickup((prev) => ({
@@ -606,7 +665,10 @@ export default function App() {
         <div className="bolt-app-shell">
           <SendPackagePage
             onBack={() => setCurrentView('home')}
-            onOpenMap={() => setCurrentView('pickup-selection')}
+            onOpenMap={(mode = 'destination') => {
+              setMapSelectionMode(mode);
+              setCurrentView('pickup-selection');
+            }}
             onSelectDestination={handleSelectDestinationFromWhereTo}
             onSelectPickup={(newPickup) => {
               setPickup((prev) => ({
@@ -637,6 +699,12 @@ export default function App() {
             onBack={() => setCurrentView('send-package')}
             onSwapLocations={handleSwapLocations}
             onBook={handleBookWhatsApp}
+            onUpdateDropoff={(newDropoff) => {
+              setDropoff(newDropoff);
+              if (newDropoff?.name) {
+                setSearchDestinationQuery(newDropoff.name);
+              }
+            }}
             distanceKm={distanceKm}
           />
         </div>
@@ -649,11 +717,13 @@ export default function App() {
       <div className="app-viewport-wrapper">
         <div className="bolt-app-shell">
           <PickupSelectionPage
+            targetMode={mapSelectionMode}
             pickup={pickup}
             dropoff={dropoff}
             driverNotes={driverNotes || ''}
             onBack={() => setCurrentView(selectedVehicleType === 'express' ? 'send-package' : 'where-to')}
             onConfirmPickup={handleConfirmPickup}
+            onConfirmDestination={handleConfirmDestinationFromMap}
             selectedVehicleType={selectedVehicleType}
           />
         </div>
@@ -718,6 +788,23 @@ export default function App() {
     );
   }
 
+  if (currentView === 'payment-methods') {
+    return (
+      <div className="app-viewport-wrapper">
+        <div className="bolt-app-shell">
+          <PaymentMethodsPage
+            selectedMethod={paymentMethod}
+            onBack={() => setCurrentView('ride')}
+            onSelectMethod={(method) => {
+              setPaymentMethod(method);
+              setCurrentView('ride');
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
   if (currentView === 'ride') {
     return (
       <div className="app-viewport-wrapper">
@@ -728,11 +815,37 @@ export default function App() {
             driverNotes={driverNotes}
             selectedVehicleType={selectedVehicleType}
             activeTab={activeTab}
-            onBack={() => setCurrentView('pickup-selection')}
-            onEditPickup={() => setCurrentView('pickup-selection')}
+            paymentMethod={paymentMethod}
+            onOpenPaymentMethods={() => setCurrentView('payment-methods')}
+            onBack={() => setCurrentView('where-to')}
+            onEditPickup={() => {
+              setMapSelectionMode('pickup');
+              setCurrentView('pickup-selection');
+            }}
             onBook={handleBookWhatsApp}
             distanceKm={distanceKm}
             durationMinutes={durationMinutes}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (currentView === 'ride-details') {
+    return (
+      <div className="app-viewport-wrapper">
+        <div className="bolt-app-shell">
+          <RideDetailsPage
+            pickup={activeRideBooking?.pickup || pickup}
+            dropoff={activeRideBooking?.dropoff || dropoff}
+            ride={activeRideBooking?.ride || currentRide}
+            distanceKm={activeRideBooking?.distanceKm || distanceKm}
+            durationMinutes={activeRideBooking?.durationMinutes || durationMinutes}
+            paymentMethod={activeRideBooking?.paymentMethod || paymentMethod}
+            driverNotes={activeRideBooking?.driverNotes || driverNotes}
+            selectedDriver={activeRideBooking?.selectedDriver || selectedDriver}
+            onBack={() => setCurrentView('ride')}
+            onCancelRide={() => setCurrentView('home')}
           />
         </div>
       </div>
@@ -970,19 +1083,19 @@ export default function App() {
           {selectedDriver && (
             <div
               style={{
-                background: '#EBF8F0',
-                border: '1px solid rgba(0, 177, 79, 0.25)',
+                background: '#FDF2F8',
+                border: '1px solid #FBCFE8',
                 borderRadius: 8,
                 padding: '8px 12px',
                 fontSize: 12,
-                color: '#024724',
+                color: '#831843',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between'
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <UserCheck size={16} color="#00B14F" />
+                <UserCheck size={16} color="#FF337F" />
                 <span>
                   Driver: <strong>{selectedDriver.name}</strong> ({selectedDriver.vehicleModel})
                 </span>

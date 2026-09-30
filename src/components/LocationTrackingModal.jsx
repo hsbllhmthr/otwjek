@@ -111,7 +111,7 @@ export default function LocationTrackingModal({
 
         {/* Header Tag Badge */}
         <div className="location-modal-badge">
-          <Crosshair size={13} color="#00B14F" strokeWidth={2.6} />
+          <Crosshair size={13} color="#FF337F" strokeWidth={2.6} />
           <span>Akurasi Penjemputan Realtime</span>
         </div>
 
@@ -125,7 +125,7 @@ export default function LocationTrackingModal({
         <div className="location-features-list">
           <div className="location-feature-item">
             <div className="location-feature-icon-wrap bg-green">
-              <MapPin size={18} color="#00B14F" strokeWidth={2.4} />
+              <MapPin size={18} color="#FF337F" strokeWidth={2.4} />
             </div>
             <div className="location-feature-text">
               <h4>Titik Jemput Otomatis & Presisi</h4>

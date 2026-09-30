@@ -17,18 +17,20 @@ export function formatBookingMessage({
   customerNotes = '',
   driverName = '',
   packageDetails = '',
-  packageInfo = null
+  packageInfo = null,
+  paymentMethod = 'cash'
 }) {
-  let serviceLabel = 'Antar Penumpang (SheRide Motor)';
+  let serviceLabel = 'Antar Penumpang (OTWJek Motor)';
   if (serviceType === 'ride') {
-    serviceLabel = vehicleType === 'mobil' ? 'Antar Penumpang (SheRide Mobil)' : 'Antar Penumpang (SheRide Motor)';
+    serviceLabel = vehicleType === 'mobil' ? 'Antar Penumpang (OTWJek Mobil)' : 'Antar Penumpang (OTWJek Motor)';
   } else {
-    serviceLabel = `Antar Paket (SheSend) ${packageDetails ? '- ' + packageDetails : ''}`;
+    serviceLabel = `Antar Paket (OTWJek Kirim) ${packageDetails ? '- ' + packageDetails : ''}`;
   }
 
+  const paymentLabel = paymentMethod === 'qris' ? 'QRIS (Scan Barcode)' : 'Tunai / Cash';
   const selectedDriver = driverName && driverName.trim().length > 0 ? driverName : 'Acak (Dicarikan Admin)';
   const notesText = customerNotes && customerNotes.trim().length > 0 ? customerNotes : 'Tidak ada catatan';
-  const nameText = customerName && customerName.trim().length > 0 ? customerName : 'Pelanggan SheRide';
+  const nameText = customerName && customerName.trim().length > 0 ? customerName : 'Pelanggan OTWJek';
 
   if (serviceType === 'send' && packageInfo) {
     const weightLabels = {
@@ -43,7 +45,7 @@ export function formatBookingMessage({
       : 'Penerima di lokasi';
     const instructionsStr = packageInfo.specialNotes || notesText;
 
-    return `Halo Admin SheRide, saya ingin memesan layanan:
+    return `Halo Admin OTWJek, saya ingin memesan layanan:
 
 🌸 *Tipe Layanan*: ${serviceLabel}
 📦 *Detail & Berat Paket*: ${itemStr}
@@ -54,20 +56,22 @@ export function formatBookingMessage({
 ⚠️ *Instruksi Pengiriman*: ${instructionsStr}
 📏 *Estimasi Jarak*: ${distanceKm} km
 💵 *Estimasi Tarif*: ${formattedFare}
+💳 *Metode Pembayaran*: ${paymentLabel}
 🛵 *Kurir Pilihan*: ${selectedDriver}
 
 Mohon konfirmasi mitra kurir perempuan yang tersedia. Terima kasih!`;
   }
 
-  return `Halo Admin SheRide, saya ingin memesan layanan:
+  return `Halo Admin OTWJek, saya ingin memesan layanan:
 
 🌸 *Tipe Layanan*: ${serviceLabel}
 📍 *Titik Jemput*: ${pickupAddress || 'Titik Jemput di Peta'}
 🏁 *Titik Tujuan*: ${dropoffAddress || 'Titik Tujuan di Peta'}
 📏 *Estimasi Jarak*: ${distanceKm} km
 💵 *Estimasi Tarif*: ${formattedFare}
+💳 *Metode Pembayaran*: ${paymentLabel}
 👤 *Nama Pemesan*: ${nameText}
-📦 *Catatan / Info Paket*: ${notesText}
+📦 *Catatan / Info*: ${notesText}
 🛵 *Driver Pilihan*: ${selectedDriver}
 
 Mohon konfirmasi driver perempuan yang tersedia. Terima kasih!`;

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { formatRupiah, calculateFare } from '../utils/fareCalculator.js';
 import { fetchOSRMRoute, calculateHaversineDistance } from '../utils/geoUtils.js';
+import qrisLogo from '../assets/qris_logo.png';
 
 function escapeHtml(str) {
   if (!str) return '';
@@ -59,10 +60,10 @@ function StandardBike3D({ width = 88, height = 62 }) {
         </linearGradient>
 
         <linearGradient id="std_green_seat" x1="18" y1="28" x2="58" y2="48" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#22C55E" />
-          <stop offset="35%" stopColor="#16A34A" />
-          <stop offset="80%" stopColor="#15803D" />
-          <stop offset="100%" stopColor="#14532D" />
+          <stop offset="0%" stopColor="#FF6097" />
+          <stop offset="35%" stopColor="#FF337F" />
+          <stop offset="80%" stopColor="#E11D6F" />
+          <stop offset="100%" stopColor="#9D174D" />
         </linearGradient>
 
         {/* Tire Shading */}
@@ -140,8 +141,8 @@ function StandardBike3D({ width = 88, height = 62 }) {
       {/* Seat Top Highlight */}
       <path
         d="M24 35 C28 32 38 31 50 33 C56 34 58 35 56 37 C48 37 34 37 26 36 Z"
-        fill="#86EFAC"
-        opacity="0.5"
+        fill="#FBCFE8"
+        opacity="0.8"
       />
     </svg>
   );
@@ -566,6 +567,8 @@ export default function RideConfirmationPage({
   distanceKm = 6.5,
   durationMinutes = 17,
   onEditPickup,
+  onOpenPaymentMethods,
+  paymentMethod = 'cash',
   selectedVehicleType = 'bike',
   activeTab = 'ride'
 }) {
@@ -753,7 +756,7 @@ export default function RideConfirmationPage({
       }
 
       routePolylineRef.current = L.polyline(coords, {
-        color: '#00B14F',
+        color: '#FF337F',
         weight: 6,
         opacity: 0.95,
         lineCap: 'round',
@@ -892,7 +895,7 @@ export default function RideConfirmationPage({
       {/* Toast Notification */}
       {toastMessage && (
         <div className="ridego-toast-banner">
-          <CheckCircle2 size={16} color="#00B14F" />
+          <CheckCircle2 size={16} color="#FF337F" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -987,12 +990,32 @@ export default function RideConfirmationPage({
           <button
             type="button"
             className="payment-bar-btn payment-cash-btn"
-            onClick={() => showToast('💵 Metode pembayaran: Tunai (Cash)')}
+            onClick={() => {
+              if (onOpenPaymentMethods) {
+                onOpenPaymentMethods();
+              } else {
+                showToast('💵 Metode pembayaran: Tunai (Cash)');
+              }
+            }}
           >
-            <div className="cash-icon-bubble">
-              <Banknote size={15} color="#00B14F" />
+            <div className="cash-icon-bubble" style={{ overflow: 'hidden' }}>
+              {paymentMethod === 'qris' ? (
+                <img
+                  src={qrisLogo}
+                  alt="QRIS"
+                  style={{
+                    width: 20,
+                    height: 20,
+                    objectFit: 'cover',
+                    borderRadius: 4,
+                    transform: 'scale(1.35)'
+                  }}
+                />
+              ) : (
+                <Banknote size={15} color="#FF337F" />
+              )}
             </div>
-            <span>Cash</span>
+            <span>{paymentMethod === 'qris' ? 'QRIS' : 'Cash'}</span>
           </button>
 
           <div className="payment-bar-divider" />
@@ -1017,6 +1040,7 @@ export default function RideConfirmationPage({
           </button>
         </div>
 
+
         {/* 5. Big CTA Button */}
         <button
           type="button"
@@ -1026,7 +1050,8 @@ export default function RideConfirmationPage({
               onBook({
                 ride: currentRide,
                 serviceType: isSendMode ? 'send' : 'ride',
-                packageData: isSendMode ? packageData : null
+                packageData: isSendMode ? packageData : null,
+                paymentMethod: paymentMethod || 'cash'
               });
             }
           }}
@@ -1036,6 +1061,8 @@ export default function RideConfirmationPage({
               <Package size={18} />
               <span>Kirim Paket Sekarang · Rp{currentRide.price.toLocaleString('id-ID')}</span>
             </span>
+          ) : paymentMethod === 'qris' ? (
+            <span>Book with QRIS · Rp{currentRide.price.toLocaleString('id-ID')}</span>
           ) : (
             <span>Book with cash · Rp{currentRide.price.toLocaleString('id-ID')}</span>
           )}

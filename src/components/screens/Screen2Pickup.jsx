@@ -58,7 +58,7 @@ export default function Screen2Pickup({
           <span>Pickup Suggestion</span>
           <ChevronRight size={14} style={{ color: '#8E8E93' }} />
           <div style={{ width: 1, height: 16, background: '#E5E7EB', margin: '0 4px' }} />
-          <Plus size={16} style={{ color: '#00B14F', cursor: 'pointer' }} />
+          <Plus size={16} style={{ color: '#FF337F', cursor: 'pointer' }} />
         </div>
 
         <div style={{ width: 38 }} />

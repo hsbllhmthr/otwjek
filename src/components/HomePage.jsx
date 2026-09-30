@@ -23,7 +23,7 @@ function RedLocationPin({ size = 22 }) {
     >
       <path
         d="M12 2C7.58 2 4 5.58 4 10C4 15.5 11.25 21.6 11.56 21.86C11.69 21.96 11.84 22 12 22C12.16 22 12.31 21.96 12.44 21.86C12.75 21.6 20 15.5 20 10C20 5.58 16.42 2 12 2Z"
-        fill="#FF3B30"
+        fill="#FF337F"
       />
       <circle cx="12" cy="9.8" r="3.2" fill="#FFFFFF" />
     </svg>
@@ -43,9 +43,9 @@ function OrangeDestinationPin({ size = 19 }) {
     >
       <path
         d="M12 2C7.58 2 4 5.58 4 10C4 15.5 11.25 21.6 11.56 21.86C11.69 21.96 11.84 22 12 22C12.16 22 12.31 21.96 12.44 21.86C12.75 21.6 20 15.5 20 10C20 5.58 16.42 2 12 2Z"
-        fill="#FFFFFF"
+        fill="#FDF2F8"
       />
-      <circle cx="12" cy="9.8" r="3.2" fill="#FF7A00" />
+      <circle cx="12" cy="9.8" r="3.2" fill="#FF337F" />
     </svg>
   );
 }
@@ -110,7 +110,7 @@ export default function HomePage({
       {/* Toast Notification */}
       {toastMessage && (
         <div className="ridego-toast-banner">
-          <CheckCircle2 size={16} color="#00B14F" />
+          <CheckCircle2 size={16} color="#FF337F" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -122,7 +122,7 @@ export default function HomePage({
           <div className="ridego-hero-bg-wrapper">
             <img
               src={sherideHeroArt}
-              alt="SheRide Grab Fleet Illustration"
+              alt="OTWJek Fleet Illustration"
               className="ridego-hero-bg-img"
             />
             <div className="ridego-hero-overlay" />

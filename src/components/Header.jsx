@@ -1,21 +1,18 @@
 import React from 'react';
-import { ShieldCheck, Heart, UserPlus, Sparkles } from 'lucide-react';
+import { ShieldCheck, UserPlus, Sparkles } from 'lucide-react';
+import otwjekLogo from '../assets/otwjek_logo.png';
 
 export default function Header({ onOpenMitra, onOpenSafety }) {
   return (
     <header className="app-header">
       <div className="header-left">
         <div className="brand-logo">
-          <div className="logo-icon-wrap">
-            <Heart size={20} className="logo-heart" fill="currentColor" />
-          </div>
+          <img src={otwjekLogo} alt="OTWJek Logo" className="header-otwjek-logo" />
           <div className="brand-text">
             <div className="brand-title">
-              <span>She</span>Ride
-              <span className="brand-dot">·</span>
-              <span className="brand-sub">SheSend</span>
+              OTW<span>Jek</span>
             </div>
-            <div className="brand-tagline">Mobilitas Aman Sesama Perempuan</div>
+            <div className="brand-tagline">Ojek Transportasi Wanita</div>
           </div>
         </div>
 
@@ -72,39 +69,27 @@ export default function Header({ onOpenMitra, onOpenSafety }) {
           cursor: pointer;
         }
 
-        .logo-icon-wrap {
-          width: 38px;
-          height: 38px;
-          background: linear-gradient(135deg, var(--primary) 0%, #D44A78 100%);
-          color: white;
-          border-radius: var(--radius-md);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 4px 10px var(--primary-glow);
-        }
-
-        .logo-heart {
-          animation: beat 2.4s infinite;
-        }
-
-        @keyframes beat {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.12); }
+        .header-otwjek-logo {
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          object-fit: cover;
+          box-shadow: 0 2px 8px rgba(225, 91, 136, 0.25);
+          border: 1.5px solid rgba(225, 91, 136, 0.3);
         }
 
         .brand-title {
           font-size: 19px;
           font-weight: 800;
           letter-spacing: -0.5px;
-          color: var(--text-main);
+          color: #4A4A4A;
           display: flex;
           align-items: center;
-          gap: 4px;
+          gap: 1px;
         }
 
-        .brand-title span:first-child {
-          color: var(--primary);
+        .brand-title span {
+          color: #FF337F;
         }
 
         .brand-dot {
