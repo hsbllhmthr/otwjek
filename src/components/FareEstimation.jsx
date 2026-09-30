@@ -52,7 +52,7 @@ export default function FareEstimation({
       {isDetailOpen && (
         <div className="fare-breakdown-details">
           <div className="breakdown-row">
-            <span className="detail-item-name">Tarif Dasar (2 km pertama):</span>
+            <span className="detail-item-name">Tarif Dasar ({fareBreakdown.baseKm || 4} km pertama):</span>
             <span className="detail-item-value">{formatRupiah(fareBreakdown.baseFare)}</span>
           </div>
 

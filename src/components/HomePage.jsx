@@ -102,7 +102,7 @@ export default function HomePage({
   };
 
   const handleCopyPromo = () => {
-    showToast('🎉 Kode promo "RIDEGO" berhasil disalin! Diskon hingga 30%.');
+    showToast('🎉 Kode promo "OTWJEK" berhasil disalin! Diskon hingga 30%.');
   };
 
   return (
@@ -135,7 +135,7 @@ export default function HomePage({
           <div className="ridego-discount-banner" onClick={handleCopyPromo}>
             <div className="discount-left">
               <Tag size={15} className="discount-tag-icon" />
-              <span className="discount-text">Discount up to 30% with &ldquo;RIDEGO&rdquo;</span>
+              <span className="discount-text">Discount up to 30% with &ldquo;OTWJEK&rdquo;</span>
             </div>
             <ChevronRight size={18} className="discount-chevron" />
           </div>

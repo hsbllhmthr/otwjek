@@ -621,25 +621,32 @@ export default function RideConfirmationPage({
     vehicleType: 'motor',
     distanceKm: actualDist
   }).totalFare;
-  const standardBikePrice = Math.max(10000, Math.round(baseStandardFare / 100) * 100);
-  const hematBikePrice = Math.max(9000, Math.round((standardBikePrice * 0.92) / 100) * 100);
+  const standardBikePrice = Math.round(baseStandardFare / 100) * 100;
+  const hematBikePrice = Math.round((standardBikePrice * 0.92) / 100) * 100;
 
   const baseCarFare = calculateFare({
     serviceType: 'ride',
     vehicleType: 'mobil',
     distanceKm: actualDist
   }).totalFare;
-  const hematCarPrice = Math.max(18000, Math.round(baseCarFare / 500) * 500);
+  const hematCarPrice = Math.round(baseCarFare / 100) * 100;
 
   // Dynamic Fares for SheSend (Package delivery with weight surcharge)
   const sendFareResult = calculateFare({
     serviceType: 'send',
+    vehicleType: 'motor',
     weightCategory: packageData.weightTier,
     distanceKm: actualDist
   });
-  const baseSendInstantFare = Math.max(12000, Math.round(sendFareResult.totalFare / 100) * 100);
-  const baseSendHematFare = Math.max(10000, Math.round((baseSendInstantFare * 0.88) / 500) * 500);
-  const baseSendCarFare = Math.max(25000, Math.round((baseSendInstantFare * 1.6) / 1000) * 1000);
+  const sendCarFareResult = calculateFare({
+    serviceType: 'send',
+    vehicleType: 'mobil',
+    weightCategory: packageData.weightTier,
+    distanceKm: actualDist
+  });
+  const baseSendInstantFare = Math.round(sendFareResult.totalFare / 100) * 100;
+  const baseSendHematFare = Math.round((baseSendInstantFare * 0.88) / 500) * 500;
+  const baseSendCarFare = Math.round(sendCarFareResult.totalFare / 100) * 100;
 
   // Ride options matching current mode with dynamic fares
   const rideOptions = isSendMode
@@ -1023,7 +1030,7 @@ export default function RideConfirmationPage({
           <button
             type="button"
             className="payment-bar-btn payment-offers-btn"
-            onClick={() => showToast('🎟️ Promo "RIDEGO" diterapkan!')}
+            onClick={() => showToast('🎟️ Promo "OTWJEK" diterapkan!')}
           >
             <Tag size={15} color="#6B7280" />
             <span>Offers</span>

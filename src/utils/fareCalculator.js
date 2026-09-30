@@ -6,19 +6,19 @@
 export const PRICING_CONFIG = {
   platformFee: 2000, // Sisterhood Safety & Admin Maintenance Fee
   rideMotor: {
-    baseFare: 10000,
-    baseKm: 2,
-    perKmRate: 3000
+    baseFare: 15000,
+    baseKm: 4,
+    perKmRate: 3750
   },
   rideMobil: {
-    baseFare: 18000,
-    baseKm: 2,
-    perKmRate: 5500
+    baseFare: 27600,
+    baseKm: 4,
+    perKmRate: 6900
   },
   send: {
-    baseFare: 12000,
-    baseKm: 2,
-    perKmRate: 3500,
+    baseFare: 17000,
+    baseKm: 4,
+    perKmRate: 4250,
     weightTiers: {
       'light': 0,      // < 2 kg
       'medium': 2000,  // 2 - 5 kg
@@ -44,7 +44,7 @@ export function calculateFare({
 }) {
   const dist = Math.max(0.1, Number(distanceKm) || 1);
   let baseFare = 0;
-  let baseKm = 2;
+  let baseKm = 4;
   let perKmRate = 0;
   let weightSurcharge = 0;
 
@@ -59,14 +59,20 @@ export function calculateFare({
       perKmRate = PRICING_CONFIG.rideMotor.perKmRate;
     }
   } else {
-    // SheSend
-    baseFare = PRICING_CONFIG.send.baseFare;
-    baseKm = PRICING_CONFIG.send.baseKm;
-    perKmRate = PRICING_CONFIG.send.perKmRate;
+    // SheSend (Antar Barang / Paket)
+    if (vehicleType === 'mobil') {
+      baseFare = PRICING_CONFIG.rideMobil.baseFare;
+      baseKm = PRICING_CONFIG.rideMobil.baseKm;
+      perKmRate = PRICING_CONFIG.rideMobil.perKmRate;
+    } else {
+      baseFare = PRICING_CONFIG.send.baseFare;
+      baseKm = PRICING_CONFIG.send.baseKm;
+      perKmRate = PRICING_CONFIG.send.perKmRate;
+    }
     weightSurcharge = PRICING_CONFIG.send.weightTiers[weightCategory] || 0;
   }
 
-  // Distance beyond base km
+  // Distance beyond base km (jarak tambahan di atas 4 km)
   const extraKm = Math.max(0, dist - baseKm);
   const distanceCost = Math.round(extraKm * perKmRate);
   
@@ -77,6 +83,7 @@ export function calculateFare({
 
   return {
     baseFare,
+    baseKm,
     distanceKm: dist,
     extraKm: Math.round(extraKm * 10) / 10,
     distanceCost,

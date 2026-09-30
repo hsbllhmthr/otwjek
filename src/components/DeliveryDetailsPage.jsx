@@ -671,12 +671,10 @@ export default function DeliveryDetailsPage({
     distanceKm: actualDistance
   });
 
-  const baseFare = selectedVehicle === 'car'
-    ? Math.max(38000, Math.round((fareResult.totalFare * 1.5) / 500) * 500)
-    : Math.max(25000, Math.round(fareResult.totalFare / 500) * 500);
+  const baseFare = Math.round(fareResult.totalFare / 100) * 100;
 
   const finalFare = deliverySpeed === 'hemat'
-    ? Math.max(20000, baseFare - 3500)
+    ? Math.max(15000, Math.round((baseFare * 0.9) / 100) * 100)
     : baseFare;
 
   const handleReviewOrderClick = () => {
@@ -1868,7 +1866,7 @@ export default function DeliveryDetailsPage({
                 <div className="dd-speed-text-col">
                   <div className="dd-speed-row-top">
                     <span className="dd-speed-name">Instant - Hemat</span>
-                    <span className="dd-speed-price">Rp{Math.max(20000, baseFare - 3500).toLocaleString('id-ID')}</span>
+                    <span className="dd-speed-price">Rp{Math.max(15000, Math.round((baseFare * 0.9) / 100) * 100).toLocaleString('id-ID')}</span>
                   </div>
                   <div className="dd-speed-desc">
                     Arrives in 2–3 hours. Efficient routes, saves fuel

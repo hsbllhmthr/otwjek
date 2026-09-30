@@ -342,42 +342,54 @@ export default function App() {
   }, [pickup, dropoff]);
 
   // Fare calculations
-  const fareResult = calculateFare({
-    serviceType: activeTab === 'send' ? 'send' : 'ride',
-    vehicleType: selectedRideId === 'car' ? 'mobil' : 'motor',
+  const motorFareResult = calculateFare({
+    serviceType: 'ride',
+    vehicleType: 'motor',
+    distanceKm
+  });
+  const carFareResult = calculateFare({
+    serviceType: 'ride',
+    vehicleType: 'mobil',
+    distanceKm
+  });
+  const sendFareResult = calculateFare({
+    serviceType: 'send',
+    vehicleType: 'motor',
     distanceKm
   });
 
-  const baseFare = fareResult?.totalFare || 18000;
+  const motorPrice = motorFareResult.totalFare;
+  const carPrice = carFareResult.totalFare;
+  const sendPrice = sendFareResult.totalFare;
 
   const rideOptions = [
     {
       id: 'protect',
       name: 'SheRide Protect',
       desc: '100% Mitra Driver Perempuan Terverifikasi, Helm Steril',
-      price: baseFare + 2000,
+      price: motorPrice + 2000,
       icon: '🛵'
     },
     {
       id: 'regular',
       name: 'SheRide Motor',
       desc: 'Cepat & praktis sesama perempuan',
-      price: baseFare,
-      originalPrice: baseFare + 3000,
+      price: motorPrice,
+      originalPrice: motorPrice + 3000,
       icon: '🛵'
     },
     {
       id: 'car',
       name: 'SheRide Mobil (Car)',
       desc: 'Kabin AC sejuk, bebas asap rokok, 4 kursi',
-      price: Math.round(baseFare * 1.8),
+      price: carPrice,
       icon: '🚗'
     },
     {
       id: 'send',
       name: 'SheSend Express',
       desc: 'Kurir barang & makanan aman terpercaya',
-      price: Math.round(baseFare * 1.1),
+      price: sendPrice,
       icon: '📦'
     }
   ];
@@ -420,12 +432,14 @@ export default function App() {
       dropoffAddress: dropoff?.name || dropoff?.address || 'Titik Tujuan di Peta',
       distanceKm,
       formattedFare: formatRupiah(ride.price),
-      customerName: 'Pelanggan SheRide',
+      customerName: 'Pelanggan OTWJek',
       customerNotes: pkgData?.specialNotes || driverNotes || '',
       driverName: selectedDriver?.name || 'Acak (Dicarikan Admin)',
       packageDetails: isSend ? (pkgData?.itemName || 'Paket / Makanan') : '',
       packageInfo: isSend ? pkgData : null,
-      paymentMethod: pMethod
+      paymentMethod: pMethod,
+      pickupCoords: pickup?.lat && pickup?.lng ? { lat: pickup.lat, lng: pickup.lng } : null,
+      dropoffCoords: dropoff?.lat && dropoff?.lng ? { lat: dropoff.lat, lng: dropoff.lng } : null
     });
 
     const url = buildWhatsAppLink(targetAdmin.phone, message);

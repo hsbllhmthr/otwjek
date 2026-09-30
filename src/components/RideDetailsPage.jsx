@@ -9,7 +9,7 @@ import {
   Clock,
   Users
 } from 'lucide-react';
-import { formatRupiah } from '../utils/fareCalculator.js';
+import { formatRupiah, PRICING_CONFIG } from '../utils/fareCalculator.js';
 import { buildWhatsAppLink, formatBookingMessage } from '../utils/whatsappTemplate.js';
 
 export default function RideDetailsPage({
@@ -49,9 +49,16 @@ export default function RideDetailsPage({
     day: 'numeric'
   }) + ` - ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
 
-  const currentPrice = ride?.price || 18000;
-  const originalPrice = Math.round((currentPrice * 1.25) / 1000) * 1000;
-  const discountAmount = originalPrice - currentPrice;
+  const currentPrice = ride?.price || 17000;
+  const platformFee = PRICING_CONFIG.platformFee || 2000;
+  const baseTripFare = Math.max(0, currentPrice - platformFee);
+
+  const hasOriginalPrice = ride?.originalPrice && ride.originalPrice > currentPrice;
+  const originalPrice = hasOriginalPrice
+    ? ride.originalPrice
+    : (ride?.hasDiscount ? Math.round((currentPrice + 3000) / 1000) * 1000 : currentPrice);
+  const discountAmount = Math.max(0, originalPrice - currentPrice);
+  const displayTripFare = discountAmount > 0 ? baseTripFare + discountAmount : baseTripFare;
 
   const isCar = ride?.id?.includes('car') || ride?.name?.toLowerCase().includes('mobil') || ride?.name?.toLowerCase().includes('car');
   const passengerCount = isCar ? '4 passengers' : '1 passenger';
@@ -66,9 +73,36 @@ export default function RideDetailsPage({
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const handleShareToWhatsApp = () => {
+  const [isLocating, setIsLocating] = useState(false);
+
+  const handleShareToWhatsApp = async () => {
     // Fixed admin number: +62 882-0219-42470
     const BOOK_NOW_PHONE = '62882021942470';
+
+    let shareLat = pickup?.lat;
+    let shareLng = pickup?.lng;
+
+    // Ambil titik GPS presisi langsung dari perangkat jika izin lokasi aktif
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      setIsLocating(true);
+      try {
+        const freshPos = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            resolve,
+            reject,
+            { enableHighAccuracy: true, timeout: 2000, maximumAge: 5000 }
+          );
+        });
+        if (freshPos?.coords?.latitude && freshPos?.coords?.longitude) {
+          shareLat = freshPos.coords.latitude;
+          shareLng = freshPos.coords.longitude;
+        }
+      } catch (err) {
+        // Fallback mulus ke koordinat pickup yang tersimpan di state
+      } finally {
+        setIsLocating(false);
+      }
+    }
 
     const message = formatBookingMessage({
       serviceType: 'ride',
@@ -77,10 +111,12 @@ export default function RideDetailsPage({
       dropoffAddress: dropoffTitle,
       distanceKm,
       formattedFare: formatRupiah(currentPrice),
-      customerName: 'Pelanggan SheRide',
+      customerName: 'Pelanggan OTWJek',
       customerNotes: driverNotes || '',
       driverName: selectedDriver?.name || 'Acak (Dicarikan Admin)',
-      paymentMethod
+      paymentMethod,
+      pickupCoords: shareLat && shareLng ? { lat: shareLat, lng: shareLng } : null,
+      dropoffCoords: dropoff?.lat && dropoff?.lng ? { lat: dropoff.lat, lng: dropoff.lng } : null
     });
 
     const url = buildWhatsAppLink(BOOK_NOW_PHONE, message);
@@ -302,13 +338,21 @@ export default function RideDetailsPage({
         {/* Card 5: Fare Breakdown */}
         <section className="details-card card-fare">
           <div className="table-row">
-            <span className="table-label">Trip Fare</span>
-            <span className="table-value">{formatRupiah(originalPrice)}</span>
+            <span className="table-label">Tarif Perjalanan (Trip Fare)</span>
+            <span className="table-value">{formatRupiah(displayTripFare)}</span>
+          </div>
+
+          <div className="table-row">
+            <div className="table-label-with-badge">
+              <span className="table-label">Biaya Admin Platform & Maintenance</span>
+              <span className="admin-fee-badge">Sistem & Keamanan</span>
+            </div>
+            <span className="table-value">{formatRupiah(platformFee)}</span>
           </div>
 
           {discountAmount > 0 && (
             <div className="table-row">
-              <span className="table-label">Discounts (20%)</span>
+              <span className="table-label">Diskon Promo OTWJEK</span>
               <span className="table-value discount-text">- {formatRupiah(discountAmount)}</span>
             </div>
           )}
@@ -316,7 +360,7 @@ export default function RideDetailsPage({
           <div className="fare-break-divider" />
 
           <div className="table-row total-row">
-            <span className="total-label">Total Paid</span>
+            <span className="total-label">Total Pembayaran (Total Paid)</span>
             <span className="total-amount">{formatRupiah(currentPrice)}</span>
           </div>
         </section>
@@ -327,8 +371,16 @@ export default function RideDetailsPage({
             type="button"
             className="btn-share-receipt"
             onClick={handleShareToWhatsApp}
+            disabled={isLocating}
           >
-            Book Now via WhatsApp
+            {isLocating ? (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="btn-locating-spin" />
+                <span>Menghubungkan Titik GPS...</span>
+              </span>
+            ) : (
+              <span>Book Now via WhatsApp</span>
+            )}
           </button>
 
           <button
@@ -733,6 +785,24 @@ export default function RideDetailsPage({
           color: #111827;
         }
 
+        .table-label-with-badge {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex-wrap: wrap;
+        }
+
+        .admin-fee-badge {
+          font-size: 10px;
+          font-weight: 700;
+          color: #FF337F;
+          background: #FDF2F8;
+          border: 1px solid #FBCFE8;
+          padding: 1px 7px;
+          border-radius: 9999px;
+          letter-spacing: 0.2px;
+        }
+
         .fare-break-divider {
           height: 1px;
           background: #F0F1F3;
@@ -791,6 +861,22 @@ export default function RideDetailsPage({
 
         .btn-share-receipt:active {
           transform: translateY(0.5px);
+        }
+
+        .btn-locating-spin {
+          width: 16px;
+          height: 16px;
+          border: 2.2px solid rgba(255, 255, 255, 0.35);
+          border-top-color: #FFFFFF;
+          border-radius: 50%;
+          animation: spinLocating 0.7s linear infinite;
+          display: inline-block;
+          flex-shrink: 0;
+        }
+
+        @keyframes spinLocating {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
 
         .btn-cancel-ride {

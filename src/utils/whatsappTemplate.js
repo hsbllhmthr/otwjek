@@ -18,7 +18,9 @@ export function formatBookingMessage({
   driverName = '',
   packageDetails = '',
   packageInfo = null,
-  paymentMethod = 'cash'
+  paymentMethod = 'cash',
+  pickupCoords = null,
+  dropoffCoords = null
 }) {
   let serviceLabel = 'Antar Penumpang (OTWJek Motor)';
   if (serviceType === 'ride') {
@@ -31,6 +33,17 @@ export function formatBookingMessage({
   const selectedDriver = driverName && driverName.trim().length > 0 ? driverName : 'Acak (Dicarikan Admin)';
   const notesText = customerNotes && customerNotes.trim().length > 0 ? customerNotes : 'Tidak ada catatan';
   const nameText = customerName && customerName.trim().length > 0 ? customerName : 'Pelanggan OTWJek';
+
+  // Build high-accuracy Google Maps Shareloc links
+  const pickupMapLink =
+    pickupCoords && typeof pickupCoords.lat === 'number' && typeof pickupCoords.lng === 'number'
+      ? `https://maps.google.com/?q=${pickupCoords.lat.toFixed(6)},${pickupCoords.lng.toFixed(6)}`
+      : '';
+
+  const dropoffMapLink =
+    dropoffCoords && typeof dropoffCoords.lat === 'number' && typeof dropoffCoords.lng === 'number'
+      ? `https://maps.google.com/?q=${dropoffCoords.lat.toFixed(6)},${dropoffCoords.lng.toFixed(6)}`
+      : '';
 
   if (serviceType === 'send' && packageInfo) {
     const weightLabels = {
@@ -49,9 +62,9 @@ export function formatBookingMessage({
 
 🌸 *Tipe Layanan*: ${serviceLabel}
 📦 *Detail & Berat Paket*: ${itemStr}
-📍 *Titik Jemput (Pengirim)*: ${pickupAddress || 'Titik Jemput di Peta'}
+📍 *Titik Jemput (Pengirim)*: ${pickupAddress || 'Titik Jemput di Peta'}${pickupMapLink ? `\n🗺️ *Shareloc / Peta Pengirim*:\n${pickupMapLink}` : ''}
 👤 *Pengirim*: ${nameText} ${packageInfo.senderPhone ? `(WA: ${packageInfo.senderPhone})` : ''}
-🏁 *Titik Tujuan (Penerima)*: ${dropoffAddress || 'Titik Tujuan di Peta'}
+🏁 *Titik Tujuan (Penerima)*: ${dropoffAddress || 'Titik Tujuan di Peta'}${dropoffMapLink ? `\n🗺️ *Peta Penerima*:\n${dropoffMapLink}` : ''}
 👥 *Kontak Penerima*: ${recipientStr}
 ⚠️ *Instruksi Pengiriman*: ${instructionsStr}
 📏 *Estimasi Jarak*: ${distanceKm} km
@@ -65,8 +78,8 @@ Mohon konfirmasi mitra kurir perempuan yang tersedia. Terima kasih!`;
   return `Halo Admin OTWJek, saya ingin memesan layanan:
 
 🌸 *Tipe Layanan*: ${serviceLabel}
-📍 *Titik Jemput*: ${pickupAddress || 'Titik Jemput di Peta'}
-🏁 *Titik Tujuan*: ${dropoffAddress || 'Titik Tujuan di Peta'}
+📍 *Titik Jemput*: ${pickupAddress || 'Titik Jemput di Peta'}${pickupMapLink ? `\n🗺️ *Shareloc / Peta Jemput Akurat*:\n${pickupMapLink}` : ''}
+🏁 *Titik Tujuan*: ${dropoffAddress || 'Titik Tujuan di Peta'}${dropoffMapLink ? `\n🗺️ *Peta Tujuan*:\n${dropoffMapLink}` : ''}
 📏 *Estimasi Jarak*: ${distanceKm} km
 💵 *Estimasi Tarif*: ${formattedFare}
 💳 *Metode Pembayaran*: ${paymentLabel}
