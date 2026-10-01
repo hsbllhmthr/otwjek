@@ -748,7 +748,6 @@ export default function App() {
             fare={activePackageBooking?.finalFare || 30500}
             distanceKm={activePackageBooking?.actualDistance || distanceKm}
             paymentMethod={activePackageBooking?.paymentMethod || paymentMethod}
-            selectedAdmin={activePackageBooking?.selectedAdmin}
             onBack={() => setCurrentView('delivery-details')}
             onCancelDelivery={() => setCurrentView('home')}
           />
