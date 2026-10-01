@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronLeft, Info, ShieldCheck, MoreHorizontal, Send, ChevronRight, Plus, UserCheck } from 'lucide-react';
 import { formatRupiah } from '../../utils/fareCalculator.js';
-import { buildWhatsAppLink, formatBookingMessage } from '../../utils/whatsappTemplate.js';
+import { buildWhatsAppLink, formatBookingMessage, openWhatsApp } from '../../utils/whatsappTemplate.js';
 import { ADMINS } from '../../data/admins.js';
 
 export default function Screen3SuggestedRides({
@@ -81,7 +81,7 @@ export default function Screen3SuggestedRides({
     });
 
     const url = buildWhatsAppLink(targetAdmin.phone, message);
-    window.open(url, '_blank', 'noopener,noreferrer');
+    openWhatsApp(url);
   };
 
   return (

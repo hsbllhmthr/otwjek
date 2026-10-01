@@ -15,7 +15,7 @@ import { DEFAULT_PICKUP, DEFAULT_DROPOFF, POPULAR_LOCATIONS } from './data/popul
 import { VERIFIED_DRIVERS } from './data/drivers.js';
 import { calculateFare, formatRupiah } from './utils/fareCalculator.js';
 import { fetchOSRMRoute, searchNominatim, reverseGeocodeNominatim, calculateHaversineDistance } from './utils/geoUtils.js';
-import { buildWhatsAppLink, formatBookingMessage } from './utils/whatsappTemplate.js';
+import { buildWhatsAppLink, formatBookingMessage, openWhatsApp } from './utils/whatsappTemplate.js';
 import { ADMINS } from './data/admins.js';
 import RideDetailsPage from './components/RideDetailsPage.jsx';
 import PackageDetailsPage from './components/PackageDetailsPage.jsx';
@@ -444,7 +444,7 @@ export default function App() {
     });
 
     const url = buildWhatsAppLink(targetAdmin.phone, message);
-    window.open(url, '_blank', 'noopener,noreferrer');
+    openWhatsApp(url);
   };
 
   const handleSwapLocations = () => {

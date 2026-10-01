@@ -108,7 +108,34 @@ export function sanitizeWhatsAppPhone(phone) {
 export function buildWhatsAppLink(phone, messageText) {
   const cleanPhone = sanitizeWhatsAppPhone(phone);
   const encodedText = encodeURIComponent(messageText);
-  return `https://wa.me/${cleanPhone}?text=${encodedText}`;
+  return `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`;
+}
+
+/**
+ * Reliably opens WhatsApp link across all browsers and devices without getting blocked
+ * - On Mobile: navigates via window.location.href to invoke native WhatsApp app immediately
+ * - On Desktop: attempts window.open with fallback to window.location.href if blocked
+ */
+export function openWhatsApp(url) {
+  if (!url || typeof window === 'undefined') return;
+
+  const isMobile =
+    typeof navigator !== 'undefined' &&
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '');
+
+  if (isMobile) {
+    window.location.href = url;
+    return;
+  }
+
+  try {
+    const newWin = window.open(url, '_blank', 'noopener,noreferrer');
+    if (!newWin || newWin.closed || typeof newWin.closed === 'undefined') {
+      window.location.href = url;
+    }
+  } catch (err) {
+    window.location.href = url;
+  }
 }
 
 /**

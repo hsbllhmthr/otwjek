@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft,
   MoreVertical,
@@ -10,7 +10,7 @@ import {
   Users
 } from 'lucide-react';
 import { formatRupiah, PRICING_CONFIG } from '../utils/fareCalculator.js';
-import { buildWhatsAppLink, formatBookingMessage } from '../utils/whatsappTemplate.js';
+import { buildWhatsAppLink, formatBookingMessage, openWhatsApp } from '../utils/whatsappTemplate.js';
 import { ADMINS } from '../data/admins.js';
 
 export default function RideDetailsPage({
@@ -76,36 +76,29 @@ export default function RideDetailsPage({
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const [isLocating, setIsLocating] = useState(false);
+  const [gpsCoords, setGpsCoords] = useState(null);
 
-  const handleShareToWhatsApp = async () => {
+  // Background geolocation fetching (doesn't block button click)
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (pos?.coords?.latitude && pos?.coords?.longitude) {
+            setGpsCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          }
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 3000, maximumAge: 30000 }
+      );
+    }
+  }, []);
+
+  const handleShareToWhatsApp = () => {
     // Target selected WhatsApp Admin Dispatcher
     const BOOK_NOW_PHONE = selectedAdmin?.phone || '62882021942470';
 
-    let shareLat = pickup?.lat;
-    let shareLng = pickup?.lng;
-
-    // Ambil titik GPS presisi langsung dari perangkat jika izin lokasi aktif
-    if (typeof navigator !== 'undefined' && navigator.geolocation) {
-      setIsLocating(true);
-      try {
-        const freshPos = await new Promise((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(
-            resolve,
-            reject,
-            { enableHighAccuracy: true, timeout: 2000, maximumAge: 5000 }
-          );
-        });
-        if (freshPos?.coords?.latitude && freshPos?.coords?.longitude) {
-          shareLat = freshPos.coords.latitude;
-          shareLng = freshPos.coords.longitude;
-        }
-      } catch (err) {
-        // Fallback mulus ke koordinat pickup yang tersimpan di state
-      } finally {
-        setIsLocating(false);
-      }
-    }
+    const shareLat = gpsCoords?.lat || pickup?.lat;
+    const shareLng = gpsCoords?.lng || pickup?.lng;
 
     const message = formatBookingMessage({
       serviceType: 'ride',
@@ -123,7 +116,7 @@ export default function RideDetailsPage({
     });
 
     const url = buildWhatsAppLink(BOOK_NOW_PHONE, message);
-    window.open(url, '_blank', 'noopener,noreferrer');
+    openWhatsApp(url);
   };
 
 
@@ -406,16 +399,8 @@ export default function RideDetailsPage({
             type="button"
             className="btn-share-receipt"
             onClick={handleShareToWhatsApp}
-            disabled={isLocating}
           >
-            {isLocating ? (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="btn-locating-spin" />
-                <span>Menghubungkan Titik GPS...</span>
-              </span>
-            ) : (
-              <span>Book Now via WhatsApp ({selectedAdmin.name})</span>
-            )}
+            <span>Book Now via WhatsApp ({selectedAdmin.name})</span>
           </button>
 
           <button

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft,
   MoreVertical,
@@ -14,7 +14,7 @@ import {
   FileText
 } from 'lucide-react';
 import { formatRupiah, PRICING_CONFIG } from '../utils/fareCalculator.js';
-import { buildWhatsAppLink, formatBookingMessage } from '../utils/whatsappTemplate.js';
+import { buildWhatsAppLink, formatBookingMessage, openWhatsApp } from '../utils/whatsappTemplate.js';
 import { ADMINS } from '../data/admins.js';
 
 export default function PackageDetailsPage({
@@ -32,7 +32,22 @@ export default function PackageDetailsPage({
   onCancelDelivery
 }) {
   const [copiedField, setCopiedField] = useState(null);
-  const [isLocating, setIsLocating] = useState(false);
+  const [gpsCoords, setGpsCoords] = useState(null);
+
+  // Background geolocation fetching (doesn't block button click)
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (pos?.coords?.latitude && pos?.coords?.longitude) {
+            setGpsCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          }
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 3000, maximumAge: 30000 }
+      );
+    }
+  }, []);
 
   // Dynamic Transaction & Booking IDs
   const [transactionId] = useState(() => 'TRX' + Math.floor(1000000000 + Math.random() * 9000000000));
@@ -91,30 +106,9 @@ export default function PackageDetailsPage({
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const handleShareToWhatsApp = async () => {
-    let shareLat = pickup?.lat;
-    let shareLng = pickup?.lng;
-
-    if (typeof navigator !== 'undefined' && navigator.geolocation) {
-      setIsLocating(true);
-      try {
-        const freshPos = await new Promise((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 2000,
-            maximumAge: 5000
-          });
-        });
-        if (freshPos?.coords?.latitude && freshPos?.coords?.longitude) {
-          shareLat = freshPos.coords.latitude;
-          shareLng = freshPos.coords.longitude;
-        }
-      } catch (err) {
-        // Fallback to default stored coords
-      } finally {
-        setIsLocating(false);
-      }
-    }
+  const handleShareToWhatsApp = () => {
+    const shareLat = gpsCoords?.lat || pickup?.lat;
+    const shareLng = gpsCoords?.lng || pickup?.lng;
 
     const lastIdx = parseInt(localStorage.getItem('last_admin_dispatch_index') || '-1', 10);
     const nextIdx = (lastIdx + 1) % ADMINS.length;
@@ -148,7 +142,7 @@ export default function PackageDetailsPage({
     });
 
     const url = buildWhatsAppLink(targetAdmin.phone, message);
-    window.open(url, '_blank', 'noopener,noreferrer');
+    openWhatsApp(url);
   };
 
   return (
@@ -457,19 +451,11 @@ export default function PackageDetailsPage({
             type="button"
             className="btn-share-receipt"
             onClick={handleShareToWhatsApp}
-            disabled={isLocating}
           >
-            {isLocating ? (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="btn-locating-spin" />
-                <span>Menghubungkan Titik GPS...</span>
-              </span>
-            ) : (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Share2 size={18} />
-                <span>Book Now via WhatsApp</span>
-              </span>
-            )}
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Share2 size={18} />
+              <span>Book Now via WhatsApp</span>
+            </span>
           </button>
 
           <button

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Send, Copy, Check, MessageSquare, ShieldAlert, Sparkles, User, FileText, Phone } from 'lucide-react';
 import { ADMINS } from '../data/admins.js';
-import { formatBookingMessage, buildWhatsAppLink } from '../utils/whatsappTemplate.js';
+import { formatBookingMessage, buildWhatsAppLink, openWhatsApp } from '../utils/whatsappTemplate.js';
 
 export default function WhatsAppDispatcher({
   serviceType,
@@ -50,7 +50,7 @@ export default function WhatsAppDispatcher({
 
   const handleOpenWhatsApp = () => {
     const waUrl = buildWhatsAppLink(currentAdmin.phone, bookingMessage);
-    window.open(waUrl, '_blank', 'noopener,noreferrer');
+    openWhatsApp(waUrl);
   };
 
   return (
