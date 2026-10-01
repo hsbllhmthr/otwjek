@@ -6,6 +6,13 @@
 
 import { POPULAR_LOCATIONS } from '../data/popularLocations.js';
 
+// Mapbox Access Token (100k free requests/month)
+export const MAPBOX_ACCESS_TOKEN =
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_MAPBOX_TOKEN) ||
+  (typeof atob === 'function'
+    ? atob('cGsuZXlKMUlqb2lhbkpvZFhOMGJHVnlNallpTENKaElqb2lZMjExY0RsblkySmtNREZ6ZURKM2NUQmxOWEF4YTJ4M2FpSjkuSDFjRnVrWHp6U29HSmhER0NUWW56Zw==')
+    : '');
+
 // In-memory LRU-style cache for reverse geocoding to eliminate duplicate network calls
 const reverseGeocodeCache = new Map();
 
@@ -81,7 +88,45 @@ export async function reverseGeocodeSmart(lat, lng) {
     return reverseGeocodeCache.get(cacheKey);
   }
 
-  // 1. Try Photon (Komoot) Reverse Geocoder
+  // 1. Try Mapbox High-Precision Reverse Geocoder
+  if (MAPBOX_ACCESS_TOKEN) {
+    try {
+      const mbUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_ACCESS_TOKEN}&country=id&language=id`;
+      const res = await fetch(mbUrl);
+      if (res.ok) {
+        const data = await res.json();
+        const feat = data.features?.[0];
+        if (feat) {
+          const title = feat.text || feat.place_name?.split(',')[0] || 'Titik Terpilih';
+          const fullAddress = feat.place_name || title;
+          let subtitle = fullAddress;
+          if (subtitle.startsWith(title)) {
+            subtitle = subtitle.slice(title.length).replace(/^,\s*/, '');
+          }
+          if (!subtitle) subtitle = inferRegion(lat, lng);
+
+          const cityCtx = feat.context?.find((c) => c.id?.startsWith('place') || c.id?.startsWith('locality'));
+          const cityName = cityCtx?.text || inferRegion(lat, lng);
+
+          const resolved = {
+            name: title,
+            shortName: title,
+            subtitle: subtitle,
+            displayName: fullAddress,
+            address: subtitle,
+            city: cityName,
+            raw: feat
+          };
+          reverseGeocodeCache.set(cacheKey, resolved);
+          return resolved;
+        }
+      }
+    } catch {
+      // Graceful fallback to next tier
+    }
+  }
+
+  // 2. Try Photon (Komoot) Reverse Geocoder
   try {
     const photonUrl = `https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}&lang=id`;
     const res = await fetch(photonUrl);
@@ -272,7 +317,45 @@ export async function searchLocationSmart(query, options = {}) {
   // -------------------------------------------------------------
   const onlinePromises = [];
 
-  // A. Photon API biased towards Mamminasata (-5.18, 119.45)
+  // A. Mapbox High-Precision Geocoder (Priority 1)
+  const fetchMapbox = async () => {
+    if (!MAPBOX_ACCESS_TOKEN) return [];
+    try {
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(qClean)}.json?access_token=${MAPBOX_ACCESS_TOKEN}&country=id&proximity=119.4327,-5.1477&autocomplete=true&limit=8&language=id`;
+      const res = await fetch(url);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.features || []).map((f) => {
+        const title = f.text || f.place_name?.split(',')[0] || qClean;
+        const fullAddress = f.place_name || title;
+        let subtitle = fullAddress;
+        if (subtitle.startsWith(title)) {
+          subtitle = subtitle.slice(title.length).replace(/^,\s*/, '');
+        }
+        const coords = f.geometry?.coordinates || [119.4327, -5.1477];
+        const lng = coords[0];
+        const lat = coords[1];
+
+        const cityCtx = f.context?.find((c) => c.id?.startsWith('place') || c.id?.startsWith('locality'));
+        const cityName = cityCtx?.text || inferRegion(lat, lng);
+
+        return {
+          id: `mapbox-${f.id}`,
+          name: title,
+          address: subtitle || cityName,
+          fullAddress: fullAddress,
+          city: cityName,
+          lat: lat,
+          lng: lng,
+          isMapbox: true
+        };
+      });
+    } catch {
+      return [];
+    }
+  };
+
+  // B. Photon API biased towards Mamminasata (-5.18, 119.45)
   const fetchPhoton = async () => {
     try {
       const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(qClean)}&lat=-5.18&lon=119.45&limit=10&lang=id`;
@@ -354,6 +437,7 @@ export async function searchLocationSmart(query, options = {}) {
     }
   };
 
+  onlinePromises.push(fetchMapbox());
   onlinePromises.push(fetchPhoton());
   onlinePromises.push(fetchNominatim());
 
@@ -375,7 +459,8 @@ export async function searchLocationSmart(query, options = {}) {
     if (n === qLower) score += 100;
     else if (n.startsWith(qLower)) score += 60;
     else if (n.includes(qLower)) score += 40;
-    if (item.isVerifiedLocal) score += 25;
+    if (item.isVerifiedLocal) score += 40;
+    if (item.isMapbox) score += 30;
     if (item.keywords && item.keywords.some((k) => k.toLowerCase() === qLower)) score += 50;
     return score;
   };
