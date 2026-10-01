@@ -9560,6 +9560,100 @@ button, input, select, textarea {
   flex-shrink: 0;
 }
 
+/* Delivery Details Page: WhatsApp Admin Dispatcher Selection */
+.dd-admin-dispatch-card {
+  background: #FFFFFF;
+  border-radius: 18px;
+  border: 1px solid #E5E7EB;
+  padding: 16px;
+  margin-top: 14px;
+}
+
+.dd-admin-section-header {
+  margin-bottom: 12px;
+}
+
+.dd-admin-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+  letter-spacing: -0.2px;
+}
+
+.dd-admin-section-subtitle {
+  font-size: 11.5px;
+  color: #6B7280;
+  font-weight: 450;
+  margin-top: 2px;
+}
+
+.dd-admin-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dd-admin-item-tile {
+  display: flex;
+  align-items: center;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1.5px solid #E5E7EB;
+  background: #FAFAFA;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.dd-admin-item-tile:hover {
+  background: #F3F4F6;
+}
+
+.dd-admin-item-tile.selected {
+  border-color: #00B14F;
+  background: #F0FDF4;
+}
+
+.dd-admin-tile-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.dd-admin-radio-circle {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #D1D5DB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: #FFFFFF;
+  transition: border-color 0.15s ease;
+}
+
+.dd-admin-radio-circle.active {
+  border-color: #00B14F;
+}
+
+.dd-admin-radio-inner {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #00B14F;
+}
+
+.dd-admin-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  letter-spacing: -0.1px;
+}
+
 
 
 

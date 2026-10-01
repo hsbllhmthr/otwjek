@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { formatRupiah, calculateFare } from '../utils/fareCalculator.js';
 import { calculateHaversineDistance, reverseGeocodeNominatim } from '../utils/geoUtils.js';
+import { ADMINS } from '../data/admins.js';
 
 // ── Dropoff Mini Map (shown inside recipient/dropoff details modal) ──────────
 function DropoffMiniMap({ dropoff }) {
@@ -580,6 +581,10 @@ export default function DeliveryDetailsPage({
     phone: '+6288705806690'
   });
 
+  // Admin Dispatcher Selection (4 Admins)
+  const [selectedAdminId, setSelectedAdminId] = useState(ADMINS[0]?.id || 'admin-1');
+  const selectedAdmin = ADMINS.find((a) => a.id === selectedAdminId) || ADMINS[0];
+
   // Recipient Details (empty initially: "Add recipient details *")
   const [recipientInfo, setRecipientInfo] = useState({
     name: '',
@@ -705,7 +710,8 @@ export default function DeliveryDetailsPage({
         deliverySpeed,
         finalFare,
         actualDistance,
-        paymentMethod: 'cash'
+        paymentMethod: 'cash',
+        selectedAdmin
       });
       return;
     }
@@ -1617,6 +1623,39 @@ export default function DeliveryDetailsPage({
               </div>
             </div>
             <ChevronRight size={18} color="#9CA3AF" />
+          </div>
+        </div>
+
+        {/* WhatsApp Admin Dispatcher Selection (4 Admins) */}
+        <div className="dd-admin-dispatch-card">
+          <div className="dd-admin-section-header">
+            <h2 className="dd-admin-section-title">Pilih Admin WhatsApp</h2>
+            <div className="dd-admin-section-subtitle">
+              Pilih nomor admin untuk memproses & menugaskan kurir
+            </div>
+          </div>
+
+          <div className="dd-admin-list-container">
+            {ADMINS.map((adm) => {
+              const isSelected = selectedAdminId === adm.id;
+              return (
+                <div
+                  key={adm.id}
+                  className={`dd-admin-item-tile ${isSelected ? 'selected' : ''}`}
+                  onClick={() => setSelectedAdminId(adm.id)}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={isSelected}
+                >
+                  <div className="dd-admin-tile-left">
+                    <div className={`dd-admin-radio-circle ${isSelected ? 'active' : ''}`}>
+                      {isSelected && <div className="dd-admin-radio-inner" />}
+                    </div>
+                    <span className="dd-admin-name">{adm.name}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 

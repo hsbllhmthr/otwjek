@@ -28,11 +28,14 @@ export default function PackageDetailsPage({
   fare = 30500,
   distanceKm = 4.5,
   paymentMethod = 'cash',
+  selectedAdmin: initialAdmin = null,
   onBack,
   onCancelDelivery
 }) {
   const [copiedField, setCopiedField] = useState(null);
   const [gpsCoords, setGpsCoords] = useState(null);
+  const [selectedAdminId, setSelectedAdminId] = useState(initialAdmin?.id || ADMINS[0]?.id || 'admin-1');
+  const selectedAdmin = ADMINS.find((a) => a.id === selectedAdminId) || initialAdmin || ADMINS[0];
 
   // Background geolocation fetching (doesn't block button click)
   useEffect(() => {
@@ -110,10 +113,7 @@ export default function PackageDetailsPage({
     const shareLat = gpsCoords?.lat || pickup?.lat;
     const shareLng = gpsCoords?.lng || pickup?.lng;
 
-    const lastIdx = parseInt(localStorage.getItem('last_admin_dispatch_index') || '-1', 10);
-    const nextIdx = (lastIdx + 1) % ADMINS.length;
-    localStorage.setItem('last_admin_dispatch_index', nextIdx.toString());
-    const targetAdmin = ADMINS[nextIdx] || ADMINS[0];
+    const BOOK_NOW_PHONE = selectedAdmin?.phone || '62882021942470';
 
     const message = formatBookingMessage({
       serviceType: 'send',
@@ -141,7 +141,7 @@ export default function PackageDetailsPage({
       dropoffCoords: dropoff?.lat && dropoff?.lng ? { lat: dropoff.lat, lng: dropoff.lng } : null
     });
 
-    const url = buildWhatsAppLink(targetAdmin.phone, message);
+    const url = buildWhatsAppLink(BOOK_NOW_PHONE, message);
     openWhatsApp(url);
   };
 
@@ -445,6 +445,41 @@ export default function PackageDetailsPage({
           </div>
         </section>
 
+        {/* Card 6: WhatsApp Dispatcher Selection (4 Admins) */}
+        <section className="details-card card-admin-dispatch">
+          <div className="admin-section-header">
+            <div>
+              <h2 className="admin-section-title">Pilih Admin WhatsApp</h2>
+              <div className="admin-section-subtitle">
+                Pilih nomor admin untuk memproses & menugaskan kurir
+              </div>
+            </div>
+          </div>
+
+          <div className="admin-list-container">
+            {ADMINS.map((adm) => {
+              const isSelected = selectedAdminId === adm.id;
+              return (
+                <div
+                  key={adm.id}
+                  className={`admin-item-tile ${isSelected ? 'selected' : ''}`}
+                  onClick={() => setSelectedAdminId(adm.id)}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={isSelected}
+                >
+                  <div className="admin-tile-left">
+                    <div className={`admin-radio-circle ${isSelected ? 'active' : ''}`}>
+                      {isSelected && <div className="admin-radio-inner" />}
+                    </div>
+                    <span className="admin-name">{adm.name}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
         {/* Bottom Dual Action Buttons */}
         <div className="bottom-buttons-area">
           <button
@@ -454,7 +489,7 @@ export default function PackageDetailsPage({
           >
             <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Share2 size={18} />
-              <span>Book Now via WhatsApp</span>
+              <span>Book Now via WhatsApp ({selectedAdmin.name})</span>
             </span>
           </button>
 
@@ -946,6 +981,104 @@ export default function PackageDetailsPage({
         @keyframes spinLocating {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+
+        /* Card 6: WhatsApp Admin Selection */
+        .card-admin-dispatch {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          background: #FFFFFF;
+          border-radius: 14px;
+          padding: 16px;
+        }
+
+        .admin-section-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding-bottom: 2px;
+        }
+
+        .admin-section-title {
+          font-size: 15px;
+          font-weight: 700;
+          color: #111827;
+          margin: 0;
+          letter-spacing: -0.2px;
+        }
+
+        .admin-section-subtitle {
+          font-size: 11.5px;
+          color: #6B7280;
+          font-weight: 450;
+          margin-top: 1px;
+        }
+
+        .admin-list-container {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .admin-item-tile {
+          display: flex;
+          align-items: center;
+          height: 46px;
+          padding: 0 14px;
+          border-radius: 12px;
+          border: 1.5px solid #E5E7EB;
+          background: #FAFAFA;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          user-select: none;
+        }
+
+        .admin-item-tile:hover {
+          background: #F3F4F6;
+        }
+
+        .admin-item-tile.selected {
+          border-color: #00B14F;
+          background: #F0FDF4;
+        }
+
+        .admin-tile-left {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex: 1;
+        }
+
+        .admin-radio-circle {
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          border: 2px solid #D1D5DB;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          background: #FFFFFF;
+          transition: border-color 0.15s ease;
+        }
+
+        .admin-radio-circle.active {
+          border-color: #00B14F;
+        }
+
+        .admin-radio-inner {
+          width: 9px;
+          height: 9px;
+          border-radius: 50%;
+          background: #00B14F;
+        }
+
+        .admin-name {
+          font-size: 14px;
+          font-weight: 600;
+          color: #111827;
+          letter-spacing: -0.1px;
         }
       `}</style>
     </div>
