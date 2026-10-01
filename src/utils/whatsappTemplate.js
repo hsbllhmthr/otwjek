@@ -110,3 +110,77 @@ export function buildWhatsAppLink(phone, messageText) {
   const encodedText = encodeURIComponent(messageText);
   return `https://wa.me/${cleanPhone}?text=${encodedText}`;
 }
+
+/**
+ * Formats WhatsApp message for OTWFood (Titip Beli / Ambil Pesanan Makanan di Resto & Warung)
+ */
+export function formatFoodOrderMessage({
+  restaurantName = '',
+  restaurantAddress = '',
+  restaurantPhone = '',
+  items = [],
+  rawOrderNotes = '',
+  customerName = '',
+  customerPhone = '',
+  deliveryAddress = '',
+  deliveryNotes = '',
+  foodEstimatePrice = 0,
+  deliveryFee = 8000,
+  platformFee = 1000,
+  totalFare = 0,
+  paymentMethod = 'cash'
+}) {
+  const paymentLabel = paymentMethod === 'qris' ? 'QRIS (Scan Barcode)' : 'Tunai / Cash saat tiba';
+  const nameText = customerName && customerName.trim().length > 0 ? customerName : 'Pelanggan OTWJek';
+  const phoneText = customerPhone && customerPhone.trim().length > 0 ? ` (WA: ${customerPhone})` : '';
+
+  let orderListStr = '';
+  if (items && items.length > 0) {
+    orderListStr = items
+      .filter((it) => it.name && it.name.trim())
+      .map((it, idx) => {
+        const qtyStr = it.qty > 1 ? ` (x${it.qty})` : ' (1 porsi)';
+        const priceStr = it.price ? ` [Estimasi: Rp ${Number(it.price).toLocaleString('id-ID')}]` : '';
+        const noteStr = it.note ? `\n   ↳ Catatan: ${it.note}` : '';
+        return `${idx + 1}. *${it.name.trim()}*${qtyStr}${priceStr}${noteStr}`;
+      })
+      .join('\n');
+  }
+
+  if (rawOrderNotes && rawOrderNotes.trim()) {
+    orderListStr = orderListStr
+      ? `${orderListStr}\n\n📝 *Catatan Tambahan Pesanan*:\n${rawOrderNotes.trim()}`
+      : rawOrderNotes.trim();
+  }
+
+  if (!orderListStr) {
+    orderListStr = 'Sesuai pesanan langsung di resto';
+  }
+
+  const formatRp = (num) => `Rp ${Number(num || 0).toLocaleString('id-ID')}`;
+
+  return `Halo Admin OTWJek, saya ingin pesan layanan *Titip Beli Makanan (OTWFood)*:
+
+🏪 *Lokasi Pembelian / Resto*:
+- Nama Resto/Warung: *${restaurantName || 'Resto Pilihan'}*
+- Alamat/Patokan: ${restaurantAddress || 'Lokasi terdekat'}
+${restaurantPhone ? `- No. Kontak Resto: ${restaurantPhone}\n` : ''}
+📋 *Rincian Pesanan Menu*:
+${orderListStr}
+
+📍 *Lokasi Pengantaran*:
+- Alamat Antar: *${deliveryAddress || 'Alamat Pemesan'}*
+${deliveryNotes ? `- Patokan/Unit: ${deliveryNotes}\n` : ''}- Nama Pemesan: *${nameText}*${phoneText}
+
+💰 *Estimasi Biaya*:
+- Estimasi Makanan (Ditalangi Kurir): ${formatRp(foodEstimatePrice)}
+- Ongkir Antar Kurir: ${formatRp(deliveryFee)}
+- Biaya Layanan Aplikasi: ${formatRp(platformFee)}
+*Total Estimasi Pembayaran: ${formatRp(totalFare)}*
+
+💳 *Metode Pembayaran*: ${paymentLabel}
+
+Mohon dicarikan kurir untuk segera membelikan dan mengantar. Terima kasih!`;
+}
+
+

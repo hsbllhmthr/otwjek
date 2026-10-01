@@ -8,8 +8,8 @@ export const ADMINS = [
     id: 'admin-1',
     name: 'Admin 1',
     role: 'Dispatch Utama',
-    phone: '6281298765432',       // ← Ganti dengan nomor WA admin 1
-    displayPhone: '+62 812-9876-5432',
+    phone: '62882021942470',
+    displayPhone: '+62 882-0219-42470',
     status: 'online',
     statusText: 'Online (Respon ~1 Menit)',
     avatar: '👩‍💼',
@@ -19,8 +19,8 @@ export const ADMINS = [
     id: 'admin-2',
     name: 'Admin 2',
     role: 'Dispatch Pendamping',
-    phone: '6281912345678',       // ← Ganti dengan nomor WA admin 2
-    displayPhone: '+62 819-1234-5678',
+    phone: '6281354613984',
+    displayPhone: '+62 813-5461-3984',
     status: 'online',
     statusText: 'Online (Respon ~2 Menit)',
     avatar: '👩‍💻',
@@ -30,8 +30,8 @@ export const ADMINS = [
     id: 'admin-3',
     name: 'Admin 3',
     role: 'Dispatch Area Barat',
-    phone: '6285678901234',       // ← Ganti dengan nomor WA admin 3
-    displayPhone: '+62 856-7890-1234',
+    phone: '6282345614803',
+    displayPhone: '+62 823-4561-4803',
     status: 'online',
     statusText: 'Online',
     avatar: '👩‍🦱',
@@ -41,8 +41,8 @@ export const ADMINS = [
     id: 'admin-4',
     name: 'Admin 4',
     role: 'Dispatch Area Timur',
-    phone: '6283412345678',       // ← Ganti dengan nomor WA admin 4
-    displayPhone: '+62 834-1234-5678',
+    phone: '6281545629713',
+    displayPhone: '+62 815-4562-9713',
     status: 'online',
     statusText: 'Online',
     avatar: '👩‍🦳',

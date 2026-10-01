@@ -18,6 +18,7 @@ import { fetchOSRMRoute, searchNominatim, reverseGeocodeNominatim, calculateHave
 import { buildWhatsAppLink, formatBookingMessage } from './utils/whatsappTemplate.js';
 import { ADMINS } from './data/admins.js';
 import RideDetailsPage from './components/RideDetailsPage.jsx';
+import PackageDetailsPage from './components/PackageDetailsPage.jsx';
 
 import {
   ChevronLeft,
@@ -58,8 +59,8 @@ export default function App() {
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [isDriverCatalogOpen, setIsDriverCatalogOpen] = useState(false);
   const [selectedAdminId, setSelectedAdminId] = useState('admin-1');
-  const [showAllRides, setShowAllRides] = useState(true);
   const [activeRideBooking, setActiveRideBooking] = useState(null);
+  const [activePackageBooking, setActivePackageBooking] = useState(null);
 
   // Routing metrics
   const [distanceKm, setDistanceKm] = useState(3.8);
@@ -616,6 +617,8 @@ export default function App() {
     } else if (serviceId === 'express' || serviceId === 'send') {
       setActiveTab('send');
       setCurrentView('ride');
+    } else if (serviceId === 'food') {
+      setCurrentView('food');
     } else if (serviceId === 'account') {
       setCurrentView('account');
     } else if (serviceId === 'activity') {
@@ -713,6 +716,10 @@ export default function App() {
             onBack={() => setCurrentView('send-package')}
             onSwapLocations={handleSwapLocations}
             onBook={handleBookWhatsApp}
+            onReviewOrder={(pkgBooking) => {
+              setActivePackageBooking(pkgBooking);
+              setCurrentView('package-details');
+            }}
             onUpdateDropoff={(newDropoff) => {
               setDropoff(newDropoff);
               if (newDropoff?.name) {
@@ -720,6 +727,29 @@ export default function App() {
               }
             }}
             distanceKm={distanceKm}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (currentView === 'package-details') {
+    return (
+      <div className="app-viewport-wrapper">
+        <div className="bolt-app-shell">
+          <PackageDetailsPage
+            pickup={activePackageBooking?.pickup || pickup}
+            dropoff={activePackageBooking?.dropoff || dropoff}
+            senderInfo={activePackageBooking?.senderInfo}
+            recipientInfo={activePackageBooking?.recipientInfo}
+            itemInfo={activePackageBooking?.itemInfo}
+            selectedVehicle={activePackageBooking?.selectedVehicle || 'bike'}
+            deliverySpeed={activePackageBooking?.deliverySpeed || 'instant'}
+            fare={activePackageBooking?.finalFare || 30500}
+            distanceKm={activePackageBooking?.actualDistance || distanceKm}
+            paymentMethod={activePackageBooking?.paymentMethod || paymentMethod}
+            onBack={() => setCurrentView('delivery-details')}
+            onCancelDelivery={() => setCurrentView('home')}
           />
         </div>
       </div>

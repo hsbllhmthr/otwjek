@@ -553,6 +553,7 @@ export default function DeliveryDetailsPage({
   dropoff,
   onBack,
   onBook,
+  onReviewOrder,
   onSwapLocations,
   onUpdateDropoff,
   distanceKm = 4.8
@@ -690,6 +691,22 @@ export default function DeliveryDetailsPage({
       setTempItem({ ...itemInfo });
       setIsItemModalOpen(true);
       showToast('⚠️ Silakan lengkapi rincian barang paket');
+      return;
+    }
+
+    if (onReviewOrder) {
+      onReviewOrder({
+        pickup,
+        dropoff: currentDropoff || dropoff,
+        senderInfo,
+        recipientInfo,
+        itemInfo,
+        selectedVehicle,
+        deliverySpeed,
+        finalFare,
+        actualDistance,
+        paymentMethod: 'cash'
+      });
       return;
     }
 
