@@ -25,6 +25,10 @@ const STORAGE_KEYS = {
   ADMIN_SESSION: 'otwjek_db_admin_session'
 };
 
+// Kredensial admin default dibaca dari .env.local (tidak di-commit)
+const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL || '').trim().toLowerCase();
+const ADMIN_PASSWORD = (import.meta.env.VITE_ADMIN_PASSWORD || '').trim();
+
 // Helper generator UUID v4 sederhana
 export function generateUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
@@ -80,17 +84,15 @@ export function initializeLocalDatabase() {
   // Buat akun admin default jika belum ada di tabel users
   const existingUsers = getStoredArray(STORAGE_KEYS.USERS, []);
   const adminExists = existingUsers.some(
-    (u) => u.role === 'admin' || u.email === 'admin@otwjek.com'
+    (u) => u.role === 'admin' || (ADMIN_EMAIL && u.email === ADMIN_EMAIL)
   );
 
-  if (!adminExists) {
+  if (!adminExists && ADMIN_EMAIL && ADMIN_PASSWORD) {
     existingUsers.push({
       id: 'admin-master-01',
       full_name: 'Admin Verifikasi OTWJek',
-      email: 'admin@otwjek.com',
+      email: ADMIN_EMAIL,
       phone: '+62882021942470',
-      password: 'admin123',
-      password_hash: 'hashed_admin123',
       gender: 'Perempuan',
       role: 'admin',
       status: 'active',
@@ -261,7 +263,7 @@ export const dbService = {
 
     getCustomers() {
       const users = this.getAll();
-      return users.filter((u) => u.role === 'customer' || (!u.role && u.email !== 'admin@otwjek.com'));
+      return users.filter((u) => u.role === 'customer' || (!u.role && u.email !== ADMIN_EMAIL));
     },
 
     toggleStatus(id) {
@@ -605,14 +607,16 @@ export const dbService = {
       const cleanPass = (password || '').trim();
 
       // Cek akun superadmin default
+      const isValidPassword = Boolean(ADMIN_PASSWORD) && cleanPass === ADMIN_PASSWORD;
+
       if (
-        (cleanIdent === 'admin@otwjek.com' || cleanIdent === 'admin' || cleanIdent === '0882021942470' || cleanIdent === '62882021942470') &&
-        (cleanPass === 'admin123' || cleanPass === 'admin')
+        isValidPassword &&
+        ((ADMIN_EMAIL && cleanIdent === ADMIN_EMAIL) || cleanIdent === '0882021942470' || cleanIdent === '62882021942470')
       ) {
         const adminObj = {
           id: 'admin-master-01',
           name: 'Super Admin Verifikasi',
-          email: 'admin@otwjek.com',
+          email: ADMIN_EMAIL,
           role: 'superadmin',
           avatar: '👩‍💼'
         };
@@ -627,7 +631,7 @@ export const dbService = {
         return aPhone === inPhone || a.id === cleanIdent;
       });
 
-      if (matchedAdmin && (cleanPass === 'admin123' || cleanPass === 'admin')) {
+      if (matchedAdmin && isValidPassword) {
         const adminObj = {
           id: matchedAdmin.id,
           name: matchedAdmin.name,

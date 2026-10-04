@@ -4,8 +4,8 @@ import { Eye, EyeOff, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 import dbService from '../services/dbService.js';
 
 export default function AdminLoginPage({ onBack, onSuccess }) {
-  const [identifier, setIdentifier] = useState('admin@otwjek.com');
-  const [password, setPassword] = useState('admin123');
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -63,7 +63,7 @@ export default function AdminLoginPage({ onBack, onSuccess }) {
                 id="admin-email-input"
                 type="text"
                 className="signin-input"
-                placeholder="admin@otwjek.com"
+                placeholder="nama@email.com"
                 value={identifier}
                 onChange={(e) => {
                   setIdentifier(e.target.value);
