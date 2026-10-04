@@ -21,6 +21,11 @@ import RideDetailsPage from './components/RideDetailsPage.jsx';
 import PackageDetailsPage from './components/PackageDetailsPage.jsx';
 import WelcomeScreen from './components/WelcomeScreen.jsx';
 import SignUpPage from './components/SignUpPage.jsx';
+import LoginPage from './components/LoginPage.jsx';
+import PersonalInfoPage from './components/PersonalInfoPage.jsx';
+import AdminLoginPage from './components/AdminLoginPage.jsx';
+import AdminVerificationDashboard from './components/AdminVerificationDashboard.jsx';
+import dbService from './services/dbService.js';
 
 import {
   ChevronLeft,
@@ -38,7 +43,51 @@ import {
 } from 'lucide-react';
 
 export default function App() {
-  const [currentView, setCurrentView] = useState('welcome'); // 'welcome' | 'home' | 'ride' | 'food' | 'activity' | 'message' | 'account'
+  // View yang tidak perlu di-restore saat refresh (form data tidak tersimpan)
+  const TRANSIENT_VIEWS = new Set(['welcome', 'signup', 'personal-info', 'login']);
+
+  // Deteksi apakah pengguna mengakses rute URL /admin
+  const checkIsAdminPath = () => {
+    if (typeof window === 'undefined') return false;
+    const p = window.location.pathname.toLowerCase();
+    const h = window.location.hash.toLowerCase();
+    return p === '/admin' || p.startsWith('/admin/') || h === '#/admin' || h.startsWith('#/admin/');
+  };
+
+  const [isAdminRoute, setIsAdminRoute] = useState(checkIsAdminPath);
+
+  useEffect(() => {
+    const handleUrlChange = () => {
+      setIsAdminRoute(checkIsAdminPath());
+    };
+    window.addEventListener('popstate', handleUrlChange);
+    window.addEventListener('hashchange', handleUrlChange);
+    return () => {
+      window.removeEventListener('popstate', handleUrlChange);
+      window.removeEventListener('hashchange', handleUrlChange);
+    };
+  }, []);
+
+  const navigateToCustomerApp = (targetView = 'home') => {
+    window.history.pushState({}, '', '/');
+    setIsAdminRoute(false);
+    setCurrentView(targetView);
+  };
+
+  const [currentView, setCurrentView] = useState(() => {
+    // Cek apakah ada sesi aktif
+    const hasSession = !!dbService.session.getCurrentUser();
+    // Ambil view terakhir dari sessionStorage
+    const savedView = sessionStorage.getItem('otwjek_current_view');
+    // Jika view tersimpan valid dan bukan transient, kembalikan view itu
+    if (savedView && !TRANSIENT_VIEWS.has(savedView)) {
+      return savedView;
+    }
+    // Jika ada sesi aktif tapi tidak ada view tersimpan, langsung ke home
+    if (hasSession) return 'home';
+    // Default: tampilkan welcome
+    return 'welcome';
+  }); // 'welcome' | 'home' | 'ride' | 'food' | 'activity' | 'message' | 'account'
   const [activeTab, setActiveTab] = useState('ride'); // 'ride' | 'send'
   const [timeMode, setTimeMode] = useState('now'); // 'now' | 'later'
   const [selectedVehicleType, setSelectedVehicleType] = useState('bike'); // 'bike' | 'car' | 'express'
@@ -63,6 +112,10 @@ export default function App() {
   const [selectedAdminId, setSelectedAdminId] = useState('admin-1');
   const [activeRideBooking, setActiveRideBooking] = useState(null);
   const [activePackageBooking, setActivePackageBooking] = useState(null);
+  const [registeredUserData, setRegisteredUserData] = useState(null);
+  const [registrationRole, setRegistrationRole] = useState('user'); // 'user' | 'driver'
+  const [currentUser, setCurrentUser] = useState(() => dbService.session.getCurrentUser());
+  const [loggedAdmin, setLoggedAdmin] = useState(() => dbService.admin.getCurrentAdmin());
 
   // Routing metrics
   const [distanceKm, setDistanceKm] = useState(3.8);
@@ -81,6 +134,13 @@ export default function App() {
   const [panelSearchResults, setPanelSearchResults] = useState([]);
   const [isSearchingPanel, setIsSearchingPanel] = useState(false);
   const panelDebounceRef = useRef(null);
+
+  // Simpan view saat ini ke sessionStorage agar tidak hilang saat refresh
+  useEffect(() => {
+    if (!TRANSIENT_VIEWS.has(currentView)) {
+      sessionStorage.setItem('otwjek_current_view', currentView);
+    }
+  }, [currentView]);
 
   const handleLocationActivated = (locData) => {
     setIsLocationTrackingActive(true);
@@ -630,14 +690,66 @@ export default function App() {
     }
   };
 
+  // RUTE KHUSUS /admin (Terpisah sepenuhnya dari aplikasi utama)
+  if (isAdminRoute) {
+    if (loggedAdmin) {
+      return (
+        <AdminVerificationDashboard
+          admin={loggedAdmin}
+          onLogout={() => {
+            dbService.admin.logout();
+            setLoggedAdmin(null);
+          }}
+          onGoToCustomerApp={() => navigateToCustomerApp('home')}
+        />
+      );
+    }
+
+    return (
+      <AdminLoginPage
+        onBack={() => navigateToCustomerApp('welcome')}
+        onSuccess={(adminUser) => {
+          setLoggedAdmin(adminUser);
+        }}
+      />
+    );
+  }
+
   if (currentView === 'welcome') {
     return (
       <div className="app-viewport-wrapper">
         <div className="bolt-app-shell">
           <WelcomeScreen
             onContinue={() => setCurrentView('home')}
-            onSignUp={() => setCurrentView('signup')}
-            onSignIn={() => setCurrentView('home')}
+            onSignUp={() => {
+              setRegistrationRole('user');
+              setCurrentView('signup');
+            }}
+            onSignIn={() => setCurrentView('login')}
+            onRegisterDriver={() => {
+              setRegistrationRole('driver');
+              setCurrentView('signup');
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (currentView === 'login') {
+    return (
+      <div className="app-viewport-wrapper">
+        <div className="bolt-app-shell">
+          <LoginPage
+            onBack={() => setCurrentView('welcome')}
+            onSuccess={(user) => {
+              if (user) setCurrentUser(user);
+              setCurrentView('home');
+            }}
+            onGoToSignUp={() => {
+              setRegistrationRole('user');
+              setCurrentView('signup');
+            }}
           />
         </div>
       </div>
@@ -649,9 +761,47 @@ export default function App() {
       <div className="app-viewport-wrapper">
         <div className="bolt-app-shell">
           <SignUpPage
+            isDriver={registrationRole === 'driver'}
             onBack={() => setCurrentView('welcome')}
-            onSuccess={() => setCurrentView('home')}
-            onGoToSignIn={() => setCurrentView('welcome')}
+            onSuccess={(data) => {
+              setRegisteredUserData({ ...data, role: registrationRole });
+              setCurrentView('personal-info');
+            }}
+            onGoToSignIn={() => setCurrentView('login')}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (currentView === 'personal-info') {
+    return (
+      <div className="app-viewport-wrapper">
+        <div className="bolt-app-shell">
+          <PersonalInfoPage
+            initialData={registeredUserData}
+            isDriver={registrationRole === 'driver'}
+            onBack={() => setCurrentView('signup')}
+            onSuccess={(profileData) => {
+              if (registrationRole === 'driver') {
+                const res = dbService.drivers.registerDriver(
+                  { ...registeredUserData, ...profileData },
+                  profileData.vehicleData || {},
+                  profileData.documents
+                );
+                dbService.session.setCurrentUser(res.user);
+                setCurrentUser(res.user);
+              } else {
+                const newUser = dbService.users.create({
+                  ...registeredUserData,
+                  ...profileData,
+                  role: 'customer'
+                });
+                dbService.session.setCurrentUser(newUser);
+                setCurrentUser(newUser);
+              }
+              setCurrentView('home');
+            }}
           />
         </div>
       </div>
@@ -853,8 +1003,13 @@ export default function App() {
       <div className="app-viewport-wrapper">
         <div className="bolt-app-shell">
           <AccountView
+            user={currentUser}
             onBack={() => setCurrentView('home')}
-            onLogout={() => setCurrentView('welcome')}
+            onLogout={() => {
+              dbService.session.logout();
+              setCurrentUser(null);
+              setCurrentView('welcome');
+            }}
           />
           <BottomNavBar
             activeTab="account"

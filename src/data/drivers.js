@@ -18,6 +18,7 @@ export const VERIFIED_DRIVERS = [
     operationalArea: 'Makassar (Tamalate & Rappocini) - Gowa',
     bio: 'Mengemudi santun, helm harum & steril, selalu sedia penutup kepala gratis.',
     badge: 'Mitra Teladan 🌸',
+    verification_status: 'approved',
     lat: -5.1830,
     lng: 119.4205
   },
@@ -35,6 +36,7 @@ export const VERIFIED_DRIVERS = [
     operationalArea: 'Pettarani - Panakkukang - Hertasning',
     bio: 'Ramah dan paham rute bebas macet. Sedia jas hujan wanita 2 pasang.',
     badge: 'Favorite Pelajar & Mahasiswi 🎓',
+    verification_status: 'approved',
     lat: -5.1765,
     lng: 119.4280
   },
@@ -52,6 +54,7 @@ export const VERIFIED_DRIVERS = [
     operationalArea: 'Makassar - Gowa - Maros (Bandara UPG)',
     bio: 'Kabin mobil wangi aromaterapi lavender, bebas rokok, aman untuk ibu & anak.',
     badge: 'SheCar Driver of the Month 🏆',
+    verification_status: 'approved',
     lat: -5.1890,
     lng: 119.4250
   },
@@ -69,6 +72,7 @@ export const VERIFIED_DRIVERS = [
     operationalArea: 'Somba Opu - Sungguminasa - Samata (Gowa)',
     bio: 'Spesialis kirim dokumen penting & pesanan kue SheSend. Hati-hati dan tepat waktu.',
     badge: 'SheSend Express Kurir 📦',
+    verification_status: 'approved',
     lat: -5.1950,
     lng: 119.4420
   }

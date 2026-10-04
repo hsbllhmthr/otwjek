@@ -62,8 +62,12 @@
   transform: scale(1.06);
 }
 
-.welcome-logo-svg {
-  filter: drop-shadow(0 4px 14px rgba(255, 51, 127, 0.22));
+.welcome-logo-svg,
+.welcome-logo-img {
+  width: 104px;
+  height: 104px;
+  object-fit: contain;
+  display: block;
 }
 
 /* Heading & Subtitle */
@@ -170,14 +174,13 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 6px 14px;
-  border-radius: 20px;
-  transition: all 0.15s ease;
+  padding: 6px 4px;
+  transition: color 0.15s ease;
 }
 
 .btn-welcome-skip:hover {
   color: #FF337F;
-  background-color: rgba(255, 51, 127, 0.08);
+  background: transparent;
 }
 
 /* Footer Legal Links */
@@ -203,6 +206,16 @@
 
 .btn-legal-link:hover {
   color: #111827;
+  text-decoration: underline;
+}
+
+.btn-legal-link.admin-link {
+  color: #6D28D9;
+  font-weight: 700;
+}
+
+.btn-legal-link.admin-link:hover {
+  color: #5B21B6;
   text-decoration: underline;
 }
 

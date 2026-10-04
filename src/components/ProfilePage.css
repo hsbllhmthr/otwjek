@@ -1,0 +1,688 @@
+/* ==========================================================================
+   OTWJek Personal Info / Profile Screen (Exact match to reference style)
+   Flat form layout, NO card boxes, NO shadows, clean pill input fields
+   ========================================================================== */
+
+.profile-page-flat {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  background-color: #FFFFFF;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, 'Plus Jakarta Sans', 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Top Navigation Bar with Back Arrow & Centered Title */
+.profile-flat-top-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background-color: #FFFFFF;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.btn-flat-back {
+  background: transparent;
+  border: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  color: #1A1D20;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.btn-flat-back:hover {
+  transform: translateX(-2px);
+  opacity: 0.8;
+}
+
+.btn-flat-back:active {
+  transform: scale(0.92);
+}
+
+.profile-flat-title {
+  font-size: 19px;
+  font-weight: 800;
+  color: #111827;
+  letter-spacing: -0.3px;
+  text-align: center;
+  flex: 1;
+  margin: 0;
+}
+
+.profile-flat-spacer {
+  width: 36px;
+  flex-shrink: 0;
+}
+
+/* Scrollable Form Content */
+.profile-flat-scroll-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 24px 100px 24px;
+  display: flex;
+  flex-direction: column;
+  max-width: 440px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Avatar Photo Section with green edit badge */
+.profile-flat-avatar-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 8px 0 24px 0;
+}
+
+.profile-flat-avatar-circle {
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  background-color: #F3F4F6;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.profile-flat-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.profile-flat-avatar-fallback {
+  color: #9CA3AF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Green Edit Badge at bottom right of Avatar (as in reference image) */
+.profile-flat-edit-badge {
+  position: absolute;
+  bottom: 0px;
+  right: 0px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background-color: #00C265;
+  border: 2px solid #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  box-shadow: 0 2px 4px rgba(0, 194, 101, 0.25);
+}
+
+/* Flat Form Fields Group (matching reference image) */
+.profile-flat-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.profile-flat-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-flat-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1F2937;
+  margin-bottom: 8px;
+  letter-spacing: -0.2px;
+}
+
+/* Rounded Pill Input Box */
+.profile-flat-pill-box {
+  display: flex;
+  align-items: center;
+  background-color: #F8FAFC;
+  border-radius: 12px;
+  height: 52px;
+  padding: 0 16px;
+  border: 1px solid #F1F5F9;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.profile-flat-pill-box.is-locked {
+  background-color: #F8FAFC;
+  border-color: #F1F5F9;
+  cursor: default;
+}
+
+.profile-flat-pill-box.is-locked:hover {
+  background-color: #F8FAFC;
+  border-color: #F1F5F9;
+}
+
+.profile-flat-pill-box.is-editing {
+  background-color: #FFFFFF;
+  border-color: #CBD5E1;
+  cursor: text;
+}
+
+.profile-flat-pill-box.is-editing:hover {
+  border-color: #94A3B8;
+}
+
+.profile-flat-pill-box.is-editing:focus-within {
+  background-color: #FFFFFF;
+  border-color: #FF337F;
+  box-shadow: 0 0 0 3px rgba(255, 51, 127, 0.12);
+}
+
+.profile-flat-pill-box.is-readonly {
+  background-color: #F8FAFC;
+  cursor: default;
+}
+
+.profile-flat-input {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #111827;
+  font-family: inherit;
+  padding: 0;
+}
+
+.profile-flat-input::placeholder {
+  color: #94A3B8;
+  font-weight: 400;
+}
+
+.profile-flat-input:disabled {
+  cursor: default;
+  color: #111827;
+  -webkit-text-fill-color: #111827;
+  opacity: 1;
+  pointer-events: none;
+}
+
+.profile-flat-input:disabled::placeholder {
+  color: #94A3B8;
+  -webkit-text-fill-color: #94A3B8;
+}
+
+.profile-flat-select:disabled {
+  cursor: default;
+  color: #111827;
+  -webkit-text-fill-color: #111827;
+  opacity: 1;
+  pointer-events: none;
+}
+
+.personal-doc-upload-box.is-disabled {
+  cursor: default !important;
+  opacity: 0.92;
+}
+
+.personal-doc-upload-box.is-disabled:hover {
+  background-color: #F9FAFB !important;
+  border-color: #E5E7EB !important;
+}
+
+.profile-flat-select {
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 8px;
+}
+
+.profile-flat-value-text {
+  flex: 1;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #111827;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.profile-flat-value-text.is-placeholder {
+  color: #94A3B8;
+  font-weight: 400;
+}
+
+/* Leading & Trailing Icons */
+.profile-flat-lead-icon {
+  margin-right: 12px;
+  color: #6B7280;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.profile-flat-trail-icon {
+  margin-left: 12px;
+  color: #6B7280;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* Phone input styling with Indonesian flag / prefix */
+.profile-flat-phone-prefix {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 12px;
+  padding-right: 10px;
+  border-right: 1px solid #E2E8F0;
+  color: #4B5563;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.profile-flag-emoji {
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* Driver Specific Section (flat style) */
+.profile-flat-driver-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 4px 0;
+  padding-top: 12px;
+  border-top: 1px dashed #E2E8F0;
+}
+
+.profile-flat-divider-text {
+  font-size: 13px;
+  font-weight: 800;
+  color: #FF337F;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.profile-doc-status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.profile-doc-status-tag.uploaded {
+  color: #059669;
+}
+
+.profile-doc-status-tag.not-uploaded {
+  color: #DC2626;
+}
+
+/* Update Data & Logout / Action Buttons */
+.profile-flat-actions {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.btn-flat-update {
+  width: 100%;
+  height: 50px;
+  border-radius: 12px;
+  border: none;
+  background: #FF337F;
+  color: #FFFFFF;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: none;
+  transition: all 0.2s ease;
+}
+
+.btn-flat-update:hover {
+  background: #E0005F;
+  box-shadow: none;
+}
+
+.btn-flat-update.is-save {
+  background: #059669;
+}
+
+.btn-flat-update.is-save:hover {
+  background: #047857;
+}
+
+.btn-flat-update:active {
+  transform: scale(0.98);
+}
+
+.btn-flat-update:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.profile-update-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-top: 14px;
+  animation: fadeInNotice 0.25s ease;
+}
+
+.profile-update-notice.success {
+  background-color: #ECFDF5;
+  border: 1px solid #A7F3D0;
+  color: #065F46;
+}
+
+.profile-update-notice.error {
+  background-color: #FEF2F2;
+  border: 1px solid #FECACA;
+  color: #991B1B;
+}
+
+.profile-update-notice .notice-icon {
+  flex-shrink: 0;
+}
+
+@keyframes fadeInNotice {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.profile-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #FFFFFF;
+  border-radius: 50%;
+  animation: spinProfileSpinner 0.6s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spinProfileSpinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.btn-flat-logout {
+  width: 100%;
+  height: 50px;
+  border-radius: 12px;
+  border: 1px solid #FEE2E2;
+  background-color: #FEF2F2;
+  color: #DC2626;
+  font-weight: 700;
+  font-size: 14.5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.btn-flat-logout:hover {
+  background-color: #FEE2E2;
+  color: #B91C1C;
+}
+
+.btn-flat-logout:active {
+  transform: scale(0.98);
+}
+
+/* =========================================
+   Document Upload Rows (KTP / SIM / STNK)
+   ========================================= */
+.profile-doc-upload-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-doc-upload-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #F8FAFC;
+  border: 1px solid #F1F5F9;
+  border-radius: 12px;
+  padding: 12px 14px;
+  gap: 12px;
+  transition: background 0.2s ease;
+}
+
+.profile-doc-upload-row:hover {
+  background-color: #F1F5F9;
+}
+
+.profile-doc-upload-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-doc-icon-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.profile-doc-icon-wrap.no-file {
+  background-color: #FFF1F5;
+  color: #FF337F;
+}
+
+.profile-doc-icon-wrap.has-file {
+  background-color: #ECFDF5;
+  color: #059669;
+}
+
+.profile-doc-upload-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.profile-doc-upload-label {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #111827;
+  letter-spacing: 0.3px;
+}
+
+.profile-doc-filename {
+  font-size: 12px;
+  font-weight: 500;
+  color: #059669;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+.profile-doc-empty {
+  font-size: 12px;
+  font-weight: 500;
+  color: #9CA3AF;
+}
+
+.profile-doc-upload-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.profile-doc-upload-btn.btn-upload {
+  background-color: #FF337F;
+  color: #FFFFFF;
+}
+
+.profile-doc-upload-btn.btn-upload:hover {
+  background-color: #E0005F;
+}
+
+.profile-doc-upload-btn.btn-reupload {
+  background-color: #ECFDF5;
+  color: #059669;
+  border: 1px solid #D1FAE5;
+}
+
+.profile-doc-upload-btn.btn-reupload:hover {
+  background-color: #D1FAE5;
+}
+
+.profile-doc-upload-btn:active {
+  transform: scale(0.96);
+}
+
+/* ==========================================================================
+   BANNER STATUS VERIFIKASI MITRA DRIVER
+   ========================================================================== */
+
+.profile-verification-banner {
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.profile-verification-banner.pending {
+  background-color: #FEF3C7;
+  border: 1.5px solid #FDE68A;
+  color: #92400E;
+}
+
+.profile-verification-banner.approved {
+  background-color: #ECFDF5;
+  border: 1.5px solid #A7F3D0;
+  color: #065F46;
+}
+
+.profile-verification-banner.rejected {
+  background-color: #FEF2F2;
+  border: 1.5px solid #FECACA;
+  color: #991B1B;
+}
+
+.banner-icon-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.banner-icon {
+  flex-shrink: 0;
+}
+
+.banner-title {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+}
+
+.banner-desc {
+  font-size: 12.5px;
+  margin: 2px 0 0 0;
+  line-height: 1.45;
+  opacity: 0.95;
+}
+
+.banner-sub-desc {
+  font-size: 12px;
+  margin: 4px 0 0 0;
+  line-height: 1.4;
+  opacity: 0.85;
+}
+
+.btn-resubmit-verification {
+  margin-top: 10px;
+  background-color: #DC2626;
+  color: #FFFFFF;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: background-color 0.15s ease;
+}
+
+.btn-resubmit-verification:hover {
+  background-color: #B91C1C;
+}
+
+.btn-resubmit-verification:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.profile-section-subhead {
+  font-size: 14px;
+  font-weight: 800;
+  color: #111827;
+  margin: 20px 0 8px 0;
+  padding-bottom: 6px;
+  border-bottom: 1.5px solid #F3F4F6;
+  letter-spacing: -0.2px;
+}
+

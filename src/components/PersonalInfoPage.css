@@ -1,0 +1,717 @@
+/* ==========================================================================
+   PERSONAL INFO PAGE (Lengkapi Data Diri)
+   Matches reference image with Indonesian text, Locked Perempuan,
+   and KTP / SIM / STNK image upload fields
+   ========================================================================== */
+
+.personal-info-container {
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: #FFFFFF;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, 'Plus Jakarta Sans', 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Top Navigation Bar with Back Arrow & Centered Title */
+.personal-info-top-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: #FFFFFF;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.btn-personal-back {
+  background: transparent;
+  border: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  color: #1A1D20;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.btn-personal-back:hover {
+  transform: translateX(-2px);
+  opacity: 0.8;
+}
+
+.btn-personal-back:active {
+  transform: scale(0.92);
+}
+
+.personal-info-nav-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #14171A;
+  letter-spacing: -0.3px;
+  text-align: center;
+  flex: 1;
+}
+
+.personal-nav-spacer {
+  width: 36px;
+  flex-shrink: 0;
+}
+
+/* Scrollable Content */
+.personal-info-scroll-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px 24px 36px 24px;
+  display: flex;
+  flex-direction: column;
+  max-width: 440px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Avatar Photo Upload Section */
+.personal-avatar-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 10px 0 28px 0;
+}
+
+.personal-avatar-circle {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background-color: #E2E8F0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: visible;
+}
+
+.personal-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.personal-avatar-icon {
+  color: #94A3B8;
+}
+
+/* Edit Badge on bottom right of Avatar */
+.personal-avatar-edit-badge {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background-color: #FF337F;
+  border: 2px solid #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  box-shadow: 0 2px 6px rgba(255, 51, 127, 0.35);
+}
+
+/* Form Styles */
+.personal-info-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.personal-field-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.personal-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.personal-field-label {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #1A1D20;
+  margin-bottom: 8px;
+  letter-spacing: -0.2px;
+}
+
+.personal-label-row .personal-field-label {
+  margin-bottom: 0;
+}
+
+.personal-locked-badge {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #FF337F;
+  background-color: #FDF2F8;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid #FCE7F3;
+}
+
+/* Input Boxes */
+.personal-input-box {
+  display: flex;
+  align-items: center;
+  background-color: #F6F7F9;
+  border-radius: 12px;
+  padding: 0 16px;
+  height: 48px;
+  min-height: 48px;
+  border: 1.5px solid transparent;
+  transition: all 0.2s ease;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.personal-input-box:focus-within {
+  background-color: #FFFFFF;
+  border-color: #FF337F;
+  box-shadow: 0 0 0 3px rgba(255, 51, 127, 0.12);
+}
+
+.personal-input-locked {
+  background-color: #F8FAFC;
+  border-color: #E2E8F0;
+  cursor: not-allowed;
+}
+
+.personal-input-locked:focus-within {
+  border-color: #E2E8F0;
+  box-shadow: none;
+  background-color: #F8FAFC;
+}
+
+.personal-locked-icon {
+  color: #94A3B8;
+  margin-left: 8px;
+}
+
+.personal-input-icon {
+  margin-right: 12px;
+  color: #9CA3AF;
+  flex-shrink: 0;
+}
+
+.personal-input-field {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: #1A1D20;
+  padding: 0;
+  font-family: inherit;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.personal-input-field.locked-field {
+  color: #475569;
+  font-weight: 600;
+  cursor: not-allowed;
+}
+
+.personal-input-field::placeholder {
+  color: #9CA3AF;
+  font-weight: 400;
+}
+
+/* Phone Prefix (+62) */
+.personal-phone-prefix {
+  display: flex;
+  align-items: center;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.personal-prefix-text {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1A1D20;
+  letter-spacing: -0.2px;
+}
+
+.personal-prefix-divider {
+  width: 1px;
+  height: 20px;
+  background-color: #D1D5DB;
+  margin: 0 12px 0 10px;
+  flex-shrink: 0;
+}
+
+/* Date Input */
+.personal-date-input {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: #1A1D20;
+  padding: 0;
+  font-family: inherit;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+/* Error message banner */
+.personal-error-banner {
+  background-color: #FEF2F2;
+  border: 1px solid #FEE2E2;
+  color: #DC2626;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+/* ==========================================================================
+   DOCUMENT UPLOADS (KTP, SIM, STNK)
+   ========================================================================== */
+
+.personal-docs-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 10px;
+  padding-top: 20px;
+  border-top: 1px solid #F1F5F9;
+}
+
+.personal-docs-header {
+  margin-bottom: 4px;
+}
+
+.personal-docs-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.personal-docs-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #14171A;
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+
+.personal-doc-optional-badge {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #64748B;
+  background-color: #F1F5F9;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid #E2E8F0;
+  letter-spacing: 0.1px;
+}
+
+.doc-optional-tag {
+  font-size: 12px;
+  font-weight: 500;
+  color: #94A3B8;
+  margin-left: 4px;
+}
+
+.personal-docs-desc {
+  font-size: 13px;
+  color: #64748B;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.personal-doc-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.personal-doc-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.personal-doc-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1E293B;
+}
+
+.personal-doc-status-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #059669;
+  background-color: #ECFDF5;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+/* Upload Dropzone / Box */
+.personal-doc-upload-box {
+  background-color: #F8FAFC;
+  border: 2px dashed #CBD5E1;
+  border-radius: 12px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  min-height: 84px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.personal-doc-upload-box:hover {
+  background-color: #F1F5F9;
+  border-color: #FF337F;
+}
+
+.personal-doc-upload-box.has-file {
+  padding: 0;
+  border: 1.5px solid #E2E8F0;
+  background-color: #000000;
+}
+
+.personal-doc-placeholder {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+}
+
+.personal-doc-upload-icon {
+  color: #FF337F;
+  flex-shrink: 0;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.personal-doc-upload-box:hover .personal-doc-upload-icon {
+  transform: translateY(-2px);
+  color: #E8236E;
+}
+
+.doc-text-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.doc-upload-prompt {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1E293B;
+  letter-spacing: -0.15px;
+}
+
+.doc-upload-hint {
+  font-size: 12px;
+  color: #64748B;
+}
+
+/* Preview of uploaded image */
+.personal-doc-preview-wrapper {
+  position: relative;
+  width: 100%;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #0F172A;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.personal-doc-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.92;
+  transition: opacity 0.2s ease;
+}
+
+.personal-doc-preview-wrapper:hover .personal-doc-preview-img {
+  opacity: 0.75;
+}
+
+.personal-doc-preview-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  background: rgba(0, 0, 0, 0.45);
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.personal-doc-preview-wrapper:hover .personal-doc-preview-overlay {
+  opacity: 1;
+}
+
+.doc-overlay-text {
+  color: #FFFFFF;
+  font-size: 12.5px;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.65);
+  padding: 6px 12px;
+  border-radius: 6px;
+}
+
+.btn-doc-remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 5;
+  transition: all 0.15s ease;
+}
+
+.btn-doc-remove:hover {
+  background-color: #DC2626;
+  border-color: #DC2626;
+  transform: scale(1.1);
+}
+
+/* ==========================================================================
+   BOTTOM ACTION SECTION
+   ========================================================================== */
+
+.personal-bottom-section {
+  padding: 16px 24px 28px 24px;
+  background: #FFFFFF;
+  border-top: 1px solid #F0F2F5;
+  max-width: 440px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.btn-personal-submit {
+  width: 100%;
+  height: 52px;
+  background-color: #FF337F;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 9999px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: none;
+}
+
+.btn-personal-submit:hover {
+  background-color: #E8236E;
+  box-shadow: none;
+}
+
+.btn-personal-submit:active {
+  transform: scale(0.985);
+}
+
+.btn-personal-submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Loading Spinner */
+.spin-loader {
+  animation: spinAround 0.8s linear infinite;
+}
+
+@keyframes spinAround {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   TAMBAHAN FITUR PENDAFTARAN MANDIRI DRIVER
+   ========================================================================== */
+
+.driver-reg-intro-banner {
+  background: linear-gradient(135deg, #FFF1F6 0%, #FDF2F8 100%);
+  border: 1px solid #FCE7F3;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.driver-intro-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #BE185D;
+  background-color: #FCE7F3;
+  padding: 3px 8px;
+  border-radius: 6px;
+  margin-bottom: 6px;
+}
+
+.driver-intro-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #831843;
+  margin: 4px 0 4px 0;
+}
+
+.driver-intro-desc {
+  font-size: 12.5px;
+  color: #9D174D;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.personal-avatar-hint {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748B;
+  margin-top: 8px;
+  text-align: center;
+}
+
+.personal-avatar-wrapper {
+  flex-direction: column;
+}
+
+.personal-section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0 2px 0;
+  border-bottom: 1.5px solid #F1F5F9;
+  margin-bottom: 4px;
+}
+
+.personal-section-label span {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #0F172A;
+  letter-spacing: -0.2px;
+}
+
+.personal-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.personal-form-row > .personal-field-group {
+  width: 100%;
+  min-width: 0;
+}
+
+.personal-select-field {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: #1A1D20;
+  font-family: inherit;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.uppercase-field {
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+/* Penanda Wajib & Opsional */
+.required-star {
+  color: #EF4444;
+  font-weight: 800;
+  margin-left: 2px;
+}
+
+.optional-tag {
+  font-size: 11.5px;
+  font-weight: 550;
+  color: #64748B;
+  margin-left: 6px;
+  background-color: #F1F5F9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.personal-incomplete-notice {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #991B1B;
+  text-align: center;
+  margin-bottom: 10px;
+  line-height: 1.4;
+  background-color: #FEF2F2;
+  border: 1px solid #FEE2E2;
+  border-radius: 8px;
+  padding: 6px 12px;
+}
+
+.btn-personal-submit.btn-disabled-incomplete {
+  background-color: #E2E8F0 !important;
+  color: #94A3B8 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+}
+
+

@@ -1,0 +1,235 @@
+/* ==========================================================================
+   ADMIN SIGN IN PAGE (FLAT DESIGN - NO SHADOWS - INDONESIAN)
+   Clean, modern, flat card layout strictly following user requirements:
+   - NO box shadows
+   - Indonesian text and warm greeting
+   - 'Kembali ke Aplikasi' button placed beneath the Sign In button
+   ========================================================================== */
+
+.signin-page-viewport {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: #F8FAFC;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  position: relative;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, 'Plus Jakarta Sans', Roboto, sans-serif;
+  color: #111827;
+}
+
+/* Floating Card Container - strictly FLAT (NO SHADOW) */
+.signin-card-container {
+  background-color: #FFFFFF;
+  border-radius: 24px;
+  width: 100%;
+  max-width: 440px;
+  padding: 42px 36px 36px 36px;
+  box-shadow: none;
+  border: 1px solid #E5E7EB;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+/* Header Text */
+.signin-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.signin-title {
+  font-size: 26px;
+  font-weight: 800;
+  color: #111827;
+  letter-spacing: -0.4px;
+  margin: 0 0 8px 0;
+}
+
+.signin-subtitle {
+  font-size: 13.5px;
+  color: #6B7280;
+  margin: 0;
+  font-weight: 400;
+  line-height: 1.45;
+  letter-spacing: -0.1px;
+}
+
+/* Alert Banner */
+.signin-alert-banner {
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.signin-alert-banner.error {
+  background-color: #FEF2F2;
+  border: 1px solid #FEE2E2;
+  color: #DC2626;
+  font-weight: 500;
+}
+
+/* Form Groups */
+.signin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.signin-field-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.signin-field-label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+  letter-spacing: -0.15px;
+}
+
+.signin-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.signin-input {
+  width: 100%;
+  height: 48px;
+  background-color: #FFFFFF;
+  border: 1.5px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 0 16px;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: #111827;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s ease;
+  box-sizing: border-box;
+  box-shadow: none;
+}
+
+.signin-input:focus {
+  border-color: #3B82F6;
+  box-shadow: none;
+}
+
+.signin-input::placeholder {
+  color: #9CA3AF;
+  font-weight: 400;
+}
+
+.signin-input.password-input {
+  padding-right: 46px;
+}
+
+.btn-toggle-eye {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: #4B5563;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 6px;
+  transition: color 0.15s ease;
+}
+
+.btn-toggle-eye:hover {
+  color: #111827;
+}
+
+/* Primary Action Button: Sign in - Flat, NO SHADOW */
+.btn-primary-signin {
+  width: 100%;
+  height: 48px;
+  background-color: #3B82F6;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
+  box-shadow: none;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.btn-primary-signin:hover {
+  background-color: #2563EB;
+  box-shadow: none;
+}
+
+.btn-primary-signin:active {
+  transform: scale(0.99);
+}
+
+.btn-primary-signin:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Kembali ke Aplikasi Utama - Berada di bawah tombol Masuk */
+.signin-back-wrapper {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.btn-back-to-customer-app {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  border: none;
+  color: #64748B;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: color 0.15s ease;
+}
+
+.btn-back-to-customer-app:hover {
+  color: #1E293B;
+  text-decoration: underline;
+}
+
+/* Loading Spinner */
+.spin-loader {
+  animation: spinAround 0.8s linear infinite;
+}
+
+@keyframes spinAround {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Responsiveness for mobile screens */
+@media (max-width: 480px) {
+  .signin-card-container {
+    padding: 32px 20px 24px 20px;
+    border-radius: 20px;
+  }
+}

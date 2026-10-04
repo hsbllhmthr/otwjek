@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './SignUpPage.css';
 import {
-  ChevronLeft,
+  ArrowLeft,
   User,
   Mail,
   Lock,
@@ -10,7 +10,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 
-export default function SignUpPage({ onBack, onSuccess, onGoToSignIn }) {
+export default function SignUpPage({ isDriver = false, onBack, onSuccess, onGoToSignIn }) {
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
@@ -48,7 +48,7 @@ export default function SignUpPage({ onBack, onSuccess, onGoToSignIn }) {
       return;
     }
     if (!formData.agreeTerms) {
-      setErrorMsg('Anda harus menyetujui Syarat & Ketentuan.');
+      setErrorMsg(isDriver ? 'Anda harus menyetujui Syarat & Ketentuan Kemitraan.' : 'Anda harus menyetujui Syarat & Ketentuan.');
       return;
     }
 
@@ -56,8 +56,8 @@ export default function SignUpPage({ onBack, onSuccess, onGoToSignIn }) {
     // Simulate swift account creation
     setTimeout(() => {
       setIsLoading(false);
-      if (onSuccess) onSuccess();
-    }, 700);
+      if (onSuccess) onSuccess(formData);
+    }, 400);
   };
 
   // Password strength calculation
@@ -75,27 +75,30 @@ export default function SignUpPage({ onBack, onSuccess, onGoToSignIn }) {
 
   return (
     <div className="signup-page-container">
-      {/* Top Navigation Bar */}
+      {/* Top Navigation Bar with Back Arrow */}
       <div className="signup-top-nav">
         <button
           type="button"
           className="btn-signup-back"
           onClick={onBack}
           aria-label="Kembali"
+          title="Kembali"
         >
-          <ChevronLeft size={22} />
+          <ArrowLeft size={24} strokeWidth={2} />
         </button>
-        <span className="signup-nav-title">Daftar Akun</span>
-        <div className="signup-nav-placeholder" />
       </div>
 
       {/* Main Scrollable Content */}
       <div className="signup-scroll-content">
         {/* Brand Header */}
         <div className="signup-brand-header">
-          <h1 className="signup-headline">Buat Akun Baru</h1>
+          <h1 className="signup-headline">
+            {isDriver ? 'Daftar sebagai Mitra Driver' : 'Buat Akun Baru'}
+          </h1>
           <p className="signup-subheadline">
-            Mulai nikmati kemudahan bepergian dan pengiriman cepat hari ini.
+            {isDriver
+              ? 'Mulai hasilkan pendapatan dan nikmati kemudahan bergabung bersama OTWJek.'
+              : 'Mulai nikmati kemudahan bepergian dan pengiriman cepat hari ini.'}
           </p>
         </div>
 
@@ -209,8 +212,11 @@ export default function SignUpPage({ onBack, onSuccess, onGoToSignIn }) {
               className="checkbox-input"
             />
             <span className="checkbox-text">
-              Saya menyetujui <span className="terms-highlight">Syarat & Ketentuan</span> serta{' '}
-              <span className="terms-highlight">Kebijakan Privasi</span>.
+              Saya menyetujui{' '}
+              <span className="terms-highlight">
+                {isDriver ? 'Syarat & Ketentuan Kemitraan' : 'Syarat & Ketentuan'}
+              </span>{' '}
+              serta <span className="terms-highlight">Kebijakan Privasi</span>.
             </span>
           </label>
 
@@ -224,7 +230,7 @@ export default function SignUpPage({ onBack, onSuccess, onGoToSignIn }) {
               <div className="signup-btn-spinner" />
             ) : (
               <>
-                <span>Daftar Akun</span>
+                <span>{isDriver ? 'Daftar sebagai Mitra Driver' : 'Daftar Akun'}</span>
                 <ArrowRight size={18} />
               </>
             )}
@@ -233,7 +239,7 @@ export default function SignUpPage({ onBack, onSuccess, onGoToSignIn }) {
 
         {/* Bottom Switcher: Go to Login */}
         <div className="signup-footer-switcher">
-          <span>Sudah memiliki akun? </span>
+          <span>{isDriver ? 'Sudah memiliki akun mitra? ' : 'Sudah memiliki akun? '}</span>
           <button
             type="button"
             className="btn-switch-to-signin"

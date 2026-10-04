@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import './WelcomeScreen.css';
-import { X as CloseIcon, ArrowRight } from 'lucide-react';
+import { X as CloseIcon } from 'lucide-react';
+import otwjekLogo from '../assets/otwjek_logo.png';
 
-export default function WelcomeScreen({ onContinue, onSignUp, onSignIn }) {
+export default function WelcomeScreen({ onContinue, onSignUp, onSignIn, onRegisterDriver }) {
   const [activeModal, setActiveModal] = useState(null); // 'terms' | 'privacy' | null
 
   return (
@@ -13,30 +14,11 @@ export default function WelcomeScreen({ onContinue, onSignUp, onSignIn }) {
           {/* App Logo */}
           <div className="welcome-logo-wrapper">
             <div className="welcome-brand-mark">
-              <svg
-                width="72"
-                height="64"
-                viewBox="0 0 76 66"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="welcome-logo-svg"
-              >
-                {/* Top Speed Streak */}
-                <rect x="18" y="10" width="26" height="8" rx="4" fill="#FF337F" />
-                {/* Middle (Longest) Speed Streak */}
-                <rect x="8" y="26" width="30" height="8" rx="4" fill="#FF337F" />
-                {/* Bottom Speed Streak */}
-                <rect x="18" y="42" width="26" height="8" rx="4" fill="#FF337F" />
-
-                {/* Main Circular Body */}
-                <circle cx="50" cy="30" r="23" fill="#FF337F" />
-
-                {/* White Hollow Ring Gap */}
-                <circle cx="50" cy="30" r="12" fill="#FFFFFF" />
-
-                {/* Inner Solid Pink Disc */}
-                <circle cx="50" cy="30" r="6" fill="#FF337F" />
-              </svg>
+              <img
+                src={otwjekLogo}
+                alt="OTWJek Logo"
+                className="welcome-logo-img"
+              />
             </div>
           </div>
 
@@ -67,14 +49,14 @@ export default function WelcomeScreen({ onContinue, onSignUp, onSignIn }) {
             </button>
           </div>
 
-          {/* Direct Guest Entry / Skip */}
+          {/* Driver Registration Entry */}
           <div className="welcome-skip-wrapper">
             <button
               type="button"
               className="btn-welcome-skip"
-              onClick={onContinue}
+              onClick={onRegisterDriver || onSignUp || onContinue}
             >
-              Masuk sebagai Tamu (Lewati) <ArrowRight size={13} />
+              Daftar sebagai mitra driver
             </button>
           </div>
         </div>

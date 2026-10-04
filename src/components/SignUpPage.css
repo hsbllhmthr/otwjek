@@ -17,50 +17,37 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* Top Navigation Bar */
+/* Top Navigation Bar with Back Arrow (Uniform with LoginPage) */
 .signup-top-nav {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
+  padding: 18px 24px 8px 20px;
   background: #FFFFFF;
-  border-bottom: 1px solid #F0F2F5;
   flex-shrink: 0;
   z-index: 10;
 }
 
 .btn-signup-back {
-  background: #F4F5F7;
+  background: transparent;
   border: none;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  padding: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   color: #1A1D20;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: transform 0.15s ease, opacity 0.15s ease;
 }
 
 .btn-signup-back:hover {
-  background: #EAEBED;
-  transform: translateX(-1px);
+  transform: translateX(-2px);
+  opacity: 0.8;
 }
 
 .btn-signup-back:active {
-  transform: scale(0.95);
-}
-
-.signup-nav-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #1A1D20;
-  letter-spacing: -0.2px;
-}
-
-.signup-nav-placeholder {
-  width: 38px;
+  transform: scale(0.92);
 }
 
 /* Main Scrollable Area */
@@ -68,7 +55,7 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 24px 24px 36px 24px;
+  padding: 16px 24px 36px 24px;
   display: flex;
   flex-direction: column;
   max-width: 440px;

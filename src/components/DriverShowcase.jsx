@@ -1,5 +1,6 @@
 import React from 'react';
 import { Star, ShieldCheck, Check, Sparkles } from 'lucide-react';
+import driverPlaceholder from '../assets/driver_placeholder.svg';
 
 export default function DriverShowcase({
   drivers,
@@ -57,11 +58,12 @@ export default function DriverShowcase({
             >
               <div className="avatar-wrapper">
                 <img
-                  src={driver.avatar}
+                  src={driver.avatar || driverPlaceholder}
                   alt={driver.name}
                   className="driver-avatar-img"
                   onError={(e) => {
-                    e.target.src = 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80';
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = driverPlaceholder;
                   }}
                 />
                 <span className="status-dot-active" title="Aktif Online" />

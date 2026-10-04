@@ -1,6 +1,8 @@
-import React from 'react';
-import { X, Star, Check, Sparkles } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { X, Star, Check, Sparkles, User } from 'lucide-react';
 import { VERIFIED_DRIVERS } from '../data/drivers.js';
+import dbService from '../services/dbService.js';
+import driverPlaceholder from '../assets/driver_placeholder.svg';
 
 export default function DriverCatalogModal({
   isOpen,
@@ -8,6 +10,15 @@ export default function DriverCatalogModal({
   selectedDriver,
   onSelectDriver
 }) {
+  const approvedDrivers = useMemo(() => {
+    try {
+      const list = dbService.drivers.getApprovedDrivers();
+      return list && list.length > 0 ? list : VERIFIED_DRIVERS;
+    } catch {
+      return VERIFIED_DRIVERS;
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
@@ -83,7 +94,7 @@ export default function DriverCatalogModal({
 
         {/* Driver List */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 340, overflowY: 'auto' }}>
-          {VERIFIED_DRIVERS.map((driver) => {
+          {approvedDrivers.map((driver) => {
             const isSelected = selectedDriver?.id === driver.id;
             return (
               <div
@@ -105,19 +116,23 @@ export default function DriverCatalogModal({
               >
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                   <img
-                    src={driver.avatar}
+                    src={driver.avatar || driverPlaceholder}
                     alt={driver.name}
                     style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover' }}
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = driverPlaceholder;
+                    }}
                   />
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: '#1C1C1E' }}>{driver.name}</span>
                       <span style={{ fontSize: 11, fontWeight: 700, color: '#F5A623', display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Star size={11} fill="#F5A623" /> {driver.rating}
+                        <Star size={11} fill="#F5A623" /> {driver.rating || 5.0}
                       </span>
                     </div>
                     <div style={{ fontSize: 11, color: '#FF337F', fontWeight: 600 }}>
-                      {driver.vehicleModel} · {driver.plateNumber}
+                      {driver.vehicleModel || (driver.vehicleType === 'mobil' ? 'SheCar' : 'SheRide')} · {driver.plateNumber || 'DD XXXX'}
                     </div>
                     <div style={{ fontSize: 10, color: '#8E8E93', marginTop: 2 }}>
                       {driver.operationalArea} · {driver.tripsCount} trips
