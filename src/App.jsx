@@ -19,6 +19,8 @@ import { buildWhatsAppLink, formatBookingMessage, openWhatsApp } from './utils/w
 import { ADMINS } from './data/admins.js';
 import RideDetailsPage from './components/RideDetailsPage.jsx';
 import PackageDetailsPage from './components/PackageDetailsPage.jsx';
+import WelcomeScreen from './components/WelcomeScreen.jsx';
+import SignUpPage from './components/SignUpPage.jsx';
 
 import {
   ChevronLeft,
@@ -36,7 +38,7 @@ import {
 } from 'lucide-react';
 
 export default function App() {
-  const [currentView, setCurrentView] = useState('home'); // 'home' | 'ride' | 'food' | 'activity' | 'message' | 'account'
+  const [currentView, setCurrentView] = useState('welcome'); // 'welcome' | 'home' | 'ride' | 'food' | 'activity' | 'message' | 'account'
   const [activeTab, setActiveTab] = useState('ride'); // 'ride' | 'send'
   const [timeMode, setTimeMode] = useState('now'); // 'now' | 'later'
   const [selectedVehicleType, setSelectedVehicleType] = useState('bike'); // 'bike' | 'car' | 'express'
@@ -628,6 +630,34 @@ export default function App() {
     }
   };
 
+  if (currentView === 'welcome') {
+    return (
+      <div className="app-viewport-wrapper">
+        <div className="bolt-app-shell">
+          <WelcomeScreen
+            onContinue={() => setCurrentView('home')}
+            onSignUp={() => setCurrentView('signup')}
+            onSignIn={() => setCurrentView('home')}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (currentView === 'signup') {
+    return (
+      <div className="app-viewport-wrapper">
+        <div className="bolt-app-shell">
+          <SignUpPage
+            onBack={() => setCurrentView('welcome')}
+            onSuccess={() => setCurrentView('home')}
+            onGoToSignIn={() => setCurrentView('welcome')}
+          />
+        </div>
+      </div>
+    );
+  }
+
   if (currentView === 'home') {
     return (
       <div className="app-viewport-wrapper">
@@ -822,7 +852,10 @@ export default function App() {
     return (
       <div className="app-viewport-wrapper">
         <div className="bolt-app-shell">
-          <AccountView onBack={() => setCurrentView('home')} />
+          <AccountView
+            onBack={() => setCurrentView('home')}
+            onLogout={() => setCurrentView('welcome')}
+          />
           <BottomNavBar
             activeTab="account"
             onChangeTab={(tab) => setCurrentView(tab)}
