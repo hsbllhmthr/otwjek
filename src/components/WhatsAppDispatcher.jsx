@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Send, Copy, Check, MessageSquare, ShieldAlert, Sparkles, User, FileText, Phone } from 'lucide-react';
 import { ADMINS } from '../data/admins.js';
 import { formatBookingMessage, buildWhatsAppLink, openWhatsApp } from '../utils/whatsappTemplate.js';
+import dbService from '../services/dbService.js';
 
 export default function WhatsAppDispatcher({
   serviceType,
@@ -14,7 +15,10 @@ export default function WhatsAppDispatcher({
   packageCategory,
   weightCategory
 }) {
-  const [customerName, setCustomerName] = useState('');
+  const [customerName, setCustomerName] = useState(() => {
+    const sessionUser = dbService?.session?.getCurrentUser();
+    return sessionUser?.fullName || sessionUser?.full_name || sessionUser?.name || '';
+  });
   const [customerNotes, setCustomerNotes] = useState('');
   const [selectedAdminId, setSelectedAdminId] = useState('admin-1');
   const [isCopied, setIsCopied] = useState(false);

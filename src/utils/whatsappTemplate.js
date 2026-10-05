@@ -1,3 +1,5 @@
+import dbService from '../services/dbService.js';
+
 /**
  * WhatsApp Booking Message Generator (Seam 3)
  * Implements PRD standard markdown template and URL encoder
@@ -14,6 +16,7 @@ export function formatBookingMessage({
   distanceKm = 0,
   formattedFare = 'Rp 0',
   customerName = '',
+  customerPhone = '',
   customerNotes = '',
   driverName = '',
   packageDetails = '',
@@ -32,7 +35,29 @@ export function formatBookingMessage({
   const paymentLabel = paymentMethod === 'qris' ? 'QRIS (Scan Barcode)' : 'Tunai / Cash';
   const selectedDriver = driverName && driverName.trim().length > 0 ? driverName : 'Acak (Dicarikan Admin)';
   const notesText = customerNotes && customerNotes.trim().length > 0 ? customerNotes : 'Tidak ada catatan';
-  const nameText = customerName && customerName.trim().length > 0 ? customerName : 'Pelanggan OTWJek';
+
+  // Deteksi nama dan nomor WhatsApp pemesan dari akun login aktif
+  let effectiveCustomerName = customerName && customerName.trim() && customerName !== 'Pelanggan OTWJek' && customerName !== 'Pelanggan Perempuan'
+    ? customerName.trim()
+    : '';
+  let effectiveCustomerPhone = customerPhone && customerPhone.trim() ? customerPhone.trim() : '';
+
+  try {
+    const sessionUser = dbService?.session?.getCurrentUser();
+    if (sessionUser) {
+      if (!effectiveCustomerName) {
+        effectiveCustomerName = sessionUser.fullName || sessionUser.full_name || sessionUser.name || '';
+      }
+      if (!effectiveCustomerPhone && sessionUser.phone) {
+        effectiveCustomerPhone = sessionUser.phone;
+      }
+    }
+  } catch (err) {
+    // Ignore error
+  }
+
+  const nameText = effectiveCustomerName || 'Pelanggan OTWJek';
+  const phoneText = effectiveCustomerPhone ? ` (WA: ${effectiveCustomerPhone})` : '';
 
   // Build high-accuracy Google Maps Shareloc links
   const pickupMapLink =
@@ -57,13 +82,14 @@ export function formatBookingMessage({
       ? `${packageInfo.recipientName} ${packageInfo.recipientPhone ? `(WA: ${packageInfo.recipientPhone})` : ''}`
       : 'Penerima di lokasi';
     const instructionsStr = packageInfo.specialNotes || notesText;
+    const senderPhoneStr = packageInfo.senderPhone ? `(WA: ${packageInfo.senderPhone})` : phoneText;
 
     return `Halo Admin OTWJek, saya ingin memesan layanan:
 
 🌸 *Tipe Layanan*: ${serviceLabel}
 📦 *Detail & Berat Paket*: ${itemStr}
 📍 *Titik Jemput (Pengirim)*: ${pickupAddress || 'Titik Jemput di Peta'}${pickupMapLink ? `\n🗺️ *Shareloc / Peta Pengirim*:\n${pickupMapLink}` : ''}
-👤 *Pengirim*: ${nameText} ${packageInfo.senderPhone ? `(WA: ${packageInfo.senderPhone})` : ''}
+👤 *Pengirim*: ${nameText} ${senderPhoneStr}
 🏁 *Titik Tujuan (Penerima)*: ${dropoffAddress || 'Titik Tujuan di Peta'}${dropoffMapLink ? `\n🗺️ *Peta Penerima*:\n${dropoffMapLink}` : ''}
 👥 *Kontak Penerima*: ${recipientStr}
 ⚠️ *Instruksi Pengiriman*: ${instructionsStr}
@@ -83,7 +109,7 @@ Mohon konfirmasi mitra kurir perempuan yang tersedia. Terima kasih!`;
 📏 *Estimasi Jarak*: ${distanceKm} km
 💵 *Estimasi Tarif*: ${formattedFare}
 💳 *Metode Pembayaran*: ${paymentLabel}
-👤 *Nama Pemesan*: ${nameText}
+👤 *Nama Pemesan*: ${nameText}${phoneText}
 📦 *Catatan / Info*: ${notesText}
 🛵 *Driver Pilihan*: ${selectedDriver}
 
@@ -158,8 +184,28 @@ export function formatFoodOrderMessage({
   paymentMethod = 'cash'
 }) {
   const paymentLabel = paymentMethod === 'qris' ? 'QRIS (Scan Barcode)' : 'Tunai / Cash saat tiba';
-  const nameText = customerName && customerName.trim().length > 0 ? customerName : 'Pelanggan OTWJek';
-  const phoneText = customerPhone && customerPhone.trim().length > 0 ? ` (WA: ${customerPhone})` : '';
+
+  let effectiveCustomerName = customerName && customerName.trim() && customerName !== 'Pelanggan OTWJek'
+    ? customerName.trim()
+    : '';
+  let effectiveCustomerPhone = customerPhone && customerPhone.trim() ? customerPhone.trim() : '';
+
+  try {
+    const sessionUser = dbService?.session?.getCurrentUser();
+    if (sessionUser) {
+      if (!effectiveCustomerName) {
+        effectiveCustomerName = sessionUser.fullName || sessionUser.full_name || sessionUser.name || '';
+      }
+      if (!effectiveCustomerPhone && sessionUser.phone) {
+        effectiveCustomerPhone = sessionUser.phone;
+      }
+    }
+  } catch (err) {
+    // Ignore
+  }
+
+  const nameText = effectiveCustomerName || 'Pelanggan OTWJek';
+  const phoneText = effectiveCustomerPhone ? ` (WA: ${effectiveCustomerPhone})` : '';
 
   let orderListStr = '';
   if (items && items.length > 0) {

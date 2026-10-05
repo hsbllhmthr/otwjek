@@ -466,6 +466,9 @@ export default function App() {
     const pkgData = bookingDetails?.packageData || null;
     const pMethod = bookingDetails?.paymentMethod || paymentMethod || 'cash';
 
+    const customerDisplayName = currentUser?.fullName || currentUser?.full_name || currentUser?.name || '';
+    const customerDisplayPhone = currentUser?.phone || '';
+
     // Jika fitur motor atau mobil (ride), buka halaman baru Ride Details (sesuai gambar referensi)
     if (!isSend) {
       setActiveRideBooking({
@@ -476,7 +479,9 @@ export default function App() {
         durationMinutes,
         paymentMethod: pMethod,
         driverNotes: driverNotes || '',
-        selectedDriver
+        selectedDriver,
+        customerName: customerDisplayName,
+        customerPhone: customerDisplayPhone
       });
       setCurrentView('ride-details');
       return;
@@ -495,7 +500,8 @@ export default function App() {
       dropoffAddress: dropoff?.name || dropoff?.address || 'Titik Tujuan di Peta',
       distanceKm,
       formattedFare: formatRupiah(ride.price),
-      customerName: 'Pelanggan OTWJek',
+      customerName: customerDisplayName || 'Pelanggan OTWJek',
+      customerPhone: customerDisplayPhone,
       customerNotes: pkgData?.specialNotes || driverNotes || '',
       driverName: selectedDriver?.name || 'Acak (Dicarikan Admin)',
       packageDetails: isSend ? (pkgData?.itemName || 'Paket / Makanan') : '',
@@ -1076,6 +1082,9 @@ export default function App() {
             paymentMethod={activeRideBooking?.paymentMethod || paymentMethod}
             driverNotes={activeRideBooking?.driverNotes || driverNotes}
             selectedDriver={activeRideBooking?.selectedDriver || selectedDriver}
+            customerName={activeRideBooking?.customerName || currentUser?.fullName || currentUser?.full_name || currentUser?.name || ''}
+            customerPhone={activeRideBooking?.customerPhone || currentUser?.phone || ''}
+            currentUser={currentUser}
             onBack={() => setCurrentView('ride')}
             onCancelRide={() => setCurrentView('home')}
           />

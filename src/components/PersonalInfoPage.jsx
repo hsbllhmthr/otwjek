@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import './PersonalInfoPage.css';
 import {
   ArrowLeft,
@@ -60,11 +60,29 @@ export default function PersonalInfoPage({ initialData = {}, isDriver = false, o
   const [isLoading, setIsLoading] = useState(false);
   const [isCompressing, setIsCompressing] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [errorKey, setErrorKey] = useState(0);
+  const [birthDateError, setBirthDateError] = useState(false);
 
   const fileInputRef = useRef(null);
   const ktpInputRef = useRef(null);
   const simInputRef = useRef(null);
   const stnkInputRef = useRef(null);
+  const errorBannerRef = useRef(null);
+  const birthDateInputRef = useRef(null);
+
+  useEffect(() => {
+    if (errorMsg && errorBannerRef.current) {
+      errorBannerRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [errorMsg, errorKey]);
+
+  const triggerError = (msg, isBirth = false) => {
+    setErrorMsg(msg);
+    setErrorKey((prev) => prev + 1);
+    if (isBirth) {
+      setBirthDateError(true);
+    }
+  };
 
   const handleAvatarClick = () => {
     if (fileInputRef.current) {
@@ -122,32 +140,33 @@ export default function PersonalInfoPage({ initialData = {}, isDriver = false, o
 
     // Validasi Data Diri Umum (Wajib Bertanda *)
     if (!fullName.trim()) {
-      setErrorMsg('Nama lengkap wajib diisi (*).');
+      triggerError('Nama lengkap wajib diisi (*).');
       return;
     }
     if (!email.trim() || !email.includes('@')) {
-      setErrorMsg('Alamat email aktif yang valid wajib diisi (*).');
+      triggerError('Alamat email aktif yang valid wajib diisi (*).');
       return;
     }
     if (!phone.trim()) {
-      setErrorMsg('Nomor WhatsApp aktif wajib diisi (*).');
+      triggerError('Nomor WhatsApp aktif wajib diisi (*).');
       return;
     }
     if (!birthDate) {
-      setErrorMsg('Tanggal lahir wajib diisi (*).');
+      triggerError('Tanggal lahir wajib diisi (*).', true);
       return;
     }
 
     // Validasi Khusus Pendaftaran Driver Mandiri (Opsional - admin juga dapat input dari dashboard)
     if (isDriverRegistration && nik.trim()) {
       if (nik.trim().length !== 16 || !/^\d+$/.test(nik.trim())) {
-        setErrorMsg('Jika NIK diisi, NIK KTP harus berupa 16 digit angka.');
+        triggerError('Jika NIK diisi, NIK KTP harus berupa 16 digit angka.');
         return;
       }
     }
 
     setIsLoading(true);
     setErrorMsg('');
+    setBirthDateError(false);
 
     const fullVehicleModel = vehicleModelName.trim();
     const effectiveSim = vehicleType === 'mobil' 
@@ -256,7 +275,7 @@ export default function PersonalInfoPage({ initialData = {}, isDriver = false, o
 
         {/* Error notification */}
         {errorMsg && (
-          <div className="personal-error-banner">
+          <div key={errorKey} ref={errorBannerRef} className="personal-error-banner">
             {errorMsg}
           </div>
         )}
@@ -353,12 +372,17 @@ export default function PersonalInfoPage({ initialData = {}, isDriver = false, o
             <label className="personal-field-label">
               Tanggal Lahir <span className="required-star">*</span>
             </label>
-            <div className="personal-input-box">
+            <div className={`personal-input-box ${birthDateError ? 'has-error' : ''}`}>
               <input
+                ref={birthDateInputRef}
                 type="date"
                 className="personal-date-input"
                 value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
+                onChange={(e) => {
+                  setBirthDate(e.target.value);
+                  if (errorMsg) setErrorMsg('');
+                  if (birthDateError) setBirthDateError(false);
+                }}
               />
             </div>
           </div>

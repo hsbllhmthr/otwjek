@@ -12,6 +12,7 @@ import {
 import { formatRupiah, PRICING_CONFIG } from '../utils/fareCalculator.js';
 import { buildWhatsAppLink, formatBookingMessage, openWhatsApp } from '../utils/whatsappTemplate.js';
 import { ADMINS } from '../data/admins.js';
+import dbService from '../services/dbService.js';
 
 export default function RideDetailsPage({
   pickup,
@@ -22,6 +23,9 @@ export default function RideDetailsPage({
   paymentMethod = 'cash',
   driverNotes = '',
   selectedDriver = null,
+  customerName = '',
+  customerPhone = '',
+  currentUser = null,
   onBack,
   onCancelRide
 }) {
@@ -100,6 +104,15 @@ export default function RideDetailsPage({
     const shareLat = gpsCoords?.lat || pickup?.lat;
     const shareLng = gpsCoords?.lng || pickup?.lng;
 
+    const sessionUser = currentUser || dbService?.session?.getCurrentUser();
+    const resolvedCustomerName =
+      customerName ||
+      sessionUser?.fullName ||
+      sessionUser?.full_name ||
+      sessionUser?.name ||
+      'Pelanggan OTWJek';
+    const resolvedCustomerPhone = customerPhone || sessionUser?.phone || '';
+
     const message = formatBookingMessage({
       serviceType: 'ride',
       vehicleType: isCar ? 'mobil' : 'motor',
@@ -107,7 +120,8 @@ export default function RideDetailsPage({
       dropoffAddress: dropoffTitle,
       distanceKm,
       formattedFare: formatRupiah(currentPrice),
-      customerName: 'Pelanggan OTWJek',
+      customerName: resolvedCustomerName,
+      customerPhone: resolvedCustomerPhone,
       customerNotes: driverNotes || '',
       driverName: selectedDriver?.name || 'Acak (Dicarikan Admin)',
       paymentMethod,
@@ -272,6 +286,20 @@ export default function RideDetailsPage({
 
         {/* Card 4: Metadata Table */}
         <section className="details-card card-table">
+          {(() => {
+            const sessionUser = currentUser || dbService?.session?.getCurrentUser();
+            const displayName = customerName || sessionUser?.fullName || sessionUser?.full_name || sessionUser?.name;
+            if (!displayName) return null;
+            return (
+              <div className="table-row">
+                <span className="table-label">Nama Pemesan</span>
+                <span className="table-value" style={{ fontWeight: 600, color: '#111827' }}>
+                  {displayName}
+                </span>
+              </div>
+            );
+          })()}
+
           <div className="table-row">
             <span className="table-label">Status</span>
             <span className="status-badge-scheduled">

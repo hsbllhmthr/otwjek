@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { formatRupiah, calculateFare } from '../utils/fareCalculator.js';
 import { calculateHaversineDistance, reverseGeocodeNominatim } from '../utils/geoUtils.js';
+import dbService from '../services/dbService.js';
 
 // ── Dropoff Mini Map (shown inside recipient/dropoff details modal) ──────────
 function DropoffMiniMap({ dropoff }) {
@@ -574,11 +575,25 @@ export default function DeliveryDetailsPage({
     }
   }, [dropoff]);
 
-  // Sender Details (as seen in reference screenshot: Hasbullah • +6288705806690)
-  const [senderInfo, setSenderInfo] = useState({
-    name: 'Hasbullah',
-    phone: '+6288705806690'
+  // Sender Details (menggunakan data akun login jika tersedia)
+  const [senderInfo, setSenderInfo] = useState(() => {
+    const sessionUser = dbService?.session?.getCurrentUser();
+    return {
+      name: sessionUser?.fullName || sessionUser?.full_name || sessionUser?.name || 'Hasbullah',
+      phone: sessionUser?.phone || '+6288705806690'
+    };
   });
+
+  useEffect(() => {
+    const sessionUser = dbService?.session?.getCurrentUser();
+    if (sessionUser?.fullName || sessionUser?.full_name || sessionUser?.name) {
+      setSenderInfo((prev) => ({
+        ...prev,
+        name: sessionUser.fullName || sessionUser.full_name || sessionUser.name,
+        phone: sessionUser.phone || prev.phone
+      }));
+    }
+  }, []);
 
   // Recipient Details (empty initially: "Add recipient details *")
   const [recipientInfo, setRecipientInfo] = useState({

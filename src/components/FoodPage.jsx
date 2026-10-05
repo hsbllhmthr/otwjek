@@ -16,6 +16,7 @@ import sherideHeroArt from '../assets/sheride_hero_pink.png';
 import { searchNominatim } from '../utils/geoUtils.js';
 import { ADMINS } from '../data/admins.js';
 import { buildWhatsAppLink, formatFoodOrderMessage } from '../utils/whatsappTemplate.js';
+import dbService from '../services/dbService.js';
 
 // Pixel-perfect Red Location Pin for Delivery Destination
 function RedLocationPin({ size = 20 }) {
@@ -168,8 +169,14 @@ export default function FoodPage({
   ]);
   const [rawOrderNotes, setRawOrderNotes] = useState('');
   const [floorUnit, setFloorUnit] = useState('');
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerName, setCustomerName] = useState(() => {
+    const sessionUser = dbService?.session?.getCurrentUser();
+    return sessionUser?.fullName || sessionUser?.full_name || sessionUser?.name || '';
+  });
+  const [customerPhone, setCustomerPhone] = useState(() => {
+    const sessionUser = dbService?.session?.getCurrentUser();
+    return sessionUser?.phone ? sessionUser.phone.replace(/^\+?62|^0/, '') : '';
+  });
   const [driverNotes, setDriverNotes] = useState('');
   const [foodEstimatePrice, setFoodEstimatePrice] = useState('45000');
   const [deliveryFee] = useState(8000);

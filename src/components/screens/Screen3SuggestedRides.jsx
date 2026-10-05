@@ -3,6 +3,7 @@ import { ChevronLeft, Info, ShieldCheck, MoreHorizontal, Send, ChevronRight, Plu
 import { formatRupiah } from '../../utils/fareCalculator.js';
 import { buildWhatsAppLink, formatBookingMessage, openWhatsApp } from '../../utils/whatsappTemplate.js';
 import { ADMINS } from '../../data/admins.js';
+import dbService from '../../services/dbService.js';
 
 export default function Screen3SuggestedRides({
   pickup,
@@ -66,6 +67,10 @@ export default function Screen3SuggestedRides({
     localStorage.setItem('last_admin_dispatch_index', nextIdx.toString());
     const targetAdmin = ADMINS[nextIdx] || ADMINS[0];
 
+    const sessionUser = dbService?.session?.getCurrentUser();
+    const resolvedName = sessionUser?.fullName || sessionUser?.full_name || sessionUser?.name || 'Pelanggan Perempuan';
+    const resolvedPhone = sessionUser?.phone || '';
+
     const message = formatBookingMessage({
       serviceType: currentRide.id === 'send' ? 'send' : 'ride',
       vehicleType: currentRide.id === 'car' ? 'mobil' : 'motor',
@@ -73,7 +78,8 @@ export default function Screen3SuggestedRides({
       dropoffAddress: dropoff?.name || dropoff?.address || 'Titik Tujuan',
       distanceKm,
       formattedFare: formatRupiah(currentRide.price),
-      customerName: 'Pelanggan Perempuan',
+      customerName: resolvedName,
+      customerPhone: resolvedPhone,
       customerNotes: driverNotes || '',
       driverName: selectedDriver?.name || 'Acak (Dicarikan Admin)',
       packageDetails: currentRide.id === 'send' ? 'Paket / Makanan' : '',

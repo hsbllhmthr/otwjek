@@ -402,6 +402,38 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
     ).length;
   };
 
+  // Helper format tanggal lahir customer
+  const formatBirthDate = (val) => {
+    if (!val) return 'Belum diisi';
+    try {
+      const parts = String(val).split('-');
+      if (parts.length === 3) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const day = parseInt(parts[2], 10);
+        const d = new Date(year, month, day);
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleDateString('id-ID', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+          });
+        }
+      }
+      const d = new Date(val);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString('id-ID', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        });
+      }
+      return val;
+    } catch {
+      return val;
+    }
+  };
+
   return (
     <div className="admin-dash-layout">
       {/* Mobile Drawer Overlay */}
@@ -1936,9 +1968,6 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
         <div className="admin-modal-backdrop" onClick={() => setSelectedCustomerDetail(null)}>
           <div className="admin-modal-dialog customer-detail-dialog" onClick={(e) => e.stopPropagation()}>
             <div className="dialog-header">
-              <div className="dialog-icon-wrap customer">
-                <User size={22} />
-              </div>
               <div>
                 <h3 className="dialog-title">Detail Profil Pelanggan</h3>
                 <span className="dialog-sub">ID: {selectedCustomerDetail.id}</span>
@@ -1947,66 +1976,86 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                 type="button"
                 className="btn-close-dialog"
                 onClick={() => setSelectedCustomerDetail(null)}
+                title="Tutup dialog"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
-            <div className="dialog-body">
+            <div className="dialog-body customer-dialog-body">
+              {/* Profile Card */}
               <div className="customer-modal-profile">
-                <div className="customer-modal-avatar">
-                  {selectedCustomerDetail.avatar_url ? (
-                    <img src={selectedCustomerDetail.avatar_url} alt={selectedCustomerDetail.full_name} />
-                  ) : (
-                    <div className="modal-initials">
-                      {selectedCustomerDetail.full_name ? selectedCustomerDetail.full_name.charAt(0).toUpperCase() : 'P'}
-                    </div>
-                  )}
+                <div className="customer-modal-avatar-wrapper">
+                  <div className="customer-modal-avatar">
+                    {selectedCustomerDetail.avatar_url ? (
+                      <img src={selectedCustomerDetail.avatar_url} alt={selectedCustomerDetail.full_name} />
+                    ) : (
+                      <div className="modal-initials">
+                        {selectedCustomerDetail.full_name ? selectedCustomerDetail.full_name.charAt(0).toUpperCase() : 'P'}
+                      </div>
+                    )}
+                  </div>
+                  <span
+                    className={`cust-avatar-status-dot ${selectedCustomerDetail.status === 'suspended' ? 'suspended' : 'active'}`}
+                    title={selectedCustomerDetail.status === 'suspended' ? 'Akun Ditangguhkan' : 'Akun Aktif'}
+                  />
                 </div>
                 <div className="customer-modal-name-group">
-                  <h4 className="modal-cust-name">{selectedCustomerDetail.full_name}</h4>
-                  <span className={`modal-status-badge ${selectedCustomerDetail.status === 'suspended' ? 'suspended' : 'active'}`}>
-                    Status: {selectedCustomerDetail.status === 'suspended' ? 'Akun Ditangguhkan' : 'Akun Aktif'}
-                  </span>
+                  <h4 className="modal-cust-name">{selectedCustomerDetail.full_name || 'Pelanggan'}</h4>
+                  <div className="customer-modal-meta">
+                    {selectedCustomerDetail.status === 'suspended' && (
+                      <span className="cust-status-badge suspended">
+                        Akun Ditangguhkan
+                      </span>
+                    )}
+                    <span className="cust-meta-text">Perempuan (Khusus Wanita)</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="customer-details-table">
-                <div className="modal-data-row">
-                  <span className="data-row-label">Nomor WhatsApp:</span>
-                  <div className="data-row-val-group">
-                    <span className="data-row-val">{selectedCustomerDetail.phone || '-'}</span>
+              {/* Clean Key-Value List */}
+              <div className="customer-details-list">
+                <div className="cust-detail-row">
+                  <span className="cust-detail-label">Nomor WhatsApp</span>
+                  <div className="cust-detail-value-group">
+                    <span className="cust-detail-value">{selectedCustomerDetail.phone || '-'}</span>
                     {selectedCustomerDetail.phone && (
                       <a
                         href={`https://wa.me/${(selectedCustomerDetail.phone || '').replace(/^\+?62|^0/, '62')}?text=Halo%20Kak%20${encodeURIComponent(selectedCustomerDetail.full_name || 'Pelanggan')},%20kami%20dari%20Customer%20Care%20OTWJek.`}
                         target="_blank"
                         rel="noreferrer"
-                        className="modal-link-wa"
+                        className="cust-wa-link"
+                        title="Buka WhatsApp"
+                        aria-label="Buka WhatsApp"
                       >
-                        Buka WhatsApp <ExternalLink size={12} />
+                        <ExternalLink size={13} />
                       </a>
                     )}
                   </div>
                 </div>
 
-                <div className="modal-data-row">
-                  <span className="data-row-label">Email:</span>
-                  <span className="data-row-val">{selectedCustomerDetail.email || '-'}</span>
+                <div className="cust-detail-row">
+                  <span className="cust-detail-label">Alamat Email</span>
+                  <span className="cust-detail-value">{selectedCustomerDetail.email || '-'}</span>
                 </div>
 
-                <div className="modal-data-row">
-                  <span className="data-row-label">Jenis Kelamin:</span>
-                  <span className="data-row-val">{selectedCustomerDetail.gender || 'Perempuan'} (Verifikasi Wanita)</span>
+                <div className="cust-detail-row">
+                  <span className="cust-detail-label">Jenis Kelamin</span>
+                  <span className="cust-detail-value">
+                    {selectedCustomerDetail.gender || 'Perempuan'}
+                  </span>
                 </div>
 
-                <div className="modal-data-row">
-                  <span className="data-row-label">Tanggal Lahir:</span>
-                  <span className="data-row-val">{selectedCustomerDetail.birth_date || 'Belum diisi'}</span>
+                <div className="cust-detail-row">
+                  <span className="cust-detail-label">Tanggal Lahir</span>
+                  <span className="cust-detail-value">
+                    {formatBirthDate(selectedCustomerDetail.birth_date || selectedCustomerDetail.birthDate)}
+                  </span>
                 </div>
 
-                <div className="modal-data-row">
-                  <span className="data-row-label">Tanggal Bergabung:</span>
-                  <span className="data-row-val">
+                <div className="cust-detail-row">
+                  <span className="cust-detail-label">Tanggal Bergabung</span>
+                  <span className="cust-detail-value">
                     {selectedCustomerDetail.created_at
                       ? new Date(selectedCustomerDetail.created_at).toLocaleString('id-ID', {
                           day: 'numeric',
@@ -2014,14 +2063,14 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                           year: 'numeric',
                           hour: '2-digit',
                           minute: '2-digit'
-                        })
+                        }) + ' WITA'
                       : '-'}
                   </span>
                 </div>
 
-                <div className="modal-data-row">
-                  <span className="data-row-label">Total Pesanan:</span>
-                  <span className="data-row-val bold-val">
+                <div className="cust-detail-row">
+                  <span className="cust-detail-label">Total Pesanan</span>
+                  <span className="cust-detail-value">
                     {getCustomerOrderCount(selectedCustomerDetail)} kali order
                   </span>
                 </div>

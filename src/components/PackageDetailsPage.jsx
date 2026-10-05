@@ -16,11 +16,12 @@ import {
 import { formatRupiah, PRICING_CONFIG } from '../utils/fareCalculator.js';
 import { buildWhatsAppLink, formatBookingMessage, openWhatsApp } from '../utils/whatsappTemplate.js';
 import { ADMINS } from '../data/admins.js';
+import dbService from '../services/dbService.js';
 
 export default function PackageDetailsPage({
   pickup,
   dropoff,
-  senderInfo = { name: 'Hasbullah', phone: '+6288705806690' },
+  senderInfo = null,
   recipientInfo = { name: '', phone: '', floorUnit: '', noteToDriver: '' },
   itemInfo = { itemName: '', category: 'Food', size: 'S', weight: '1', weightTier: 'light', guarantee: '1 Basic' },
   selectedVehicle = 'bike',
@@ -36,6 +37,16 @@ export default function PackageDetailsPage({
   const [gpsCoords, setGpsCoords] = useState(null);
   const [selectedAdminId, setSelectedAdminId] = useState(initialAdmin?.id || ADMINS[0]?.id || 'admin-1');
   const selectedAdmin = ADMINS.find((a) => a.id === selectedAdminId) || initialAdmin || ADMINS[0];
+
+  const sessionUser = dbService?.session?.getCurrentUser();
+  const effectiveSenderName =
+    senderInfo?.name && senderInfo.name !== 'Hasbullah' && senderInfo.name !== 'Pengirim OTWJek'
+      ? senderInfo.name
+      : (sessionUser?.fullName || sessionUser?.full_name || sessionUser?.name || senderInfo?.name || 'Pengirim OTWJek');
+  const effectiveSenderPhone =
+    senderInfo?.phone && senderInfo.phone !== '+6288705806690'
+      ? senderInfo.phone
+      : (sessionUser?.phone || senderInfo?.phone || '+6288705806690');
 
   // Background geolocation fetching (doesn't block button click)
   useEffect(() => {
@@ -122,7 +133,8 @@ export default function PackageDetailsPage({
       dropoffAddress: dropoffTitle,
       distanceKm,
       formattedFare: formatRupiah(currentPrice),
-      customerName: senderInfo?.name || 'Pengirim OTWJek',
+      customerName: effectiveSenderName,
+      customerPhone: effectiveSenderPhone,
       customerNotes: recipientInfo?.noteToDriver || '',
       driverName: 'Acak (Dicarikan Admin)',
       packageDetails: `${itemInfo?.itemName || 'Barang'} [${itemInfo?.category || 'Umum'}, ${itemInfo?.weight || '1'}kg]`,
@@ -133,7 +145,7 @@ export default function PackageDetailsPage({
         size: itemInfo?.size || 'S',
         recipientName: recipientInfo?.name || 'Penerima',
         recipientPhone: recipientInfo?.phone || '',
-        senderPhone: senderInfo?.phone || '',
+        senderPhone: effectiveSenderPhone,
         specialNotes: recipientInfo?.noteToDriver || ''
       },
       paymentMethod,
@@ -271,7 +283,7 @@ export default function PackageDetailsPage({
               <div className="route-row-item pickup-row" style={{ height: 'auto', flexDirection: 'column', alignItems: 'flex-start' }}>
                 <div className="location-heading">{pickupTitle}</div>
                 <div style={{ fontSize: '11.5px', color: '#6E7191', marginTop: '2px' }}>
-                  Pengirim: <strong style={{ color: '#111827' }}>{senderInfo?.name || 'Hasbullah'}</strong> ({senderInfo?.phone || '+6288705806690'})
+                  Pengirim: <strong style={{ color: '#111827' }}>{effectiveSenderName}</strong> ({effectiveSenderPhone})
                 </div>
               </div>
 
@@ -290,10 +302,7 @@ export default function PackageDetailsPage({
 
         {/* Card 4: Item & Package Details (Special for Package Flow) */}
         <section className="details-card card-table">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', borderBottom: '1px solid #F0F1F3', paddingBottom: '10px' }}>
-            <div style={{ width: 28, height: 28, borderRadius: '8px', background: '#FCE7F3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Package size={16} color="#EC4899" />
-            </div>
+          <div style={{ marginBottom: '4px', borderBottom: '1px solid #F0F1F3', paddingBottom: '10px' }}>
             <h3 style={{ fontSize: '14.5px', fontWeight: '750', color: '#111827', margin: 0 }}>
               Detail Barang Kiriman
             </h3>
