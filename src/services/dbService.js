@@ -25,9 +25,9 @@ const STORAGE_KEYS = {
   ADMIN_SESSION: 'otwjek_db_admin_session'
 };
 
-// Kredensial admin default dibaca dari .env.local (tidak di-commit)
-const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL || '').trim().toLowerCase();
-const ADMIN_PASSWORD = (import.meta.env.VITE_ADMIN_PASSWORD || '').trim();
+// Kredensial admin default dibaca dari .env / .env.local (dengan fallback default jika belum diset)
+const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL || 'admin@otwjek.com').trim().toLowerCase();
+const ADMIN_PASSWORD = (import.meta.env.VITE_ADMIN_PASSWORD || 'admin123').trim();
 
 // Helper generator UUID v4 sederhana
 export function generateUUID() {
@@ -409,20 +409,101 @@ export const dbService = {
     },
 
     /**
-     * Memperbarui Data Driver (Kendaraan, Identitas, dll)
+     * Memperbarui / Melengkapi Data Driver oleh Admin atau Sistem
+     * Dapat mengupdate identitas, kendaraan, legalitas, dokumen foto, dan status verifikasi.
      */
-    updateDriver(driverId, updateData) {
+    updateDriver(driverId, updateData = {}, documents = {}, reviewerName = 'Admin OTWJek') {
       const drivers = this.getAll();
       const idx = drivers.findIndex((d) => d.id === driverId);
       if (idx === -1) return null;
 
+      // Persiapkan status & badge jika ada perubahan verification_status
+      let extraStatusFields = {};
+      if (updateData.verification_status === 'approved') {
+        extraStatusFields = {
+          verification_status: 'approved',
+          status: updateData.status || 'Tersedia',
+          badge: updateData.badge || drivers[idx].badge || 'Mitra Resmi 🌸',
+          reviewed_by: reviewerName,
+          reviewed_at: new Date().toISOString(),
+          rejection_reason: null
+        };
+      } else if (updateData.verification_status === 'rejected') {
+        extraStatusFields = {
+          verification_status: 'rejected',
+          status: updateData.status || 'Verifikasi Ditolak',
+          rejection_reason: updateData.rejection_reason || 'Dokumen belum lengkap atau tidak sesuai.',
+          reviewed_by: reviewerName,
+          reviewed_at: new Date().toISOString()
+        };
+      } else if (updateData.verification_status === 'pending') {
+        extraStatusFields = {
+          verification_status: 'pending',
+          status: updateData.status || 'Menunggu Verifikasi',
+          rejection_reason: null
+        };
+      }
+
       drivers[idx] = {
         ...drivers[idx],
-        ...updateData
+        ...updateData,
+        ...extraStatusFields,
+        updated_at: new Date().toISOString()
       };
       setStoredArray(STORAGE_KEYS.DRIVERS, drivers);
 
-      // Sinkronisasi session lokal
+      // Sinkronisasi akun user jika ada perubahan nama/telepon/avatar
+      if (drivers[idx].user_id) {
+        const users = getStoredArray(STORAGE_KEYS.USERS, []);
+        const uIdx = users.findIndex((u) => u.id === drivers[idx].user_id);
+        if (uIdx !== -1) {
+          users[uIdx] = {
+            ...users[uIdx],
+            full_name: updateData.name || users[uIdx].full_name,
+            phone: updateData.phone || users[uIdx].phone,
+            avatar_url: updateData.avatar || users[uIdx].avatar_url,
+            updated_at: new Date().toISOString()
+          };
+          setStoredArray(STORAGE_KEYS.USERS, users);
+        }
+      }
+
+      // Sinkronisasi dokumen (KTP, SIM, STNK) jika diunggah atau diupdate
+      if (documents && Object.keys(documents).length > 0) {
+        const storedDocs = getStoredArray(STORAGE_KEYS.DRIVER_DOCS, []);
+        ['ktp', 'sim', 'stnk'].forEach((docType) => {
+          if (documents[docType]) {
+            const docVal = documents[docType];
+            const docUrl = typeof docVal === 'string' ? docVal : docVal.url;
+            const docName = (typeof docVal === 'object' && docVal.name) ? docVal.name : `${docType}_document.jpg`;
+            const docStatus = updateData.verification_status === 'approved' ? 'approved' : (docVal.verification_status || 'pending');
+
+            const existingIdx = storedDocs.findIndex(
+              (d) => d.driver_id === driverId && d.document_type === docType
+            );
+
+            const docEntry = {
+              id: existingIdx !== -1 ? storedDocs[existingIdx].id : generateUUID(),
+              driver_id: driverId,
+              document_type: docType,
+              document_url: docUrl,
+              file_name: docName,
+              verification_status: docStatus,
+              rejection_reason: null,
+              updated_at: new Date().toISOString()
+            };
+
+            if (existingIdx !== -1) {
+              storedDocs[existingIdx] = docEntry;
+            } else {
+              storedDocs.push(docEntry);
+            }
+          }
+        });
+        setStoredArray(STORAGE_KEYS.DRIVER_DOCS, storedDocs);
+      }
+
+      // Sinkronisasi session lokal jika sedang login sebagai driver tersebut
       const sessionUser = dbService.session.getCurrentUser();
       if (sessionUser && (sessionUser.id === drivers[idx].user_id || sessionUser.driver?.id === driverId)) {
         sessionUser.driver = drivers[idx];
@@ -432,6 +513,7 @@ export const dbService = {
         };
         dbService.session.setCurrentUser(sessionUser);
       }
+
       return drivers[idx];
     },
 
@@ -611,7 +693,7 @@ export const dbService = {
 
       if (
         isValidPassword &&
-        ((ADMIN_EMAIL && cleanIdent === ADMIN_EMAIL) || cleanIdent === '0882021942470' || cleanIdent === '62882021942470')
+        ((ADMIN_EMAIL && cleanIdent === ADMIN_EMAIL) || cleanIdent === 'admin' || cleanIdent === '0882021942470' || cleanIdent === '62882021942470')
       ) {
         const adminObj = {
           id: 'admin-master-01',

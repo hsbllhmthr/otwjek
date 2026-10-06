@@ -64,23 +64,39 @@
 }
 
 .admin-sidebar-header {
-  padding: 22px 24px;
+  height: 64px;
+  min-height: 64px;
+  max-height: 64px;
+  padding: 0 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid #2E3A47;
+  background-color: #1C2434;
+  flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .admin-sidebar-brand {
   display: flex;
   align-items: center;
+  gap: 10px;
+}
+
+.sidebar-brand-img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  border-radius: 6px;
+  flex-shrink: 0;
 }
 
 .sidebar-app-name {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 800;
   color: #FFFFFF;
   letter-spacing: 0.5px;
+  line-height: 1;
 }
 
 .btn-sidebar-close {
@@ -491,8 +507,11 @@
 }
 
 .admin-sidebar.is-collapsed .admin-sidebar-header {
+  height: 64px;
+  min-height: 64px;
+  max-height: 64px;
   justify-content: center;
-  padding: 20px 10px;
+  padding: 0 10px;
 }
 
 .admin-sidebar.is-collapsed .sidebar-nav-item {
@@ -3090,5 +3109,390 @@
   .btn-overview-action {
     width: 100%;
     justify-content: center;
+  }
+}
+
+/* ==========================================================================
+   DRIVER EDIT & COMPLETION MODAL (SIMPLE, CLEAN & MINIMALIST)
+   ========================================================================== */
+
+.btn-table-edit {
+  padding: 5px 12px;
+  background-color: #FFFFFF;
+  color: #3C50E0;
+  border: 1px solid #D1D5DB;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-table-edit:hover {
+  background-color: #F1F5F9;
+  border-color: #3C50E0;
+}
+
+/* Modal Dialog */
+.driver-edit-dialog-minimal {
+  max-width: 580px;
+  width: 95%;
+  border-radius: 12px;
+  background-color: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 20px 40px -8px rgba(15, 23, 42, 0.15);
+  overflow: hidden;
+}
+
+.edit-dialog-header-minimal {
+  padding: 16px 20px;
+  border-bottom: 1px solid #F1F5F9;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.edit-dialog-header-minimal .dialog-title {
+  font-size: 15.5px;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0;
+}
+
+.edit-dialog-header-minimal .dialog-sub {
+  font-size: 11.5px;
+  color: #64748B;
+  margin-top: 3px;
+  display: block;
+}
+
+.edit-dialog-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Minimalist Text-Only Tabs */
+.driver-edit-tabs-minimal {
+  display: flex;
+  border-bottom: 1px solid #E2E8F0;
+  background-color: #F8FAFC;
+  padding: 0 16px;
+  gap: 4px;
+}
+
+.tab-btn-minimal {
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748B;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+  margin-bottom: -1px;
+}
+
+.tab-btn-minimal:hover {
+  color: #0F172A;
+}
+
+.tab-btn-minimal.active {
+  color: #3C50E0;
+  font-weight: 600;
+  border-bottom-color: #3C50E0;
+  background-color: transparent;
+}
+
+/* Modal Body */
+.edit-body-minimal {
+  padding: 18px 20px;
+  max-height: calc(85vh - 140px);
+  overflow-y: auto;
+  background-color: #FFFFFF;
+}
+
+.edit-section-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Minimal Avatar Row */
+.avatar-row-minimal {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  background-color: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+}
+
+.avatar-thumb-minimal {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #CBD5E1;
+  background-color: #E2E8F0;
+  flex-shrink: 0;
+}
+
+.avatar-info-minimal {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.avatar-label-minimal {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1E293B;
+}
+
+.btn-file-text-minimal {
+  font-size: 12px;
+  font-weight: 600;
+  color: #3C50E0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.btn-file-text-minimal:hover {
+  color: #2D3DB8;
+}
+
+/* Minimal Grid Form */
+.minimal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px 14px;
+}
+
+.minimal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.minimal-field.full {
+  grid-column: 1 / -1;
+}
+
+.minimal-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.minimal-field input,
+.minimal-field select,
+.minimal-field textarea {
+  width: 100%;
+  padding: 8px 11px;
+  border: 1px solid #CBD5E1;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #0F172A;
+  background-color: #FFFFFF;
+  box-sizing: border-box;
+  font-family: inherit;
+  transition: border-color 0.15s ease;
+}
+
+.minimal-field input:focus,
+.minimal-field select:focus,
+.minimal-field textarea:focus {
+  outline: none;
+  border-color: #3C50E0;
+}
+
+.minimal-field input.readonly {
+  background-color: #F8FAFC;
+  color: #64748B;
+  cursor: not-allowed;
+}
+
+/* Minimal Document List */
+.docs-list-minimal {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.doc-row-minimal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background-color: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+}
+
+.doc-info-minimal {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.doc-name-minimal {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1E293B;
+}
+
+.doc-status-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.doc-status-badge.ready {
+  background-color: #D1FAE5;
+  color: #065F46;
+}
+
+.doc-status-badge.empty {
+  background-color: #FEE2E2;
+  color: #991B1B;
+}
+
+.doc-actions-minimal {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-doc-link-minimal {
+  background: none;
+  border: none;
+  color: #3C50E0;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.btn-doc-link-minimal:hover {
+  color: #2D3DB8;
+}
+
+.btn-doc-upload-minimal {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  padding: 4px 10px;
+  background-color: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 5px;
+  transition: all 0.15s ease;
+}
+
+.btn-doc-upload-minimal:hover {
+  background-color: #F1F5F9;
+  color: #0F172A;
+}
+
+/* Minimal Footer */
+.edit-footer-minimal {
+  padding: 14px 20px;
+  background-color: #F8FAFC;
+  border-top: 1px solid #E2E8F0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.footer-actions-group-minimal {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-dialog-save-driver {
+  background-color: #3C50E0;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.btn-dialog-save-driver:hover {
+  background-color: #2D3DB8;
+}
+
+.btn-dialog-save-driver:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.admin-toast-banner {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background-color: #0F172A;
+  color: #FFFFFF;
+  padding: 12px 20px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  z-index: 999;
+  font-size: 13.5px;
+  font-weight: 600;
+  animation: toastSlideUp 0.25s ease-out;
+}
+
+@keyframes toastSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 600px) {
+  .minimal-grid {
+    grid-template-columns: 1fr;
+  }
+  .doc-row-minimal {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .doc-actions-minimal {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .edit-footer-minimal {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .footer-actions-group-minimal {
+    width: 100%;
+    flex-direction: column;
+  }
+  .btn-dialog-save-driver,
+  .btn-dialog-confirm-approve {
+    width: 100%;
+    text-align: center;
   }
 }

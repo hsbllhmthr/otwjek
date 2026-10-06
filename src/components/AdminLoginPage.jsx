@@ -56,14 +56,14 @@ export default function AdminLoginPage({ onBack, onSuccess }) {
           {/* Field Email */}
           <div className="signin-field-group">
             <label className="signin-field-label" htmlFor="admin-email-input">
-              Alamat Email
+              Alamat Email / Username Admin
             </label>
             <div className="signin-input-wrapper">
               <input
                 id="admin-email-input"
                 type="text"
                 className="signin-input"
-                placeholder="nama@email.com"
+                placeholder="admin@otwjek.com"
                 value={identifier}
                 onChange={(e) => {
                   setIdentifier(e.target.value);

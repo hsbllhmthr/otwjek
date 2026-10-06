@@ -35,10 +35,17 @@ import {
   MessageSquare,
   TrendingUp,
   Bell,
-  Moon
+  Moon,
+  Edit3,
+  Save,
+  Upload,
+  Camera,
+  Check
 } from 'lucide-react';
 import dbService from '../services/dbService.js';
 import driverPlaceholder from '../assets/driver_placeholder.svg';
+import otwjekLogo from '../assets/otwjek_logo.png';
+import { compressImageFile } from '../utils/imageCompressor.js';
 
 export default function AdminVerificationDashboard({ admin, onLogout, onGoToCustomerApp }) {
   // Navigation Section: 'overview' | 'drivers' | 'customers'
@@ -60,6 +67,13 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
   const [rejectReason, setRejectReason] = useState('Foto dokumen buram atau tidak terbaca dengan jelas.');
   const [customRejectReason, setCustomRejectReason] = useState('');
   const [approveConfirmDriver, setApproveConfirmDriver] = useState(null);
+  
+  // State Edit & Lengkapi Data Driver oleh Admin
+  const [editingDriver, setEditingDriver] = useState(null);
+  const [editDriverForm, setEditDriverForm] = useState(null);
+  const [editDriverActiveTab, setEditDriverActiveTab] = useState('identitas'); // 'identitas' | 'kendaraan' | 'legalitas' | 'verifikasi'
+  const [isSavingDriver, setIsSavingDriver] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
 
   // =========================================================================
   // STATE CUSTOMER
@@ -366,6 +380,132 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
     }
   };
 
+  const handleOpenEditDriver = (driver) => {
+    if (!driver) return;
+    const docs = getDriverDocs(driver.id) || [];
+    const ktpDoc = docs.find((d) => d.document_type === 'ktp');
+    const simDoc = docs.find((d) => d.document_type === 'sim');
+    const stnkDoc = docs.find((d) => d.document_type === 'stnk');
+
+    setEditingDriver(driver);
+    setEditDriverForm({
+      name: driver.name || '',
+      phone: driver.phone || '',
+      nik: driver.nik || '',
+      gender: driver.gender || 'Perempuan',
+      avatar: driver.avatar || '',
+      bio: driver.bio || '',
+
+      vehicleType: driver.vehicleType || 'motor',
+      vehicleBrand: driver.vehicleBrand || '',
+      vehicleModel: driver.vehicleModel || '',
+      plateNumber: driver.plateNumber || '',
+      vehicleColor: driver.vehicleColor || '',
+      operationalArea: driver.operationalArea || 'Makassar dan sekitarnya',
+      badge: driver.badge || (driver.verification_status === 'approved' ? 'Mitra Resmi 🌸' : 'Calon Mitra 🌸'),
+
+      simNumber: driver.simNumber || driver.simCNumber || driver.simANumber || '',
+      simExpiry: driver.simExpiry || '',
+      stnkExpiry: driver.stnkExpiry || '',
+
+      emergencyContactName: driver.emergencyContactName || '',
+      emergencyContactPhone: driver.emergencyContactPhone || '',
+
+      verification_status: driver.verification_status || 'pending',
+      rejection_reason: driver.rejection_reason || '',
+
+      // Dokumen
+      ktpUrl: ktpDoc?.document_url || '',
+      simUrl: simDoc?.document_url || '',
+      stnkUrl: stnkDoc?.document_url || ''
+    });
+    setEditDriverActiveTab('identitas');
+  };
+
+  const handleAvatarFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const base64 = await compressImageFile(file, 400, 400, 0.8);
+      setEditDriverForm((prev) => ({ ...prev, avatar: base64 }));
+    } catch (err) {
+      alert('Gagal membaca gambar profil: ' + err.message);
+    }
+  };
+
+  const handleDocFile = async (docType, e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const base64 = await compressImageFile(file, 1000, 1000, 0.75);
+      if (docType === 'ktp') setEditDriverForm((prev) => ({ ...prev, ktpUrl: base64 }));
+      if (docType === 'sim') setEditDriverForm((prev) => ({ ...prev, simUrl: base64 }));
+      if (docType === 'stnk') setEditDriverForm((prev) => ({ ...prev, stnkUrl: base64 }));
+    } catch (err) {
+      alert('Gagal membaca gambar berkas: ' + err.message);
+    }
+  };
+
+  const handleSaveDriver = (overrideStatus = null) => {
+    if (!editingDriver || !editDriverForm) return;
+
+    if (!editDriverForm.name.trim()) {
+      alert('Nama lengkap driver tidak boleh kosong.');
+      return;
+    }
+
+    setIsSavingDriver(true);
+
+    const targetVerificationStatus = overrideStatus || editDriverForm.verification_status || 'pending';
+
+    const updatedData = {
+      name: editDriverForm.name.trim(),
+      phone: editDriverForm.phone.trim(),
+      nik: editDriverForm.nik.trim(),
+      gender: editDriverForm.gender || 'Perempuan',
+      avatar: editDriverForm.avatar,
+      bio: editDriverForm.bio.trim(),
+
+      vehicleType: editDriverForm.vehicleType,
+      vehicleBrand: editDriverForm.vehicleBrand.trim(),
+      vehicleModel: editDriverForm.vehicleModel.trim(),
+      plateNumber: editDriverForm.plateNumber.toUpperCase().trim(),
+      vehicleColor: editDriverForm.vehicleColor.trim(),
+      operationalArea: editDriverForm.operationalArea.trim(),
+      badge: editDriverForm.badge.trim(),
+
+      simNumber: editDriverForm.simNumber.trim(),
+      simExpiry: editDriverForm.simExpiry,
+      stnkExpiry: editDriverForm.stnkExpiry,
+
+      emergencyContactName: editDriverForm.emergencyContactName.trim(),
+      emergencyContactPhone: editDriverForm.emergencyContactPhone.trim(),
+
+      verification_status: targetVerificationStatus,
+      rejection_reason: targetVerificationStatus === 'rejected' ? (editDriverForm.rejection_reason || 'Dokumen belum lengkap atau tidak sesuai.') : null
+    };
+
+    const docUpdates = {};
+    if (editDriverForm.ktpUrl) {
+      docUpdates.ktp = { url: editDriverForm.ktpUrl, name: 'ktp_document.jpg', verification_status: targetVerificationStatus === 'approved' ? 'approved' : 'pending' };
+    }
+    if (editDriverForm.simUrl) {
+      docUpdates.sim = { url: editDriverForm.simUrl, name: 'sim_document.jpg', verification_status: targetVerificationStatus === 'approved' ? 'approved' : 'pending' };
+    }
+    if (editDriverForm.stnkUrl) {
+      docUpdates.stnk = { url: editDriverForm.stnkUrl, name: 'stnk_document.jpg', verification_status: targetVerificationStatus === 'approved' ? 'approved' : 'pending' };
+    }
+
+    setTimeout(() => {
+      dbService.drivers.updateDriver(editingDriver.id, updatedData, docUpdates, admin?.name || 'Admin OTWJek');
+      loadDrivers();
+      setIsSavingDriver(false);
+      setEditingDriver(null);
+      setToastMessage('Data driver berhasil disimpan dan diperbarui!');
+      setTimeout(() => setToastMessage(null), 4000);
+    }, 200);
+  };
+
   // =========================================================================
   // HANDLERS CUSTOMER
   // =========================================================================
@@ -448,6 +588,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
       <aside className={`admin-sidebar ${sidebarOpen ? 'is-open' : ''} ${sidebarCollapsed ? 'is-collapsed' : ''}`}>
         <div className="admin-sidebar-header">
           <div className="admin-sidebar-brand">
+            <img src={otwjekLogo} alt="OTWJek Logo" className="sidebar-brand-img" />
             <span className="sidebar-app-name">OTWJEK</span>
           </div>
           <button
@@ -851,11 +992,11 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                     className="btn-table-action"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setMainSection('drivers');
-                                      setDriverSearchQuery(d.name);
+                                      handleOpenEditDriver(d);
                                     }}
+                                    title="Lengkapi atau Edit Data Driver"
                                   >
-                                    {isPending ? 'Tinjau' : 'Detail'}
+                                    <span>{isPending ? 'Lengkapi' : 'Edit'}</span>
                                   </button>
                                 </td>
                               </tr>
@@ -1367,6 +1508,18 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                               </td>
                               <td className="tailadmin-td action-td text-right">
                                 <div className="table-action-group">
+                                  <button
+                                    type="button"
+                                    className="btn-table-edit"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenEditDriver(driver);
+                                    }}
+                                    title="Lengkapi atau Edit Data Driver"
+                                  >
+                                    Edit
+                                  </button>
+
                                   {isPending && (
                                     <>
                                       <button
@@ -2206,6 +2359,461 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* MODAL 7: EDIT & LENGKAPI DATA DRIVER (SIMPLE, CLEAN & MINIMALIST) */}
+      {/* ================================================================= */}
+      {editingDriver && editDriverForm && (
+        <div className="admin-modal-backdrop" onClick={() => !isSavingDriver && setEditingDriver(null)}>
+          <div className="admin-modal-dialog driver-edit-dialog-minimal" onClick={(e) => e.stopPropagation()}>
+            {/* Header: Clean & Uncluttered */}
+            <div className="dialog-header edit-dialog-header-minimal">
+              <div>
+                <div className="edit-dialog-title-row">
+                  <h3 className="dialog-title">Edit Data Mitra Driver</h3>
+                  <span className={`table-status-pill ${
+                    editDriverForm.verification_status === 'pending'
+                      ? 'pending'
+                      : editDriverForm.verification_status === 'rejected'
+                      ? 'cancel'
+                      : 'active'
+                  }`}>
+                    {editDriverForm.verification_status === 'pending'
+                      ? 'Menunggu Review'
+                      : editDriverForm.verification_status === 'rejected'
+                      ? 'Ditolak'
+                      : 'Disetujui'}
+                  </span>
+                </div>
+                <span className="dialog-sub">ID: {editingDriver.id} • {editingDriver.name}</span>
+              </div>
+              <button
+                type="button"
+                className="btn-close-dialog"
+                disabled={isSavingDriver}
+                onClick={() => setEditingDriver(null)}
+                title="Tutup dialog"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Clean Text-Only Tabs */}
+            <div className="driver-edit-tabs-minimal">
+              <button
+                type="button"
+                className={`tab-btn-minimal ${editDriverActiveTab === 'identitas' ? 'active' : ''}`}
+                onClick={() => setEditDriverActiveTab('identitas')}
+              >
+                Identitas
+              </button>
+              <button
+                type="button"
+                className={`tab-btn-minimal ${editDriverActiveTab === 'kendaraan' ? 'active' : ''}`}
+                onClick={() => setEditDriverActiveTab('kendaraan')}
+              >
+                Kendaraan
+              </button>
+              <button
+                type="button"
+                className={`tab-btn-minimal ${editDriverActiveTab === 'dokumen' ? 'active' : ''}`}
+                onClick={() => setEditDriverActiveTab('dokumen')}
+              >
+                Dokumen
+              </button>
+              <button
+                type="button"
+                className={`tab-btn-minimal ${editDriverActiveTab === 'status' ? 'active' : ''}`}
+                onClick={() => setEditDriverActiveTab('status')}
+              >
+                Status & Darurat
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="dialog-body edit-body-minimal">
+              {/* TAB 1: IDENTITAS */}
+              {editDriverActiveTab === 'identitas' && (
+                <div className="edit-section-stack">
+                  {/* Avatar minimal */}
+                  <div className="avatar-row-minimal">
+                    <img
+                      src={editDriverForm.avatar || driverPlaceholder}
+                      alt="Driver Avatar"
+                      className="avatar-thumb-minimal"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = driverPlaceholder;
+                      }}
+                    />
+                    <div className="avatar-info-minimal">
+                      <span className="avatar-label-minimal">Foto Profil Mitra</span>
+                      <label className="btn-file-text-minimal">
+                        <span>Pilih Foto Baru</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          onChange={handleAvatarFile}
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="minimal-grid">
+                    <div className="minimal-field">
+                      <label>Nama Lengkap</label>
+                      <input
+                        type="text"
+                        placeholder="Nama lengkap driver"
+                        value={editDriverForm.name}
+                        onChange={(e) => setEditDriverForm({ ...editDriverForm, name: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="minimal-field">
+                      <label>Nomor WhatsApp</label>
+                      <input
+                        type="text"
+                        placeholder="08xxxxxxxxxx"
+                        value={editDriverForm.phone}
+                        onChange={(e) => setEditDriverForm({ ...editDriverForm, phone: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="minimal-field">
+                      <label>NIK (KTP)</label>
+                      <input
+                        type="text"
+                        maxLength={16}
+                        placeholder="16 digit NIK"
+                        value={editDriverForm.nik}
+                        onChange={(e) => setEditDriverForm({ ...editDriverForm, nik: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="minimal-field">
+                      <label>Jenis Kelamin</label>
+                      <input
+                        type="text"
+                        value="Perempuan (Khusus Wanita)"
+                        readOnly
+                        className="readonly"
+                      />
+                    </div>
+
+                    <div className="minimal-field full">
+                      <label>Bio / Catatan Pelayanan</label>
+                      <textarea
+                        rows={2}
+                        placeholder="Catatan pelayanan driver..."
+                        value={editDriverForm.bio}
+                        onChange={(e) => setEditDriverForm({ ...editDriverForm, bio: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: KENDARAAN */}
+              {editDriverActiveTab === 'kendaraan' && (
+                <div className="edit-section-stack">
+                  <div className="minimal-grid">
+                    <div className="minimal-field">
+                      <label>Jenis Layanan</label>
+                      <select
+                        value={editDriverForm.vehicleType}
+                        onChange={(e) => setEditDriverForm({ ...editDriverForm, vehicleType: e.target.value })}
+                      >
+                        <option value="motor">SheRide (Sepeda Motor)</option>
+                        <option value="mobil">SheCar (Mobil Penumpang)</option>
+                      </select>
+                    </div>
+
+                    <div className="minimal-field">
+                      <label>Merk Kendaraan</label>
+                      <input
+                        type="text"
+                        placeholder="Honda, Yamaha, Toyota..."
+                        value={editDriverForm.vehicleBrand}
+                        onChange={(e) => setEditDriverForm({ ...editDriverForm, vehicleBrand: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="minimal-field">
+                      <label>Model & Tipe</label>
+                      <input
+                        type="text"
+                        placeholder="Scoopy, Fazzio, Calya..."
+                        value={editDriverForm.vehicleModel}
+                        onChange={(e) => setEditDriverForm({ ...editDriverForm, vehicleModel: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="minimal-field">
+                      <label>Plat Nomor</label>
+                      <input
+                        type="text"
+                        placeholder="DD 1234 XX"
+                        value={editDriverForm.plateNumber}
+                        onChange={(e) => setEditDriverForm({ ...editDriverForm, plateNumber: e.target.value.toUpperCase() })}
+                      />
+                    </div>
+
+                    <div className="minimal-field">
+                      <label>Warna Kendaraan</label>
+                      <input
+                        type="text"
+                        placeholder="Warna kendaraan"
+                        value={editDriverForm.vehicleColor}
+                        onChange={(e) => setEditDriverForm({ ...editDriverForm, vehicleColor: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="minimal-field">
+                      <label>Area Operasional</label>
+                      <input
+                        type="text"
+                        placeholder="Makassar, Gowa..."
+                        value={editDriverForm.operationalArea}
+                        onChange={(e) => setEditDriverForm({ ...editDriverForm, operationalArea: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="minimal-field full">
+                      <label>Badge Mitra</label>
+                      <input
+                        type="text"
+                        placeholder="Mitra Resmi 🌸"
+                        value={editDriverForm.badge}
+                        onChange={(e) => setEditDriverForm({ ...editDriverForm, badge: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: DOKUMEN & LEGALITAS */}
+              {editDriverActiveTab === 'dokumen' && (
+                <div className="edit-section-stack">
+                  <div className="minimal-grid">
+                    <div className="minimal-field">
+                      <label>Nomor SIM</label>
+                      <input
+                        type="text"
+                        placeholder="Nomor SIM"
+                        value={editDriverForm.simNumber}
+                        onChange={(e) => setEditDriverForm({ ...editDriverForm, simNumber: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="minimal-field">
+                      <label>Masa Berlaku SIM</label>
+                      <input
+                        type="date"
+                        value={editDriverForm.simExpiry || ''}
+                        onChange={(e) => setEditDriverForm({ ...editDriverForm, simExpiry: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="minimal-field full">
+                      <label>Masa Berlaku STNK</label>
+                      <input
+                        type="date"
+                        value={editDriverForm.stnkExpiry || ''}
+                        onChange={(e) => setEditDriverForm({ ...editDriverForm, stnkExpiry: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Clean Minimal Document Rows */}
+                  <div className="docs-list-minimal">
+                    <div className="doc-row-minimal">
+                      <div className="doc-info-minimal">
+                        <span className="doc-name-minimal">Foto KTP Asli</span>
+                        <span className={`doc-status-badge ${editDriverForm.ktpUrl ? 'ready' : 'empty'}`}>
+                          {editDriverForm.ktpUrl ? 'Tersedia' : 'Belum Ada'}
+                        </span>
+                      </div>
+                      <div className="doc-actions-minimal">
+                        {editDriverForm.ktpUrl && (
+                          <button
+                            type="button"
+                            className="btn-doc-link-minimal"
+                            onClick={() => setPreviewDoc({ type: 'KTP', title: 'Foto KTP', url: editDriverForm.ktpUrl, driverName: editDriverForm.name })}
+                          >
+                            Lihat Foto
+                          </button>
+                        )}
+                        <label className="btn-doc-upload-minimal">
+                          <span>{editDriverForm.ktpUrl ? 'Ganti File' : 'Unggah File'}</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                            onChange={(e) => handleDocFile('ktp', e)}
+                          />
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="doc-row-minimal">
+                      <div className="doc-info-minimal">
+                        <span className="doc-name-minimal">Foto SIM Asli</span>
+                        <span className={`doc-status-badge ${editDriverForm.simUrl ? 'ready' : 'empty'}`}>
+                          {editDriverForm.simUrl ? 'Tersedia' : 'Belum Ada'}
+                        </span>
+                      </div>
+                      <div className="doc-actions-minimal">
+                        {editDriverForm.simUrl && (
+                          <button
+                            type="button"
+                            className="btn-doc-link-minimal"
+                            onClick={() => setPreviewDoc({ type: 'SIM', title: 'Foto SIM', url: editDriverForm.simUrl, driverName: editDriverForm.name })}
+                          >
+                            Lihat Foto
+                          </button>
+                        )}
+                        <label className="btn-doc-upload-minimal">
+                          <span>{editDriverForm.simUrl ? 'Ganti File' : 'Unggah File'}</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                            onChange={(e) => handleDocFile('sim', e)}
+                          />
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="doc-row-minimal">
+                      <div className="doc-info-minimal">
+                        <span className="doc-name-minimal">Foto STNK Kendaraan</span>
+                        <span className={`doc-status-badge ${editDriverForm.stnkUrl ? 'ready' : 'empty'}`}>
+                          {editDriverForm.stnkUrl ? 'Tersedia' : 'Belum Ada'}
+                        </span>
+                      </div>
+                      <div className="doc-actions-minimal">
+                        {editDriverForm.stnkUrl && (
+                          <button
+                            type="button"
+                            className="btn-doc-link-minimal"
+                            onClick={() => setPreviewDoc({ type: 'STNK', title: 'Foto STNK', url: editDriverForm.stnkUrl, driverName: editDriverForm.name })}
+                          >
+                            Lihat Foto
+                          </button>
+                        )}
+                        <label className="btn-doc-upload-minimal">
+                          <span>{editDriverForm.stnkUrl ? 'Ganti File' : 'Unggah File'}</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                            onChange={(e) => handleDocFile('stnk', e)}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 4: STATUS & DARURAT */}
+              {editDriverActiveTab === 'status' && (
+                <div className="edit-section-stack">
+                  <div className="minimal-grid">
+                    <div className="minimal-field">
+                      <label>Kontak Darurat (Nama)</label>
+                      <input
+                        type="text"
+                        placeholder="Nama keluarga / kerabat"
+                        value={editDriverForm.emergencyContactName}
+                        onChange={(e) => setEditDriverForm({ ...editDriverForm, emergencyContactName: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="minimal-field">
+                      <label>Nomor HP Darurat</label>
+                      <input
+                        type="text"
+                        placeholder="08xxxxxxxxxx"
+                        value={editDriverForm.emergencyContactPhone}
+                        onChange={(e) => setEditDriverForm({ ...editDriverForm, emergencyContactPhone: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="minimal-field full">
+                      <label>Status Verifikasi Akun</label>
+                      <select
+                        value={editDriverForm.verification_status}
+                        onChange={(e) => setEditDriverForm({ ...editDriverForm, verification_status: e.target.value })}
+                      >
+                        <option value="approved">Disetujui (Approved / Aktif)</option>
+                        <option value="pending">Menunggu Review (Pending)</option>
+                        <option value="rejected">Ditolak (Rejected)</option>
+                      </select>
+                    </div>
+
+                    {editDriverForm.verification_status === 'rejected' && (
+                      <div className="minimal-field full">
+                        <label>Alasan Penolakan</label>
+                        <textarea
+                          rows={2}
+                          placeholder="Jelaskan alasan penolakan berkas..."
+                          value={editDriverForm.rejection_reason}
+                          onChange={(e) => setEditDriverForm({ ...editDriverForm, rejection_reason: e.target.value })}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Clean Footer Buttons (No Icons) */}
+            <div className="dialog-footer edit-footer-minimal">
+              <button
+                type="button"
+                className="btn-dialog-cancel"
+                disabled={isSavingDriver}
+                onClick={() => setEditingDriver(null)}
+              >
+                Batal
+              </button>
+
+              <div className="footer-actions-group-minimal">
+                {editDriverForm.verification_status !== 'approved' && (
+                  <button
+                    type="button"
+                    className="btn-dialog-confirm-approve"
+                    disabled={isSavingDriver}
+                    onClick={() => handleSaveDriver('approved')}
+                  >
+                    Simpan & Setujui
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  className="btn-dialog-save-driver"
+                  disabled={isSavingDriver}
+                  onClick={() => handleSaveDriver()}
+                >
+                  {isSavingDriver ? 'Menyimpan...' : 'Simpan Perubahan'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Toast Notification */}
+      {toastMessage && (
+        <div className="admin-toast-banner">
+          <CheckCircle2 size={16} />
+          <span>{toastMessage}</span>
         </div>
       )}
     </div>

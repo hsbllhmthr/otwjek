@@ -515,7 +515,7 @@ export default function ProfilePage({ user: propUser, onBack, onLogout }) {
                   <span className="banner-title">Mitra Pengemudi Resmi Terverifikasi</span>
                 </div>
                 <p className="banner-desc">
-                  Akun Anda telah diverifikasi resmi oleh Admin OTWJek. Profil Anda aktif dan dapat dipilih oleh penumpang wanita di Mamminasata.
+                  Akun Anda telah diverifikasi resmi oleh Admin OTWJek.
                 </p>
               </div>
             )}
