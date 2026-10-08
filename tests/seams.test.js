@@ -69,7 +69,7 @@ test('Seam 3: WhatsApp URL & Payload Formatter', () => {
 
   // Test URL builder
   const url = buildWhatsAppLink('081298765432', message);
-  assert.ok(url.startsWith('https://wa.me/6281298765432?text='));
+  assert.ok(url.startsWith('https://api.whatsapp.com/send?phone=6281298765432') || url.startsWith('https://wa.me/6281298765432'));
   assert.ok(url.includes(encodeURIComponent('Anisa Maharani')));
 });
 

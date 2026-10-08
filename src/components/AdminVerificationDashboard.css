@@ -80,15 +80,16 @@
 .admin-sidebar-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .sidebar-brand-img {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   object-fit: contain;
-  border-radius: 6px;
+  border-radius: 8px;
   flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(255, 51, 127, 0.25);
 }
 
 .sidebar-app-name {

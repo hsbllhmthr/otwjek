@@ -1,0 +1,76 @@
+{
+  "name": "OTWJek - Transportasi Online Khusus Wanita",
+  "short_name": "OTWJek",
+  "description": "Layanan transportasi, antar paket, dan pesan kuliner terpercaya ramah wanita di Mamminasata (Makassar, Gowa, Maros, Takalar).",
+  "theme_color": "#FF337F",
+  "background_color": "#FFFFFF",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/",
+  "start_url": "/",
+  "lang": "id",
+  "categories": [
+    "travel",
+    "navigation",
+    "transportation",
+    "lifestyle"
+  ],
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Pesan SheRide Motor",
+      "short_name": "SheRide",
+      "description": "Pesan ojek motor ramah wanita",
+      "url": "/?service=where-to&type=bike",
+      "icons": [
+        {
+          "src": "/pwa-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Pesan SheCar Mobil",
+      "short_name": "SheCar",
+      "description": "Pesan mobil sejuk ramah wanita",
+      "url": "/?service=where-to&type=car",
+      "icons": [
+        {
+          "src": "/pwa-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Kirim Paket SheSend",
+      "short_name": "SheSend",
+      "description": "Kirim barang & dokumen cepat dan aman",
+      "url": "/?service=send-package",
+      "icons": [
+        {
+          "src": "/pwa-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

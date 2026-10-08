@@ -26,8 +26,8 @@ const STORAGE_KEYS = {
 };
 
 // Kredensial admin default dibaca dari .env / .env.local (dengan fallback default jika belum diset)
-const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL || 'admin@otwjek.com').trim().toLowerCase();
-const ADMIN_PASSWORD = (import.meta.env.VITE_ADMIN_PASSWORD || 'admin123').trim();
+const ADMIN_EMAIL = (import.meta?.env?.VITE_ADMIN_EMAIL || 'admin@otwjek.com').trim().toLowerCase();
+const ADMIN_PASSWORD = (import.meta?.env?.VITE_ADMIN_PASSWORD || 'admin123').trim();
 
 // Helper generator UUID v4 sederhana
 export function generateUUID() {
@@ -39,6 +39,7 @@ export function generateUUID() {
 }
 
 function getStoredArray(key, defaultData = []) {
+  if (typeof localStorage === 'undefined') return defaultData;
   try {
     const data = localStorage.getItem(key);
     if (!data) {
@@ -55,6 +56,7 @@ function getStoredArray(key, defaultData = []) {
 }
 
 function setStoredArray(key, array) {
+  if (typeof localStorage === 'undefined') return;
   try {
     localStorage.setItem(key, JSON.stringify(array));
     if (typeof window !== 'undefined') {

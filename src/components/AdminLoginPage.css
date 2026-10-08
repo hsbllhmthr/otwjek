@@ -41,6 +41,21 @@
   margin-bottom: 28px;
 }
 
+.signin-logo-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.signin-logo {
+  width: 68px;
+  height: 68px;
+  object-fit: contain;
+  border-radius: 16px;
+  box-shadow: 0 4px 14px rgba(255, 51, 127, 0.18);
+}
+
 .signin-title {
   font-size: 26px;
   font-weight: 800;

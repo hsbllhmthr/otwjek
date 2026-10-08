@@ -25,6 +25,7 @@ import LoginPage from './components/LoginPage.jsx';
 import PersonalInfoPage from './components/PersonalInfoPage.jsx';
 import AdminLoginPage from './components/AdminLoginPage.jsx';
 import AdminVerificationDashboard from './components/AdminVerificationDashboard.jsx';
+import PwaInstallPrompt from './components/PwaInstallPrompt.jsx';
 import dbService from './services/dbService.js';
 
 import {
@@ -822,6 +823,7 @@ export default function App() {
             onSelectService={handleSelectService}
             currentLocation={pickup?.name || 'Jakarta, Indonesia'}
           />
+          <PwaInstallPrompt />
           <BottomNavBar
             activeTab="home"
             onChangeTab={(tab) => setCurrentView(tab)}

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import './AdminLoginPage.css';
 import { Eye, EyeOff, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 import dbService from '../services/dbService.js';
+import otwjekLogo from '../assets/otwjek_logo.png';
 
 export default function AdminLoginPage({ onBack, onSuccess }) {
   const [identifier, setIdentifier] = useState('');
@@ -37,6 +38,9 @@ export default function AdminLoginPage({ onBack, onSuccess }) {
       <div className="signin-card-container">
         {/* Header Sambutan Admin */}
         <div className="signin-header">
+          <div className="signin-logo-wrap">
+            <img src={otwjekLogo} alt="OTWJek Logo" className="signin-logo" />
+          </div>
           <h1 className="signin-title">Selamat Datang, Admin!</h1>
           <p className="signin-subtitle">
             Silakan masuk untuk mengelola data pelanggan serta memverifikasi mitra pengemudi OTWJek.

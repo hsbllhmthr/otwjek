@@ -22,12 +22,12 @@ export default function AdminDispatchModal({
   onClose,
   bookingData = {}
 }) {
-  if (!isOpen) return null;
-
   const [customerName, setCustomerName] = useState(bookingData.customerName || 'Pelanggan SheRide');
   const [customerNotes, setCustomerNotes] = useState(bookingData.driverNotes || bookingData.packageData?.specialNotes || '');
   const [isCopied, setIsCopied] = useState(false);
   const [lastDispatchedAdmin, setLastDispatchedAdmin] = useState(null);
+
+  if (!isOpen) return null;
 
   const {
     serviceType = 'ride',
