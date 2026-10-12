@@ -11,7 +11,6 @@
  * 4. Filtrasi Driver Resmi untuk Pemesanan GrabNow Pelanggan
  */
 
-import { VERIFIED_DRIVERS } from '../data/drivers.js';
 import { ADMINS } from '../data/admins.js';
 import { FOOD_MERCHANTS } from '../data/foodMerchants.js';
 
@@ -37,6 +36,26 @@ export function generateUUID() {
     return v.toString(16);
   });
 }
+
+/**
+ * Normalisasi nomor telepon ke digit murni tanpa prefix 62 atau 0 berulang.
+ * Contoh: "+62 812-3456-7890", "081234567890", "+62081234567890", "81234567890" -> "81234567890"
+ */
+export function normalizePhone(phone) {
+  if (!phone) return '';
+  const digits = String(phone).replace(/\D/g, '');
+  if (!digits) return '';
+  return digits.replace(/^(?:62|0)+/, '');
+}
+
+/**
+ * Format nomor telepon standar internasional Indonesia: "+6281234567890"
+ */
+export function formatStandardPhone(phone) {
+  const clean = normalizePhone(phone);
+  return clean ? `+62${clean}` : '';
+}
+
 
 function getStoredArray(key, defaultData = []) {
   if (typeof localStorage === 'undefined') return defaultData;
@@ -71,26 +90,36 @@ function setStoredArray(key, array) {
   }
 }
 
-// Inisialisasi awal database lokal jika belum ada
+// Inisialisasi awal database lokal & pembersihan data dummy bawaan
 export function initializeLocalDatabase() {
-  const existingDrivers = getStoredArray(STORAGE_KEYS.DRIVERS, []);
-  if (existingDrivers.length === 0) {
-    // Pastikan data awal memiliki status approved
-    const initialized = VERIFIED_DRIVERS.map((d) => ({
-      ...d,
-      verification_status: d.verification_status || 'approved'
-    }));
-    setStoredArray(STORAGE_KEYS.DRIVERS, initialized);
-  }
-
-  // Buat akun admin default jika belum ada di tabel users
+  // 1. Bersihkan tabel USERS: hapus sample dummy pelanggan, pertahankan data riil & superadmin
   const existingUsers = getStoredArray(STORAGE_KEYS.USERS, []);
-  const adminExists = existingUsers.some(
+  const dummyCustomerPhones = ['81234567890', '85712348901', '89698765432', '82133445566'];
+  
+  const realUsers = existingUsers.filter((u) => {
+    if (!u) return false;
+    // Pertahankan superadmin
+    if (u.role === 'admin' || u.id === 'admin-master-01' || (ADMIN_EMAIL && u.email === ADMIN_EMAIL)) {
+      return true;
+    }
+    // Hapus dummy bawaan (cust-001 s/d cust-004 atau berawalan cust-)
+    if (typeof u.id === 'string' && u.id.startsWith('cust-')) {
+      return false;
+    }
+    // Hapus nomor dummy sample
+    if (dummyCustomerPhones.includes(normalizePhone(u.phone))) {
+      return false;
+    }
+    return true;
+  });
+
+  // Pastikan akun superadmin default tersedia untuk akses portal admin
+  const adminExists = realUsers.some(
     (u) => u.role === 'admin' || (ADMIN_EMAIL && u.email === ADMIN_EMAIL)
   );
 
   if (!adminExists && ADMIN_EMAIL && ADMIN_PASSWORD) {
-    existingUsers.push({
+    realUsers.unshift({
       id: 'admin-master-01',
       full_name: 'Admin Verifikasi OTWJek',
       email: ADMIN_EMAIL,
@@ -102,59 +131,29 @@ export function initializeLocalDatabase() {
     });
   }
 
-  // Buat data pelanggan contoh awal jika belum ada data pelanggan
-  const hasCustomers = existingUsers.some((u) => u.role === 'customer' || !u.role);
-  if (!hasCustomers) {
-    const sampleCustomers = [
-      {
-        id: 'cust-001',
-        full_name: 'Siti Rahmawati',
-        email: 'siti.rahmawati@gmail.com',
-        phone: '+6281234567890',
-        gender: 'Perempuan',
-        birth_date: '1998-05-14',
-        role: 'customer',
-        status: 'active',
-        created_at: '2026-09-10T08:30:00.000Z'
-      },
-      {
-        id: 'cust-002',
-        full_name: 'Dian Permata Sari',
-        email: 'dian.permata@gmail.com',
-        phone: '+6285712348901',
-        gender: 'Perempuan',
-        birth_date: '2001-11-22',
-        role: 'customer',
-        status: 'active',
-        created_at: '2026-09-18T10:15:00.000Z'
-      },
-      {
-        id: 'cust-003',
-        full_name: 'Aisyah Putri Azzahra',
-        email: 'aisyah.azzahra@yahoo.com',
-        phone: '+6289698765432',
-        gender: 'Perempuan',
-        birth_date: '1999-03-08',
-        role: 'customer',
-        status: 'active',
-        created_at: '2026-09-28T14:40:00.000Z'
-      },
-      {
-        id: 'cust-004',
-        full_name: 'Nurlaila Hanum',
-        email: 'laila.hanum@gmail.com',
-        phone: '+6282133445566',
-        gender: 'Perempuan',
-        birth_date: '1997-07-19',
-        role: 'customer',
-        status: 'suspended',
-        created_at: '2026-10-02T16:20:00.000Z'
-      }
-    ];
-    existingUsers.push(...sampleCustomers);
-  }
+  setStoredArray(STORAGE_KEYS.USERS, realUsers);
 
-  setStoredArray(STORAGE_KEYS.USERS, existingUsers);
+  // 2. Bersihkan tabel DRIVERS dari data dummy bawaan (drv-1 s/d drv-4 atau berawalan drv-)
+  const existingDrivers = getStoredArray(STORAGE_KEYS.DRIVERS, []);
+  const realDrivers = existingDrivers.filter((d) => {
+    if (!d) return false;
+    if (typeof d.id === 'string' && d.id.startsWith('drv-')) {
+      return false;
+    }
+    return true;
+  });
+  setStoredArray(STORAGE_KEYS.DRIVERS, realDrivers);
+
+  // 3. Bersihkan tabel DRIVER_DOCS yang terikat dengan driver dummy
+  const existingDocs = getStoredArray(STORAGE_KEYS.DRIVER_DOCS, []);
+  const realDocs = existingDocs.filter((doc) => {
+    if (!doc) return false;
+    if (typeof doc.driver_id === 'string' && doc.driver_id.startsWith('drv-')) {
+      return false;
+    }
+    return true;
+  });
+  setStoredArray(STORAGE_KEYS.DRIVER_DOCS, realDocs);
 }
 
 // Inisialisasi saat file di-load
@@ -197,12 +196,19 @@ export const dbService = {
 
     findByPhone(phone) {
       if (!phone) return null;
-      const cleanPhone = phone.replace(/^\+?62|^0/, '');
+      const target = normalizePhone(phone);
+      if (!target) return null;
       const users = getStoredArray(STORAGE_KEYS.USERS, []);
-      return users.find((u) => {
-        const uClean = (u.phone || '').replace(/^\+?62|^0/, '');
-        return uClean === cleanPhone;
+      // Cari semua akun yang cocok nomornya
+      const matches = users.filter((u) => normalizePhone(u.phone) === target);
+      if (matches.length === 0) return null;
+      // Jika ada lebih dari satu (misal ada akun dummy 'Pelanggan SheRide' dan akun riil),
+      // prioritaskan akun yang memiliki nama asli
+      const realUser = matches.find((u) => {
+        const name = (u.full_name || u.fullName || '').trim().toLowerCase();
+        return name && name !== 'pelanggan sheride' && name !== 'pelanggan perempuan';
       });
+      return realUser || matches[matches.length - 1];
     },
 
     findByEmail(email) {
@@ -218,18 +224,47 @@ export const dbService = {
 
     create(userData) {
       const users = getStoredArray(STORAGE_KEYS.USERS, []);
+      const standardPhone = formatStandardPhone(userData.phone);
+      const targetDigits = normalizePhone(standardPhone);
+
+      // Jika akun dengan nomor ini sudah ada, perbarui datanya daripada membuat duplikat
+      if (targetDigits) {
+        const existingIdx = users.findIndex((u) => normalizePhone(u.phone) === targetDigits);
+        if (existingIdx !== -1) {
+          const rawName = (userData.fullName || userData.full_name || users[existingIdx].full_name || users[existingIdx].fullName || '').trim();
+          const updated = {
+            ...users[existingIdx],
+            ...userData,
+            phone: standardPhone || users[existingIdx].phone,
+            full_name: rawName,
+            fullName: rawName,
+            birth_date: userData.birthDate || userData.birth_date || users[existingIdx].birth_date || users[existingIdx].birthDate || null,
+            birthDate: userData.birthDate || userData.birth_date || users[existingIdx].birthDate || users[existingIdx].birth_date || null,
+            avatar_url: userData.avatarUrl || userData.avatar_url || users[existingIdx].avatar_url || users[existingIdx].avatarUrl || null,
+            avatarUrl: userData.avatarUrl || userData.avatar_url || users[existingIdx].avatarUrl || users[existingIdx].avatar_url || null,
+            role: userData.role || users[existingIdx].role || 'customer',
+            updated_at: new Date().toISOString()
+          };
+          users[existingIdx] = updated;
+          setStoredArray(STORAGE_KEYS.USERS, users);
+          return updated;
+        }
+      }
+
+      const rawName = (userData.fullName || userData.full_name || '').trim();
       const newUser = {
         id: generateUUID(),
-        full_name: userData.fullName || userData.full_name || '',
+        full_name: rawName,
+        fullName: rawName,
         email: userData.email || '',
-        phone: userData.phone?.startsWith('+62')
-          ? userData.phone
-          : `+62${(userData.phone || '').replace(/^0/, '')}`,
+        phone: standardPhone,
         password: userData.password || '',
         password_hash: userData.password ? `hashed_${userData.password}` : 'mock_hash',
         gender: 'Perempuan',
         birth_date: userData.birthDate || userData.birth_date || null,
+        birthDate: userData.birthDate || userData.birth_date || null,
         avatar_url: userData.avatarUrl || userData.avatar_url || null,
+        avatarUrl: userData.avatarUrl || userData.avatar_url || null,
         role: userData.role || 'customer',
         status: 'active',
         created_at: new Date().toISOString(),
@@ -246,9 +281,17 @@ export const dbService = {
       const index = users.findIndex((u) => u.id === id);
       if (index === -1) return null;
 
+      const rawName = (updates.fullName || updates.full_name || users[index].full_name || users[index].fullName || '').trim();
       const updated = {
         ...users[index],
         ...updates,
+        phone: updates.phone ? formatStandardPhone(updates.phone) : users[index].phone,
+        full_name: rawName,
+        fullName: rawName,
+        birth_date: updates.birthDate || updates.birth_date || users[index].birth_date || users[index].birthDate || null,
+        birthDate: updates.birthDate || updates.birth_date || users[index].birthDate || users[index].birth_date || null,
+        avatar_url: updates.avatarUrl || updates.avatar_url || users[index].avatar_url || users[index].avatarUrl || null,
+        avatarUrl: updates.avatarUrl || updates.avatar_url || users[index].avatarUrl || users[index].avatar_url || null,
         updated_at: new Date().toISOString()
       };
       users[index] = updated;
@@ -256,7 +299,7 @@ export const dbService = {
 
       // Sinkronisasi dengan sesi aktif jika user yang diubah adalah currentUser
       const currentUser = dbService.session.getCurrentUser();
-      if (currentUser && currentUser.id === id) {
+      if (currentUser && (currentUser.id === id || normalizePhone(currentUser.phone) === normalizePhone(updated.phone))) {
         dbService.session.setCurrentUser({ ...currentUser, ...updated });
       }
 
@@ -289,7 +332,7 @@ export const dbService = {
   // ==========================================
   drivers: {
     getAll() {
-      return getStoredArray(STORAGE_KEYS.DRIVERS, VERIFIED_DRIVERS);
+      return getStoredArray(STORAGE_KEYS.DRIVERS, []);
     },
 
     // Driver yang disetujui (Approved) untuk katalog GrabNow & Order Pelanggan
@@ -334,22 +377,29 @@ export const dbService = {
         });
       } else {
         user = dbService.users.update(user.id, {
+          ...userData,
           role: 'driver',
           full_name: userData.fullName || userData.full_name || user.full_name,
+          fullName: userData.fullName || userData.full_name || user.fullName,
           email: userData.email || user.email,
           avatar_url: userData.avatarUrl || userData.avatar_url || user.avatar_url,
-          birth_date: userData.birthDate || userData.birth_date || user.birth_date
+          avatarUrl: userData.avatarUrl || userData.avatar_url || user.avatarUrl,
+          birth_date: userData.birthDate || userData.birth_date || user.birth_date,
+          birthDate: userData.birthDate || userData.birth_date || user.birthDate
         });
       }
 
-      // 2. Buat profil driver baru
-      const drivers = getStoredArray(STORAGE_KEYS.DRIVERS, VERIFIED_DRIVERS);
-      const newDriver = {
-        id: generateUUID(),
+      // 2. Buat atau perbarui profil driver
+      const drivers = getStoredArray(STORAGE_KEYS.DRIVERS, []);
+      const existingIdx = drivers.findIndex(
+        (d) => d.user_id === user.id || normalizePhone(d.phone) === normalizePhone(user.phone)
+      );
+
+      const driverPayload = {
         user_id: user.id,
-        name: user.full_name,
+        name: user.full_name || user.fullName,
         phone: user.phone,
-        avatar: user.avatar_url || null,
+        avatar: user.avatar_url || user.avatarUrl || null,
         
         // Data Kendaraan Mandiri
         vehicleType: vehicleData.vehicleType || 'motor', // 'motor' | 'mobil'
@@ -369,21 +419,36 @@ export const dbService = {
 
         // Kontak Darurat
         emergencyContactName: vehicleData.emergencyContactName || '',
-        emergencyContactPhone: vehicleData.emergencyContactPhone || '',
+        emergencyContactPhone: vehicleData.emergencyContactPhone ? formatStandardPhone(vehicleData.emergencyContactPhone) : '',
 
         // Status Verifikasi & Operasional
-        rating: 5.0,
-        tripsCount: 0,
-        status: 'Menunggu Verifikasi',
-        verification_status: 'pending',
+        rating: existingIdx !== -1 ? (drivers[existingIdx].rating || 5.0) : 5.0,
+        tripsCount: existingIdx !== -1 ? (drivers[existingIdx].tripsCount || 0) : 0,
+        status: existingIdx !== -1 ? drivers[existingIdx].status : 'Menunggu Verifikasi',
+        verification_status: existingIdx !== -1 ? drivers[existingIdx].verification_status : 'pending',
         rejection_reason: null,
         is_online: false,
-        badge: 'Calon Mitra 🌸',
-        bio: vehicleData.bio || 'Mitra Pengemudi Amanah OTWJek Khusus Perempuan.',
-        created_at: new Date().toISOString()
+        badge: existingIdx !== -1 ? (drivers[existingIdx].badge || 'Calon Mitra 🌸') : 'Calon Mitra 🌸',
+        bio: vehicleData.bio || 'Mitra Pengemudi Amanah OTWJek Khusus Perempuan.'
       };
 
-      drivers.push(newDriver);
+      let activeDriver;
+      if (existingIdx !== -1) {
+        activeDriver = {
+          ...drivers[existingIdx],
+          ...driverPayload,
+          updated_at: new Date().toISOString()
+        };
+        drivers[existingIdx] = activeDriver;
+      } else {
+        activeDriver = {
+          id: generateUUID(),
+          ...driverPayload,
+          created_at: new Date().toISOString()
+        };
+        drivers.push(activeDriver);
+      }
+
       setStoredArray(STORAGE_KEYS.DRIVERS, drivers);
 
       // 3. Simpan berkas dokumen (KTP, SIM, STNK)
@@ -392,22 +457,33 @@ export const dbService = {
         ['ktp', 'sim', 'stnk'].forEach((docType) => {
           if (documents[docType]) {
             const docObj = documents[docType];
-            storedDocs.push({
-              id: generateUUID(),
-              driver_id: newDriver.id,
+            const existingDocIdx = storedDocs.findIndex(
+              (d) => d.driver_id === activeDriver.id && d.document_type === docType
+            );
+            const docEntry = {
+              id: existingDocIdx !== -1 ? storedDocs[existingDocIdx].id : generateUUID(),
+              driver_id: activeDriver.id,
               document_type: docType,
               document_url: docObj.url || docObj,
               file_name: docObj.name || `${docType}_document.jpg`,
               verification_status: 'pending',
-              created_at: new Date().toISOString()
-            });
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+            if (existingDocIdx !== -1) {
+              storedDocs[existingDocIdx] = docEntry;
+            } else {
+              storedDocs.push(docEntry);
+            }
           }
         });
         setStoredArray(STORAGE_KEYS.DRIVER_DOCS, storedDocs);
       }
 
+      user.driver = activeDriver;
+      user.vehicleData = vehicleData || {};
       user.documents = documents || {};
-      return { user, driver: newDriver };
+      return { user, driver: activeDriver };
     },
 
     /**
@@ -795,6 +871,13 @@ export const dbService = {
 
   getMerchants() {
     return FOOD_MERCHANTS;
+  },
+
+  // Bersihkan data dummy bawaan secara manual dan sinkronisasi realtime
+  clearDummyData() {
+    initializeLocalDatabase();
+    this.notifyChange('all');
+    return true;
   },
 
   // Sesi Pengguna Biasa / Driver

@@ -1,45 +1,30 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import './AdminVerificationDashboard.css';
 import {
   LayoutDashboard,
   Menu,
-  ShieldCheck,
   LogOut,
   Search,
   CheckCircle2,
   XCircle,
-  Clock,
   User,
   Users,
   UserCheck,
   UserX,
   Bike,
-  Car,
-  CreditCard,
-  FileText,
-  Calendar,
-  Phone,
-  Mail,
-  MapPin,
   ExternalLink,
   Eye,
   X,
   AlertTriangle,
-  RotateCcw,
   Sparkles,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
   Trash2,
-  Shield,
-  MessageSquare,
-  TrendingUp,
   Bell,
   Moon,
   Edit3,
-  Save,
-  Upload,
-  Camera,
+  ArrowUpDown,
   Check
 } from 'lucide-react';
 import dbService from '../services/dbService.js';
@@ -60,6 +45,14 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
   const [drivers, setDrivers] = useState([]);
   const [driverTab, setDriverTab] = useState('pending'); // 'all' | 'pending' | 'approved' | 'rejected'
   const [driverSearchQuery, setDriverSearchQuery] = useState('');
+  // Filter & sorting per kolom driver
+  const [driverSortKey, setDriverSortKey] = useState('created_at'); // 'created_at' | 'name' | 'vehicleType' | 'docs' | 'operationalArea' | 'status'
+  const [driverSortDir, setDriverSortDir] = useState('desc'); // 'desc' | 'asc'
+  const [driverServiceFilter, setDriverServiceFilter] = useState('all'); // 'all' | 'motor' | 'mobil'
+  const [driverDocFilter, setDriverDocFilter] = useState('all'); // 'all' | 'complete' | 'incomplete'
+
+  // Active column menu dropdown popover
+  const [activeColumnMenu, setActiveColumnMenu] = useState(null);
   
   // Driver Modals
   const [previewDoc, setPreviewDoc] = useState(null); // { type, url, title, driverName }
@@ -81,6 +74,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
   const [customers, setCustomers] = useState([]);
   const [customerTab, setCustomerTab] = useState('all'); // 'all' | 'active' | 'suspended'
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+  // Filter & sorting per kolom pelanggan
+  const [customerSortKey, setCustomerSortKey] = useState('created_at'); // 'created_at' | 'name' | 'phone' | 'orders' | 'status'
+  const [customerSortDir, setCustomerSortDir] = useState('desc'); // 'desc' | 'asc'
   const [selectedCustomerDetail, setSelectedCustomerDetail] = useState(null);
   const [customerStatusConfirm, setCustomerStatusConfirm] = useState(null);
   const [customerDeleteConfirm, setCustomerDeleteConfirm] = useState(null);
@@ -168,24 +164,134 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
     };
   }, []);
 
+  // Tutup dropdown menu kolom saat klik di luar
+  useEffect(() => {
+    const handleGlobalClick = (e) => {
+      if (activeColumnMenu && !e.target.closest('.th-filter-dropdown-container')) {
+        setActiveColumnMenu(null);
+      }
+    };
+    document.addEventListener('mousedown', handleGlobalClick);
+    return () => document.removeEventListener('mousedown', handleGlobalClick);
+  }, [activeColumnMenu]);
+
+  const toggleColumnMenu = (menuKey) => {
+    setActiveColumnMenu((prev) => (prev === menuKey ? null : menuKey));
+  };
+
+  const handleSetDriverSort = (key, dir) => {
+    setDriverSortKey(key);
+    setDriverSortDir(dir);
+    setActiveColumnMenu(null);
+  };
+
+  const handleSetCustomerSort = (key, dir) => {
+    setCustomerSortKey(key);
+    setCustomerSortDir(dir);
+    setActiveColumnMenu(null);
+  };
+
+  // Helper hitung jumlah pesanan per customer
+  const getCustomerOrderCount = useCallback((customer) => {
+    if (!customer) return 0;
+    const cleanPhone = (customer.phone || '').replace(/^\+?62|^0/, '');
+    const bookingList = Array.isArray(bookings) ? bookings : [];
+    return bookingList.filter(
+      (b) =>
+        b.user_id === customer.id ||
+        (b.customer_phone && b.customer_phone.replace(/^\+?62|^0/, '') === cleanPhone)
+    ).length;
+  }, [bookings]);
+
   // =========================================================================
-  // OVERVIEW TABLES PAGINATION (5 DATA TERBARU PER HALAMAN)
+  // OVERVIEW TABLES PAGINATION (5 DATA TERBARU PER HALAMAN) & FILTER/SORTING
   // =========================================================================
   const TABLE_PAGE_SIZE = 5;
   const [driverTablePage, setDriverTablePage] = useState(1);
   const [customerTablePage, setCustomerTablePage] = useState(1);
 
-  // Drivers diurutkan dari yang terbaru (pending diutamakan lalu created_at)
+  // Filter & sorting per kolom Overview Driver
+  const [overviewDriverSortKey, setOverviewDriverSortKey] = useState('created_at'); // 'created_at' | 'name' | 'vehicleType' | 'operationalArea' | 'status'
+  const [overviewDriverSortDir, setOverviewDriverSortDir] = useState('desc'); // 'desc' | 'asc'
+  const [overviewDriverServiceFilter, setOverviewDriverServiceFilter] = useState('all'); // 'all' | 'motor' | 'mobil'
+  const [overviewDriverStatusFilter, setOverviewDriverStatusFilter] = useState('all'); // 'all' | 'pending' | 'approved' | 'rejected'
+
+  const handleSetOverviewDriverSort = (key, dir) => {
+    setOverviewDriverSortKey(key);
+    setOverviewDriverSortDir(dir);
+    setDriverTablePage(1);
+    setActiveColumnMenu(null);
+  };
+
+  // Filter & sorting per kolom Overview Pelanggan
+  const [overviewCustomerSortKey, setOverviewCustomerSortKey] = useState('created_at'); // 'created_at' | 'name' | 'phone' | 'orders' | 'status'
+  const [overviewCustomerSortDir, setOverviewCustomerSortDir] = useState('desc'); // 'desc' | 'asc'
+  const [overviewCustomerStatusFilter, setOverviewCustomerStatusFilter] = useState('all'); // 'all' | 'active' | 'suspended'
+
+  const handleSetOverviewCustomerSort = (key, dir) => {
+    setOverviewCustomerSortKey(key);
+    setOverviewCustomerSortDir(dir);
+    setCustomerTablePage(1);
+    setActiveColumnMenu(null);
+  };
+
+  // Drivers diurutkan dari yang terbaru (pending diutamakan lalu created_at) serta mendukung filter & sort
   const sortedOverviewDrivers = useMemo(() => {
-    return [...drivers].sort((a, b) => {
+    let result = [...drivers];
+
+    // Filter Status
+    if (overviewDriverStatusFilter !== 'all') {
+      if (overviewDriverStatusFilter === 'pending') {
+        result = result.filter((d) => d.verification_status === 'pending');
+      } else if (overviewDriverStatusFilter === 'approved') {
+        result = result.filter((d) => (d.verification_status || 'approved') === 'approved');
+      } else if (overviewDriverStatusFilter === 'rejected') {
+        result = result.filter((d) => d.verification_status === 'rejected');
+      }
+    }
+
+    // Filter Layanan
+    if (overviewDriverServiceFilter !== 'all') {
+      result = result.filter((d) => (d.vehicleType || 'motor') === overviewDriverServiceFilter);
+    }
+
+    // Sorting
+    result.sort((a, b) => {
+      if (overviewDriverSortKey === 'name') {
+        const nameA = (a.name || '').toLowerCase();
+        const nameB = (b.name || '').toLowerCase();
+        return overviewDriverSortDir === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+      }
+      if (overviewDriverSortKey === 'vehicleType') {
+        const typeA = (a.vehicleType || 'motor').toLowerCase();
+        const typeB = (b.vehicleType || 'motor').toLowerCase();
+        return overviewDriverSortDir === 'asc' ? typeA.localeCompare(typeB) : typeB.localeCompare(typeA);
+      }
+      if (overviewDriverSortKey === 'operationalArea') {
+        const areaA = (a.operationalArea || '').toLowerCase();
+        const areaB = (b.operationalArea || '').toLowerCase();
+        return overviewDriverSortDir === 'asc' ? areaA.localeCompare(areaB) : areaB.localeCompare(areaA);
+      }
+      if (overviewDriverSortKey === 'status') {
+        const sA = a.verification_status || 'approved';
+        const sB = b.verification_status || 'approved';
+        return overviewDriverSortDir === 'asc' ? sA.localeCompare(sB) : sB.localeCompare(sA);
+      }
+      // Default: 'created_at'
       const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
       const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      if (overviewDriverSortDir === 'asc') {
+        return timeA - timeB;
+      }
       if (timeA !== timeB) return timeB - timeA;
+      // Pending diutamakan jika waktu sama
       if (a.verification_status === 'pending' && b.verification_status !== 'pending') return -1;
       if (b.verification_status === 'pending' && a.verification_status !== 'pending') return 1;
       return 0;
     });
-  }, [drivers]);
+
+    return result;
+  }, [drivers, overviewDriverStatusFilter, overviewDriverServiceFilter, overviewDriverSortKey, overviewDriverSortDir]);
 
   const totalDriverPages = Math.max(1, Math.ceil(sortedOverviewDrivers.length / TABLE_PAGE_SIZE));
   const currentDriverPage = Math.min(driverTablePage, totalDriverPages);
@@ -194,14 +300,45 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
     return sortedOverviewDrivers.slice(startIndex, startIndex + TABLE_PAGE_SIZE);
   }, [sortedOverviewDrivers, currentDriverPage]);
 
-  // Customers diurutkan dari yang terbaru
+  // Customers diurutkan dan difilter untuk overview
   const sortedOverviewCustomers = useMemo(() => {
-    return [...customers].sort((a, b) => {
+    let result = [...customers];
+
+    // Filter Status
+    if (overviewCustomerStatusFilter !== 'all') {
+      result = result.filter((c) => (c.status || 'active') === overviewCustomerStatusFilter);
+    }
+
+    // Sorting
+    result.sort((a, b) => {
+      if (overviewCustomerSortKey === 'name') {
+        const nameA = (a.full_name || a.name || '').toLowerCase();
+        const nameB = (b.full_name || b.name || '').toLowerCase();
+        return overviewCustomerSortDir === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+      }
+      if (overviewCustomerSortKey === 'phone') {
+        const phoneA = a.phone || '';
+        const phoneB = b.phone || '';
+        return overviewCustomerSortDir === 'asc' ? phoneA.localeCompare(phoneB) : phoneB.localeCompare(phoneA);
+      }
+      if (overviewCustomerSortKey === 'orders') {
+        const ordersA = getCustomerOrderCount(a);
+        const ordersB = getCustomerOrderCount(b);
+        return overviewCustomerSortDir === 'asc' ? ordersA - ordersB : ordersB - ordersA;
+      }
+      if (overviewCustomerSortKey === 'status') {
+        const statusA = a.status === 'suspended' ? 'suspended' : 'active';
+        const statusB = b.status === 'suspended' ? 'suspended' : 'active';
+        return overviewCustomerSortDir === 'asc' ? statusA.localeCompare(statusB) : statusB.localeCompare(statusA);
+      }
+      // Default: 'created_at'
       const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
       const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
-      return timeB - timeA;
+      return overviewCustomerSortDir === 'asc' ? timeA - timeB : timeB - timeA;
     });
-  }, [customers]);
+
+    return result;
+  }, [customers, overviewCustomerStatusFilter, overviewCustomerSortKey, overviewCustomerSortDir, getCustomerOrderCount]);
 
   const totalCustomerPages = Math.max(1, Math.ceil(sortedOverviewCustomers.length / TABLE_PAGE_SIZE));
   const currentCustomerPage = Math.min(customerTablePage, totalCustomerPages);
@@ -277,6 +414,21 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
       result = result.filter((d) => d.verification_status === 'rejected');
     }
 
+    if (driverServiceFilter && driverServiceFilter !== 'all') {
+      result = result.filter((d) => (d.vehicleType || 'motor') === driverServiceFilter);
+    }
+
+    if (driverDocFilter && driverDocFilter !== 'all') {
+      result = result.filter((d) => {
+        const docs = getDriverDocs(d.id);
+        const hasKtp = Boolean(docs.find((x) => x.document_type === 'ktp')?.document_url || d.ktpUrl);
+        const hasSim = Boolean(docs.find((x) => x.document_type === 'sim')?.document_url || d.simUrl);
+        const hasStnk = Boolean(docs.find((x) => x.document_type === 'stnk')?.document_url || d.stnkUrl);
+        const isComplete = hasKtp && hasSim && hasStnk;
+        return driverDocFilter === 'complete' ? isComplete : !isComplete;
+      });
+    }
+
     if (driverSearchQuery.trim()) {
       const q = driverSearchQuery.toLowerCase().trim();
       result = result.filter(
@@ -285,12 +437,51 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
           d.plateNumber?.toLowerCase().includes(q) ||
           d.phone?.toLowerCase().includes(q) ||
           d.nik?.toLowerCase().includes(q) ||
-          d.vehicleModel?.toLowerCase().includes(q)
+          d.vehicleModel?.toLowerCase().includes(q) ||
+          d.operationalArea?.toLowerCase().includes(q)
       );
     }
 
+    result = [...result].sort((a, b) => {
+      if (driverSortKey === 'name') {
+        const nameA = (a.name || '').toLowerCase();
+        const nameB = (b.name || '').toLowerCase();
+        return driverSortDir === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+      }
+      if (driverSortKey === 'vehicleType') {
+        const typeA = (a.vehicleType || 'motor').toLowerCase();
+        const typeB = (b.vehicleType || 'motor').toLowerCase();
+        return driverSortDir === 'asc' ? typeA.localeCompare(typeB) : typeB.localeCompare(typeA);
+      }
+      if (driverSortKey === 'docs') {
+        const docsA = getDriverDocs(a.id);
+        const docsB = getDriverDocs(b.id);
+        const completeA = Boolean(docsA.find((x) => x.document_type === 'ktp')?.document_url || a.ktpUrl) &&
+                          Boolean(docsA.find((x) => x.document_type === 'sim')?.document_url || a.simUrl) &&
+                          Boolean(docsA.find((x) => x.document_type === 'stnk')?.document_url || a.stnkUrl);
+        const completeB = Boolean(docsB.find((x) => x.document_type === 'ktp')?.document_url || b.ktpUrl) &&
+                          Boolean(docsB.find((x) => x.document_type === 'sim')?.document_url || b.simUrl) &&
+                          Boolean(docsB.find((x) => x.document_type === 'stnk')?.document_url || b.stnkUrl);
+        return driverSortDir === 'asc' ? (completeA ? 1 : -1) : (completeB ? 1 : -1);
+      }
+      if (driverSortKey === 'status') {
+        const statusA = a.verification_status || 'approved';
+        const statusB = b.verification_status || 'approved';
+        return driverSortDir === 'asc' ? statusA.localeCompare(statusB) : statusB.localeCompare(statusA);
+      }
+      if (driverSortKey === 'operationalArea') {
+        const areaA = (a.operationalArea || '').toLowerCase();
+        const areaB = (b.operationalArea || '').toLowerCase();
+        return driverSortDir === 'asc' ? areaA.localeCompare(areaB) : areaB.localeCompare(areaA);
+      }
+      // Default: 'created_at'
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return driverSortDir === 'asc' ? timeA - timeB : timeB - timeA;
+    });
+
     return result;
-  }, [drivers, driverTab, driverSearchQuery]);
+  }, [drivers, driverTab, driverServiceFilter, driverDocFilter, driverSearchQuery, driverSortKey, driverSortDir]);
 
   // =========================================================================
   // CUSTOMER COUNTS & FILTERS
@@ -321,8 +512,35 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
       );
     }
 
+    result = [...result].sort((a, b) => {
+      if (customerSortKey === 'name') {
+        const nameA = (a.full_name || a.name || '').toLowerCase();
+        const nameB = (b.full_name || b.name || '').toLowerCase();
+        return customerSortDir === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+      }
+      if (customerSortKey === 'phone') {
+        const phoneA = a.phone || '';
+        const phoneB = b.phone || '';
+        return customerSortDir === 'asc' ? phoneA.localeCompare(phoneB) : phoneB.localeCompare(phoneA);
+      }
+      if (customerSortKey === 'orders') {
+        const ordersA = getCustomerOrderCount(a);
+        const ordersB = getCustomerOrderCount(b);
+        return customerSortDir === 'asc' ? ordersA - ordersB : ordersB - ordersA;
+      }
+      if (customerSortKey === 'status') {
+        const statusA = a.status === 'suspended' ? 'suspended' : 'active';
+        const statusB = b.status === 'suspended' ? 'suspended' : 'active';
+        return customerSortDir === 'asc' ? statusA.localeCompare(statusB) : statusB.localeCompare(statusA);
+      }
+      // Default: 'created_at'
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return customerSortDir === 'asc' ? timeA - timeB : timeB - timeA;
+    });
+
     return result;
-  }, [customers, customerTab, customerSearchQuery]);
+  }, [customers, customerTab, customerSearchQuery, customerSortKey, customerSortDir, getCustomerOrderCount]);
 
   // =========================================================================
   // PAGINATION UNTUK HALAMAN VERIFIKASI DRIVER & DATA PELANGGAN (5 DATA / HALAMAN)
@@ -330,7 +548,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
   const [driversViewPage, setDriversViewPage] = useState(1);
   useEffect(() => {
     setDriversViewPage(1);
-  }, [driverTab, driverSearchQuery]);
+  }, [driverTab, driverSearchQuery, driverSortKey, driverSortDir, driverServiceFilter, driverDocFilter]);
 
   const totalDriversViewPages = Math.max(1, Math.ceil(filteredDrivers.length / TABLE_PAGE_SIZE));
   const currentDriversViewPage = Math.min(driversViewPage, totalDriversViewPages);
@@ -342,7 +560,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
   const [customersViewPage, setCustomersViewPage] = useState(1);
   useEffect(() => {
     setCustomersViewPage(1);
-  }, [customerTab, customerSearchQuery]);
+  }, [customerTab, customerSearchQuery, customerSortKey, customerSortDir]);
 
   const totalCustomersViewPages = Math.max(1, Math.ceil(filteredCustomers.length / TABLE_PAGE_SIZE));
   const currentCustomersViewPage = Math.min(customersViewPage, totalCustomersViewPages);
@@ -371,6 +589,15 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
     setCustomRejectReason('');
   };
 
+  const formatOperationalArea = (area) => {
+    if (!area) return 'Makassar & sekitarnya';
+    const trimmed = area.trim();
+    if (trimmed.length > 20) {
+      return `${trimmed.slice(0, 18)}...`;
+    }
+    return trimmed;
+  };
+
   const getDriverDocs = (driverId) => {
     try {
       const storedDocs = JSON.parse(localStorage.getItem('otwjek_db_driver_documents') || '[]');
@@ -380,7 +607,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
     }
   };
 
-  const handleOpenEditDriver = (driver) => {
+  const handleOpenEditDriver = (driver, initialTab = 'identitas') => {
     if (!driver) return;
     const docs = getDriverDocs(driver.id) || [];
     const ktpDoc = docs.find((d) => d.document_type === 'ktp');
@@ -419,7 +646,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
       simUrl: simDoc?.document_url || '',
       stnkUrl: stnkDoc?.document_url || ''
     });
-    setEditDriverActiveTab('identitas');
+    setEditDriverActiveTab(initialTab);
   };
 
   const handleAvatarFile = async (e) => {
@@ -530,17 +757,6 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
     }
   };
 
-  // Helper hitung jumlah pesanan per customer
-  const getCustomerOrderCount = (customer) => {
-    if (!customer) return 0;
-    const cleanPhone = (customer.phone || '').replace(/^\+?62|^0/, '');
-    const bookingList = Array.isArray(bookings) ? bookings : [];
-    return bookingList.filter(
-      (b) =>
-        b.user_id === customer.id ||
-        (b.customer_phone && b.customer_phone.replace(/^\+?62|^0/, '') === cleanPhone)
-    ).length;
-  };
 
   // Helper format tanggal lahir customer
   const formatBirthDate = (val) => {
@@ -701,25 +917,6 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
             >
               <Menu size={18} />
             </button>
-            <div className="tailadmin-topbar-search">
-              <Search size={16} className="tailadmin-search-icon" />
-              <input
-                type="text"
-                className="tailadmin-search-input"
-                placeholder="search anything here"
-                value={
-                  mainSection === 'drivers'
-                    ? driverSearchQuery
-                    : mainSection === 'customers'
-                    ? customerSearchQuery
-                    : ''
-                }
-                onChange={(e) => {
-                  if (mainSection === 'drivers') setDriverSearchQuery(e.target.value);
-                  if (mainSection === 'customers') setCustomerSearchQuery(e.target.value);
-                }}
-              />
-            </div>
           </div>
 
           <div className="topbar-right">
@@ -901,10 +1098,290 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                     <table className="tailadmin-project-table">
                       <thead>
                         <tr className="tailadmin-th-row">
-                          <th className="tailadmin-th text-left">Driver</th>
-                          <th className="tailadmin-th text-left">Layanan & Kendaraan</th>
-                          <th className="tailadmin-th text-left">Wilayah Operasional</th>
-                          <th className="tailadmin-th text-left">Status</th>
+                          <th className="tailadmin-th text-left">
+                            <div className="th-header-inner">
+                              <span>Driver</span>
+                              <div className="th-filter-dropdown-container">
+                                <button
+                                  type="button"
+                                  className={`th-filter-btn ${overviewDriverSortKey === 'name' || overviewDriverSortKey === 'created_at' ? 'is-active' : ''}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleColumnMenu('ov_driver_name');
+                                  }}
+                                  title="Filter & Urutkan Driver"
+                                  aria-label="Filter & Urutkan Driver"
+                                >
+                                  <ArrowUpDown size={12} />
+                                </button>
+                                {activeColumnMenu === 'ov_driver_name' && (
+                                  <div className="th-filter-popover" onClick={(e) => e.stopPropagation()}>
+                                    <div className="th-popover-title">Urutkan Driver</div>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewDriverSortKey === 'created_at' && overviewDriverSortDir === 'desc' ? 'active' : ''}`}
+                                      onClick={() => handleSetOverviewDriverSort('created_at', 'desc')}
+                                    >
+                                      <span>Data Terbaru (Daftar)</span>
+                                      {overviewDriverSortKey === 'created_at' && overviewDriverSortDir === 'desc' && <Check size={13} />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewDriverSortKey === 'created_at' && overviewDriverSortDir === 'asc' ? 'active' : ''}`}
+                                      onClick={() => handleSetOverviewDriverSort('created_at', 'asc')}
+                                    >
+                                      <span>Data Terlama (Daftar)</span>
+                                      {overviewDriverSortKey === 'created_at' && overviewDriverSortDir === 'asc' && <Check size={13} />}
+                                    </button>
+                                    <div className="th-popover-divider" />
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewDriverSortKey === 'name' && overviewDriverSortDir === 'asc' ? 'active' : ''}`}
+                                      onClick={() => handleSetOverviewDriverSort('name', 'asc')}
+                                    >
+                                      <span>Nama (A → Z)</span>
+                                      {overviewDriverSortKey === 'name' && overviewDriverSortDir === 'asc' && <Check size={13} />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewDriverSortKey === 'name' && overviewDriverSortDir === 'desc' ? 'active' : ''}`}
+                                      onClick={() => handleSetOverviewDriverSort('name', 'desc')}
+                                    >
+                                      <span>Nama (Z → A)</span>
+                                      {overviewDriverSortKey === 'name' && overviewDriverSortDir === 'desc' && <Check size={13} />}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </th>
+                          <th className="tailadmin-th text-left">
+                            <div className="th-header-inner">
+                              <span>Layanan & Kendaraan</span>
+                              <div className="th-filter-dropdown-container">
+                                <button
+                                  type="button"
+                                  className={`th-filter-btn ${overviewDriverServiceFilter !== 'all' || overviewDriverSortKey === 'vehicleType' ? 'is-active' : ''}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleColumnMenu('ov_driver_service');
+                                  }}
+                                  title="Filter & Urutkan Layanan"
+                                  aria-label="Filter & Urutkan Layanan"
+                                >
+                                  <ArrowUpDown size={12} />
+                                </button>
+                                {activeColumnMenu === 'ov_driver_service' && (
+                                  <div className="th-filter-popover" onClick={(e) => e.stopPropagation()}>
+                                    <div className="th-popover-title">Filter Layanan</div>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewDriverServiceFilter === 'all' && overviewDriverSortKey !== 'vehicleType' ? 'active' : ''}`}
+                                      onClick={() => {
+                                        setOverviewDriverServiceFilter('all');
+                                        setOverviewDriverSortKey('created_at');
+                                        setDriverTablePage(1);
+                                        setActiveColumnMenu(null);
+                                      }}
+                                    >
+                                      <span>Semua Layanan</span>
+                                      {overviewDriverServiceFilter === 'all' && overviewDriverSortKey !== 'vehicleType' && <Check size={13} />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewDriverServiceFilter === 'motor' ? 'active' : ''}`}
+                                      onClick={() => {
+                                        setOverviewDriverServiceFilter('motor');
+                                        setDriverTablePage(1);
+                                        setActiveColumnMenu(null);
+                                      }}
+                                    >
+                                      <span>SheRide (Motor)</span>
+                                      {overviewDriverServiceFilter === 'motor' && <Check size={13} />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewDriverServiceFilter === 'mobil' ? 'active' : ''}`}
+                                      onClick={() => {
+                                        setOverviewDriverServiceFilter('mobil');
+                                        setDriverTablePage(1);
+                                        setActiveColumnMenu(null);
+                                      }}
+                                    >
+                                      <span>SheCar (Mobil)</span>
+                                      {overviewDriverServiceFilter === 'mobil' && <Check size={13} />}
+                                    </button>
+                                    <div className="th-popover-divider" />
+                                    <div className="th-popover-title">Urutkan Kendaraan</div>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewDriverSortKey === 'vehicleType' && overviewDriverSortDir === 'asc' ? 'active' : ''}`}
+                                      onClick={() => handleSetOverviewDriverSort('vehicleType', 'asc')}
+                                    >
+                                      <span>Motor Dahulu</span>
+                                      {overviewDriverSortKey === 'vehicleType' && overviewDriverSortDir === 'asc' && <Check size={13} />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewDriverSortKey === 'vehicleType' && overviewDriverSortDir === 'desc' ? 'active' : ''}`}
+                                      onClick={() => handleSetOverviewDriverSort('vehicleType', 'desc')}
+                                    >
+                                      <span>Mobil Dahulu</span>
+                                      {overviewDriverSortKey === 'vehicleType' && overviewDriverSortDir === 'desc' && <Check size={13} />}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </th>
+                          <th className="tailadmin-th text-left">
+                            <div className="th-header-inner">
+                              <span>Wilayah Operasional</span>
+                              <div className="th-filter-dropdown-container">
+                                <button
+                                  type="button"
+                                  className={`th-filter-btn ${overviewDriverSortKey === 'operationalArea' ? 'is-active' : ''}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleColumnMenu('ov_driver_area');
+                                  }}
+                                  title="Filter & Urutkan Wilayah"
+                                  aria-label="Filter & Urutkan Wilayah"
+                                >
+                                  <ArrowUpDown size={12} />
+                                </button>
+                                {activeColumnMenu === 'ov_driver_area' && (
+                                  <div className="th-filter-popover" onClick={(e) => e.stopPropagation()}>
+                                    <div className="th-popover-title">Urutkan Wilayah / Waktu</div>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewDriverSortKey === 'created_at' && overviewDriverSortDir === 'desc' ? 'active' : ''}`}
+                                      onClick={() => handleSetOverviewDriverSort('created_at', 'desc')}
+                                    >
+                                      <span>Tanggal Terbaru</span>
+                                      {overviewDriverSortKey === 'created_at' && overviewDriverSortDir === 'desc' && <Check size={13} />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewDriverSortKey === 'created_at' && overviewDriverSortDir === 'asc' ? 'active' : ''}`}
+                                      onClick={() => handleSetOverviewDriverSort('created_at', 'asc')}
+                                    >
+                                      <span>Tanggal Terlama</span>
+                                      {overviewDriverSortKey === 'created_at' && overviewDriverSortDir === 'asc' && <Check size={13} />}
+                                    </button>
+                                    <div className="th-popover-divider" />
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewDriverSortKey === 'operationalArea' && overviewDriverSortDir === 'asc' ? 'active' : ''}`}
+                                      onClick={() => handleSetOverviewDriverSort('operationalArea', 'asc')}
+                                    >
+                                      <span>Wilayah (A → Z)</span>
+                                      {overviewDriverSortKey === 'operationalArea' && overviewDriverSortDir === 'asc' && <Check size={13} />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewDriverSortKey === 'operationalArea' && overviewDriverSortDir === 'desc' ? 'active' : ''}`}
+                                      onClick={() => handleSetOverviewDriverSort('operationalArea', 'desc')}
+                                    >
+                                      <span>Wilayah (Z → A)</span>
+                                      {overviewDriverSortKey === 'operationalArea' && overviewDriverSortDir === 'desc' && <Check size={13} />}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </th>
+                          <th className="tailadmin-th text-left">
+                            <div className="th-header-inner">
+                              <span>Status</span>
+                              <div className="th-filter-dropdown-container">
+                                <button
+                                  type="button"
+                                  className={`th-filter-btn ${overviewDriverStatusFilter !== 'all' || overviewDriverSortKey === 'status' ? 'is-active' : ''}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleColumnMenu('ov_driver_status');
+                                  }}
+                                  title="Filter & Urutkan Status"
+                                  aria-label="Filter & Urutkan Status"
+                                >
+                                  <ArrowUpDown size={12} />
+                                </button>
+                                {activeColumnMenu === 'ov_driver_status' && (
+                                  <div className="th-filter-popover popover-align-right" onClick={(e) => e.stopPropagation()}>
+                                    <div className="th-popover-title">Filter Status Driver</div>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewDriverStatusFilter === 'all' && overviewDriverSortKey !== 'status' ? 'active' : ''}`}
+                                      onClick={() => {
+                                        setOverviewDriverStatusFilter('all');
+                                        setOverviewDriverSortKey('created_at');
+                                        setDriverTablePage(1);
+                                        setActiveColumnMenu(null);
+                                      }}
+                                    >
+                                      <span>Semua Status</span>
+                                      {overviewDriverStatusFilter === 'all' && overviewDriverSortKey !== 'status' && <Check size={13} />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewDriverStatusFilter === 'pending' ? 'active' : ''}`}
+                                      onClick={() => {
+                                        setOverviewDriverStatusFilter('pending');
+                                        setDriverTablePage(1);
+                                        setActiveColumnMenu(null);
+                                      }}
+                                    >
+                                      <span>Menunggu Review</span>
+                                      {overviewDriverStatusFilter === 'pending' && <Check size={13} />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewDriverStatusFilter === 'approved' ? 'active' : ''}`}
+                                      onClick={() => {
+                                        setOverviewDriverStatusFilter('approved');
+                                        setDriverTablePage(1);
+                                        setActiveColumnMenu(null);
+                                      }}
+                                    >
+                                      <span>Disetujui</span>
+                                      {overviewDriverStatusFilter === 'approved' && <Check size={13} />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewDriverStatusFilter === 'rejected' ? 'active' : ''}`}
+                                      onClick={() => {
+                                        setOverviewDriverStatusFilter('rejected');
+                                        setDriverTablePage(1);
+                                        setActiveColumnMenu(null);
+                                      }}
+                                    >
+                                      <span>Ditolak</span>
+                                      {overviewDriverStatusFilter === 'rejected' && <Check size={13} />}
+                                    </button>
+                                    <div className="th-popover-divider" />
+                                    <div className="th-popover-title">Urutkan Status</div>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewDriverSortKey === 'status' && overviewDriverSortDir === 'asc' ? 'active' : ''}`}
+                                      onClick={() => handleSetOverviewDriverSort('status', 'asc')}
+                                    >
+                                      <span>Status (A → Z)</span>
+                                      {overviewDriverSortKey === 'status' && overviewDriverSortDir === 'asc' && <Check size={13} />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewDriverSortKey === 'status' && overviewDriverSortDir === 'desc' ? 'active' : ''}`}
+                                      onClick={() => handleSetOverviewDriverSort('status', 'desc')}
+                                    >
+                                      <span>Status (Z → A)</span>
+                                      {overviewDriverSortKey === 'status' && overviewDriverSortDir === 'desc' && <Check size={13} />}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </th>
                           <th className="tailadmin-th text-right">Aksi</th>
                         </tr>
                       </thead>
@@ -912,7 +1389,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                         {sortedOverviewDrivers.length === 0 ? (
                           <tr>
                             <td colSpan="5" style={{ textAlign: 'center', padding: '32px 16px', color: '#64748B' }}>
-                              Belum ada pendaftaran driver di database.
+                              {overviewDriverServiceFilter !== 'all' || overviewDriverStatusFilter !== 'all'
+                                ? 'Tidak ada data driver yang sesuai dengan filter yang dipilih.'
+                                : 'Belum ada pendaftaran driver di database.'}
                             </td>
                           </tr>
                         ) : (
@@ -967,8 +1446,11 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 </td>
                                 <td className="tailadmin-td area-td">
                                   <div className="table-cell-meta">
-                                    <span className="table-primary-text">
-                                      {d.operationalArea || 'Makassar dan sekitarnya'}
+                                    <span
+                                      className="table-primary-text area-truncate"
+                                      title={d.operationalArea || 'Makassar dan sekitarnya'}
+                                    >
+                                      {formatOperationalArea(d.operationalArea)}
                                     </span>
                                     <span className="table-secondary-text">
                                       {d.created_at
@@ -987,17 +1469,20 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                   </span>
                                 </td>
                                 <td className="tailadmin-td action-td text-right">
-                                  <button
-                                    type="button"
-                                    className="btn-table-action"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleOpenEditDriver(d);
-                                    }}
-                                    title="Lengkapi atau Edit Data Driver"
-                                  >
-                                    <span>{isPending ? 'Lengkapi' : 'Edit'}</span>
-                                  </button>
+                                  <div className="table-action-group table-action-icons-row">
+                                    <button
+                                      type="button"
+                                      className="btn-table-icon-action btn-icon-edit"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenEditDriver(d);
+                                      }}
+                                      title={isPending ? 'Lengkapi & Verifikasi Berkas Driver' : 'Edit & Lengkapi Data Driver'}
+                                      aria-label="Edit Data Driver"
+                                    >
+                                      <Edit3 size={15} />
+                                    </button>
+                                  </div>
                                 </td>
                               </tr>
                             );
@@ -1061,10 +1546,240 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                     <table className="tailadmin-project-table">
                       <thead>
                         <tr className="tailadmin-th-row">
-                          <th className="tailadmin-th text-left">Pelanggan</th>
-                          <th className="tailadmin-th text-left">Kontak</th>
-                          <th className="tailadmin-th text-left">Aktivitas & Bergabung</th>
-                          <th className="tailadmin-th text-left">Status</th>
+                          <th className="tailadmin-th text-left">
+                            <div className="th-header-inner">
+                              <span>Pelanggan</span>
+                              <div className="th-filter-dropdown-container">
+                                <button
+                                  type="button"
+                                  className={`th-filter-btn ${overviewCustomerSortKey === 'name' || overviewCustomerSortKey === 'created_at' ? 'is-active' : ''}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleColumnMenu('ov_cust_name');
+                                  }}
+                                  title="Filter & Urutkan Pelanggan"
+                                  aria-label="Filter & Urutkan Pelanggan"
+                                >
+                                  <ArrowUpDown size={12} />
+                                </button>
+                                {activeColumnMenu === 'ov_cust_name' && (
+                                  <div className="th-filter-popover" onClick={(e) => e.stopPropagation()}>
+                                    <div className="th-popover-title">Urutkan Pelanggan</div>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewCustomerSortKey === 'created_at' && overviewCustomerSortDir === 'desc' ? 'active' : ''}`}
+                                      onClick={() => handleSetOverviewCustomerSort('created_at', 'desc')}
+                                    >
+                                      <span>Data Terbaru (Bergabung)</span>
+                                      {overviewCustomerSortKey === 'created_at' && overviewCustomerSortDir === 'desc' && <Check size={13} />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewCustomerSortKey === 'created_at' && overviewCustomerSortDir === 'asc' ? 'active' : ''}`}
+                                      onClick={() => handleSetOverviewCustomerSort('created_at', 'asc')}
+                                    >
+                                      <span>Data Terlama (Bergabung)</span>
+                                      {overviewCustomerSortKey === 'created_at' && overviewCustomerSortDir === 'asc' && <Check size={13} />}
+                                    </button>
+                                    <div className="th-popover-divider" />
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewCustomerSortKey === 'name' && overviewCustomerSortDir === 'asc' ? 'active' : ''}`}
+                                      onClick={() => handleSetOverviewCustomerSort('name', 'asc')}
+                                    >
+                                      <span>Nama (A → Z)</span>
+                                      {overviewCustomerSortKey === 'name' && overviewCustomerSortDir === 'asc' && <Check size={13} />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewCustomerSortKey === 'name' && overviewCustomerSortDir === 'desc' ? 'active' : ''}`}
+                                      onClick={() => handleSetOverviewCustomerSort('name', 'desc')}
+                                    >
+                                      <span>Nama (Z → A)</span>
+                                      {overviewCustomerSortKey === 'name' && overviewCustomerSortDir === 'desc' && <Check size={13} />}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </th>
+                          <th className="tailadmin-th text-left">
+                            <div className="th-header-inner">
+                              <span>Kontak</span>
+                              <div className="th-filter-dropdown-container">
+                                <button
+                                  type="button"
+                                  className={`th-filter-btn ${overviewCustomerSortKey === 'phone' ? 'is-active' : ''}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleColumnMenu('ov_cust_phone');
+                                  }}
+                                  title="Urutkan Kontak"
+                                  aria-label="Urutkan Kontak"
+                                >
+                                  <ArrowUpDown size={12} />
+                                </button>
+                                {activeColumnMenu === 'ov_cust_phone' && (
+                                  <div className="th-filter-popover" onClick={(e) => e.stopPropagation()}>
+                                    <div className="th-popover-title">Urutkan Nomor Kontak</div>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewCustomerSortKey === 'phone' && overviewCustomerSortDir === 'asc' ? 'active' : ''}`}
+                                      onClick={() => handleSetOverviewCustomerSort('phone', 'asc')}
+                                    >
+                                      <span>Nomor HP (0 → 9)</span>
+                                      {overviewCustomerSortKey === 'phone' && overviewCustomerSortDir === 'asc' && <Check size={13} />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewCustomerSortKey === 'phone' && overviewCustomerSortDir === 'desc' ? 'active' : ''}`}
+                                      onClick={() => handleSetOverviewCustomerSort('phone', 'desc')}
+                                    >
+                                      <span>Nomor HP (9 → 0)</span>
+                                      {overviewCustomerSortKey === 'phone' && overviewCustomerSortDir === 'desc' && <Check size={13} />}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </th>
+                          <th className="tailadmin-th text-left">
+                            <div className="th-header-inner">
+                              <span>Aktivitas & Bergabung</span>
+                              <div className="th-filter-dropdown-container">
+                                <button
+                                  type="button"
+                                  className={`th-filter-btn ${overviewCustomerSortKey === 'created_at' || overviewCustomerSortKey === 'orders' ? 'is-active' : ''}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleColumnMenu('ov_cust_activity');
+                                  }}
+                                  title="Filter & Urutkan Aktivitas"
+                                  aria-label="Filter & Urutkan Aktivitas"
+                                >
+                                  <ArrowUpDown size={12} />
+                                </button>
+                                {activeColumnMenu === 'ov_cust_activity' && (
+                                  <div className="th-filter-popover popover-align-right" onClick={(e) => e.stopPropagation()}>
+                                    <div className="th-popover-title">Waktu Bergabung</div>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewCustomerSortKey === 'created_at' && overviewCustomerSortDir === 'desc' ? 'active' : ''}`}
+                                      onClick={() => handleSetOverviewCustomerSort('created_at', 'desc')}
+                                    >
+                                      <span>Data Terbaru (Bergabung)</span>
+                                      {overviewCustomerSortKey === 'created_at' && overviewCustomerSortDir === 'desc' && <Check size={13} />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewCustomerSortKey === 'created_at' && overviewCustomerSortDir === 'asc' ? 'active' : ''}`}
+                                      onClick={() => handleSetOverviewCustomerSort('created_at', 'asc')}
+                                    >
+                                      <span>Data Terlama (Bergabung)</span>
+                                      {overviewCustomerSortKey === 'created_at' && overviewCustomerSortDir === 'asc' && <Check size={13} />}
+                                    </button>
+                                    <div className="th-popover-divider" />
+                                    <div className="th-popover-title">Jumlah Pesanan</div>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewCustomerSortKey === 'orders' && overviewCustomerSortDir === 'desc' ? 'active' : ''}`}
+                                      onClick={() => handleSetOverviewCustomerSort('orders', 'desc')}
+                                    >
+                                      <span>Pesanan Terbanyak</span>
+                                      {overviewCustomerSortKey === 'orders' && overviewCustomerSortDir === 'desc' && <Check size={13} />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewCustomerSortKey === 'orders' && overviewCustomerSortDir === 'asc' ? 'active' : ''}`}
+                                      onClick={() => handleSetOverviewCustomerSort('orders', 'asc')}
+                                    >
+                                      <span>Pesanan Tersedikit</span>
+                                      {overviewCustomerSortKey === 'orders' && overviewCustomerSortDir === 'asc' && <Check size={13} />}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </th>
+                          <th className="tailadmin-th text-left">
+                            <div className="th-header-inner">
+                              <span>Status</span>
+                              <div className="th-filter-dropdown-container">
+                                <button
+                                  type="button"
+                                  className={`th-filter-btn ${overviewCustomerStatusFilter !== 'all' || overviewCustomerSortKey === 'status' ? 'is-active' : ''}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleColumnMenu('ov_cust_status');
+                                  }}
+                                  title="Filter & Urutkan Status"
+                                  aria-label="Filter & Urutkan Status"
+                                >
+                                  <ArrowUpDown size={12} />
+                                </button>
+                                {activeColumnMenu === 'ov_cust_status' && (
+                                  <div className="th-filter-popover popover-align-right" onClick={(e) => e.stopPropagation()}>
+                                    <div className="th-popover-title">Filter Status Pelanggan</div>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewCustomerStatusFilter === 'all' && overviewCustomerSortKey !== 'status' ? 'active' : ''}`}
+                                      onClick={() => {
+                                        setOverviewCustomerStatusFilter('all');
+                                        setOverviewCustomerSortKey('created_at');
+                                        setCustomerTablePage(1);
+                                        setActiveColumnMenu(null);
+                                      }}
+                                    >
+                                      <span>Semua Status</span>
+                                      {overviewCustomerStatusFilter === 'all' && overviewCustomerSortKey !== 'status' && <Check size={13} />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewCustomerStatusFilter === 'active' ? 'active' : ''}`}
+                                      onClick={() => {
+                                        setOverviewCustomerStatusFilter('active');
+                                        setCustomerTablePage(1);
+                                        setActiveColumnMenu(null);
+                                      }}
+                                    >
+                                      <span>Hanya Aktif</span>
+                                      {overviewCustomerStatusFilter === 'active' && <Check size={13} />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewCustomerStatusFilter === 'suspended' ? 'active' : ''}`}
+                                      onClick={() => {
+                                        setOverviewCustomerStatusFilter('suspended');
+                                        setCustomerTablePage(1);
+                                        setActiveColumnMenu(null);
+                                      }}
+                                    >
+                                      <span>Hanya Ditangguhkan</span>
+                                      {overviewCustomerStatusFilter === 'suspended' && <Check size={13} />}
+                                    </button>
+                                    <div className="th-popover-divider" />
+                                    <div className="th-popover-title">Urutkan Status</div>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewCustomerSortKey === 'status' && overviewCustomerSortDir === 'asc' ? 'active' : ''}`}
+                                      onClick={() => handleSetOverviewCustomerSort('status', 'asc')}
+                                    >
+                                      <span>Status (A → Z)</span>
+                                      {overviewCustomerSortKey === 'status' && overviewCustomerSortDir === 'asc' && <Check size={13} />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`th-popover-item ${overviewCustomerSortKey === 'status' && overviewCustomerSortDir === 'desc' ? 'active' : ''}`}
+                                      onClick={() => handleSetOverviewCustomerSort('status', 'desc')}
+                                    >
+                                      <span>Status (Z → A)</span>
+                                      {overviewCustomerSortKey === 'status' && overviewCustomerSortDir === 'desc' && <Check size={13} />}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </th>
                           <th className="tailadmin-th text-right">Aksi</th>
                         </tr>
                       </thead>
@@ -1072,7 +1787,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                         {sortedOverviewCustomers.length === 0 ? (
                           <tr>
                             <td colSpan="5" style={{ textAlign: 'center', padding: '32px 16px', color: '#64748B' }}>
-                              Belum ada data pelanggan di database.
+                              {overviewCustomerStatusFilter !== 'all'
+                                ? 'Tidak ada data pelanggan yang sesuai dengan filter yang dipilih.'
+                                : 'Belum ada data pelanggan di database.'}
                             </td>
                           </tr>
                         ) : (
@@ -1147,16 +1864,20 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                   </span>
                                 </td>
                                 <td className="tailadmin-td action-td text-right">
-                                  <button
-                                    type="button"
-                                    className="btn-table-action"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSelectedCustomerDetail(c);
-                                    }}
-                                  >
-                                    Detail
-                                  </button>
+                                  <div className="table-action-group table-action-icons-row">
+                                    <button
+                                      type="button"
+                                      className="btn-table-icon-action btn-icon-detail"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedCustomerDetail(c);
+                                      }}
+                                      title="Lihat Detail Profil Pelanggan"
+                                      aria-label="Detail Pelanggan"
+                                    >
+                                      <Eye size={15} />
+                                    </button>
+                                  </div>
                                 </td>
                               </tr>
                             );
@@ -1338,11 +2059,308 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                   <table className="tailadmin-project-table">
                     <thead>
                       <tr className="tailadmin-th-row">
-                        <th className="tailadmin-th text-left">Driver</th>
-                        <th className="tailadmin-th text-left">Layanan & Kendaraan</th>
-                        <th className="tailadmin-th text-left">Berkas Dokumen</th>
-                        <th className="tailadmin-th text-left">Wilayah Operasional</th>
-                        <th className="tailadmin-th text-left">Status</th>
+                        <th className="tailadmin-th text-left">
+                          <div className="th-header-inner">
+                            <span>Driver</span>
+                            <div className="th-filter-dropdown-container">
+                              <button
+                                type="button"
+                                className={`th-filter-btn ${driverSortKey === 'name' || driverSortKey === 'created_at' ? 'is-active' : ''}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleColumnMenu('driver_name');
+                                }}
+                                title="Filter & Urutkan Driver"
+                                aria-label="Filter & Urutkan Driver"
+                              >
+                                <ArrowUpDown size={12} />
+                              </button>
+                              {activeColumnMenu === 'driver_name' && (
+                                <div className="th-filter-popover" onClick={(e) => e.stopPropagation()}>
+                                  <div className="th-popover-title">Urutkan Driver</div>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${driverSortKey === 'created_at' && driverSortDir === 'desc' ? 'active' : ''}`}
+                                    onClick={() => handleSetDriverSort('created_at', 'desc')}
+                                  >
+                                    <span>Data Terbaru (Daftar)</span>
+                                    {driverSortKey === 'created_at' && driverSortDir === 'desc' && <Check size={13} />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${driverSortKey === 'created_at' && driverSortDir === 'asc' ? 'active' : ''}`}
+                                    onClick={() => handleSetDriverSort('created_at', 'asc')}
+                                  >
+                                    <span>Data Terlama (Daftar)</span>
+                                    {driverSortKey === 'created_at' && driverSortDir === 'asc' && <Check size={13} />}
+                                  </button>
+                                  <div className="th-popover-divider" />
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${driverSortKey === 'name' && driverSortDir === 'asc' ? 'active' : ''}`}
+                                    onClick={() => handleSetDriverSort('name', 'asc')}
+                                  >
+                                    <span>Nama (A → Z)</span>
+                                    {driverSortKey === 'name' && driverSortDir === 'asc' && <Check size={13} />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${driverSortKey === 'name' && driverSortDir === 'desc' ? 'active' : ''}`}
+                                    onClick={() => handleSetDriverSort('name', 'desc')}
+                                  >
+                                    <span>Nama (Z → A)</span>
+                                    {driverSortKey === 'name' && driverSortDir === 'desc' && <Check size={13} />}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </th>
+                        <th className="tailadmin-th text-left">
+                          <div className="th-header-inner">
+                            <span>Layanan & Kendaraan</span>
+                            <div className="th-filter-dropdown-container">
+                              <button
+                                type="button"
+                                className={`th-filter-btn ${driverServiceFilter !== 'all' || driverSortKey === 'vehicleType' ? 'is-active' : ''}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleColumnMenu('driver_service');
+                                }}
+                                title="Filter & Urutkan Layanan"
+                                aria-label="Filter & Urutkan Layanan"
+                              >
+                                <ArrowUpDown size={12} />
+                              </button>
+                              {activeColumnMenu === 'driver_service' && (
+                                <div className="th-filter-popover" onClick={(e) => e.stopPropagation()}>
+                                  <div className="th-popover-title">Filter Layanan</div>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${driverServiceFilter === 'all' && driverSortKey !== 'vehicleType' ? 'active' : ''}`}
+                                    onClick={() => { setDriverServiceFilter('all'); setDriverSortKey('created_at'); setActiveColumnMenu(null); }}
+                                  >
+                                    <span>Semua Layanan</span>
+                                    {driverServiceFilter === 'all' && driverSortKey !== 'vehicleType' && <Check size={13} />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${driverServiceFilter === 'motor' ? 'active' : ''}`}
+                                    onClick={() => { setDriverServiceFilter('motor'); setActiveColumnMenu(null); }}
+                                  >
+                                    <span>SheRide (Motor)</span>
+                                    {driverServiceFilter === 'motor' && <Check size={13} />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${driverServiceFilter === 'mobil' ? 'active' : ''}`}
+                                    onClick={() => { setDriverServiceFilter('mobil'); setActiveColumnMenu(null); }}
+                                  >
+                                    <span>SheCar (Mobil)</span>
+                                    {driverServiceFilter === 'mobil' && <Check size={13} />}
+                                  </button>
+                                  <div className="th-popover-divider" />
+                                  <div className="th-popover-title">Urutkan Kendaraan</div>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${driverSortKey === 'vehicleType' && driverSortDir === 'asc' ? 'active' : ''}`}
+                                    onClick={() => handleSetDriverSort('vehicleType', 'asc')}
+                                  >
+                                    <span>Motor Dahulu</span>
+                                    {driverSortKey === 'vehicleType' && driverSortDir === 'asc' && <Check size={13} />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${driverSortKey === 'vehicleType' && driverSortDir === 'desc' ? 'active' : ''}`}
+                                    onClick={() => handleSetDriverSort('vehicleType', 'desc')}
+                                  >
+                                    <span>Mobil Dahulu</span>
+                                    {driverSortKey === 'vehicleType' && driverSortDir === 'desc' && <Check size={13} />}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </th>
+                        <th className="tailadmin-th text-left">
+                          <div className="th-header-inner">
+                            <span>Berkas Dokumen</span>
+                            <div className="th-filter-dropdown-container">
+                              <button
+                                type="button"
+                                className={`th-filter-btn ${driverDocFilter !== 'all' || driverSortKey === 'docs' ? 'is-active' : ''}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleColumnMenu('driver_docs');
+                                }}
+                                title="Filter & Urutkan Berkas Dokumen"
+                                aria-label="Filter & Urutkan Berkas Dokumen"
+                              >
+                                <ArrowUpDown size={12} />
+                              </button>
+                              {activeColumnMenu === 'driver_docs' && (
+                                <div className="th-filter-popover" onClick={(e) => e.stopPropagation()}>
+                                  <div className="th-popover-title">Filter Kelengkapan</div>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${driverDocFilter === 'all' && driverSortKey !== 'docs' ? 'active' : ''}`}
+                                    onClick={() => { setDriverDocFilter('all'); setDriverSortKey('created_at'); setActiveColumnMenu(null); }}
+                                  >
+                                    <span>Semua Dokumen</span>
+                                    {driverDocFilter === 'all' && driverSortKey !== 'docs' && <Check size={13} />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${driverDocFilter === 'complete' ? 'active' : ''}`}
+                                    onClick={() => { setDriverDocFilter('complete'); setActiveColumnMenu(null); }}
+                                  >
+                                    <span>Hanya Dokumen Lengkap</span>
+                                    {driverDocFilter === 'complete' && <Check size={13} />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${driverDocFilter === 'incomplete' ? 'active' : ''}`}
+                                    onClick={() => { setDriverDocFilter('incomplete'); setActiveColumnMenu(null); }}
+                                  >
+                                    <span>Hanya Belum Lengkap</span>
+                                    {driverDocFilter === 'incomplete' && <Check size={13} />}
+                                  </button>
+                                  <div className="th-popover-divider" />
+                                  <div className="th-popover-title">Urutkan Dokumen</div>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${driverSortKey === 'docs' && driverSortDir === 'desc' ? 'active' : ''}`}
+                                    onClick={() => handleSetDriverSort('docs', 'desc')}
+                                  >
+                                    <span>Lengkap Dahulu</span>
+                                    {driverSortKey === 'docs' && driverSortDir === 'desc' && <Check size={13} />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${driverSortKey === 'docs' && driverSortDir === 'asc' ? 'active' : ''}`}
+                                    onClick={() => handleSetDriverSort('docs', 'asc')}
+                                  >
+                                    <span>Belum Lengkap Dahulu</span>
+                                    {driverSortKey === 'docs' && driverSortDir === 'asc' && <Check size={13} />}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </th>
+                        <th className="tailadmin-th text-left">
+                          <div className="th-header-inner">
+                            <span>Wilayah Operasional</span>
+                            <div className="th-filter-dropdown-container">
+                              <button
+                                type="button"
+                                className={`th-filter-btn ${driverSortKey === 'operationalArea' ? 'is-active' : ''}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleColumnMenu('driver_area');
+                                }}
+                                title="Filter & Urutkan Wilayah"
+                                aria-label="Filter & Urutkan Wilayah"
+                              >
+                                <ArrowUpDown size={12} />
+                              </button>
+                              {activeColumnMenu === 'driver_area' && (
+                                <div className="th-filter-popover popover-align-right" onClick={(e) => e.stopPropagation()}>
+                                  <div className="th-popover-title">Urutkan Tanggal / Wilayah</div>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${driverSortKey === 'created_at' && driverSortDir === 'desc' ? 'active' : ''}`}
+                                    onClick={() => handleSetDriverSort('created_at', 'desc')}
+                                  >
+                                    <span>Tanggal Terbaru</span>
+                                    {driverSortKey === 'created_at' && driverSortDir === 'desc' && <Check size={13} />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${driverSortKey === 'created_at' && driverSortDir === 'asc' ? 'active' : ''}`}
+                                    onClick={() => handleSetDriverSort('created_at', 'asc')}
+                                  >
+                                    <span>Tanggal Terlama</span>
+                                    {driverSortKey === 'created_at' && driverSortDir === 'asc' && <Check size={13} />}
+                                  </button>
+                                  <div className="th-popover-divider" />
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${driverSortKey === 'operationalArea' && driverSortDir === 'asc' ? 'active' : ''}`}
+                                    onClick={() => handleSetDriverSort('operationalArea', 'asc')}
+                                  >
+                                    <span>Wilayah (A → Z)</span>
+                                    {driverSortKey === 'operationalArea' && driverSortDir === 'asc' && <Check size={13} />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${driverSortKey === 'operationalArea' && driverSortDir === 'desc' ? 'active' : ''}`}
+                                    onClick={() => handleSetDriverSort('operationalArea', 'desc')}
+                                  >
+                                    <span>Wilayah (Z → A)</span>
+                                    {driverSortKey === 'operationalArea' && driverSortDir === 'desc' && <Check size={13} />}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </th>
+                        <th className="tailadmin-th text-left">
+                          <div className="th-header-inner">
+                            <span>Status</span>
+                            <div className="th-filter-dropdown-container">
+                              <button
+                                type="button"
+                                className={`th-filter-btn ${driverTab !== 'all' || driverSortKey === 'status' ? 'is-active' : ''}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleColumnMenu('driver_status');
+                                }}
+                                title="Filter & Urutkan Status"
+                                aria-label="Filter & Urutkan Status"
+                              >
+                                <ArrowUpDown size={12} />
+                              </button>
+                              {activeColumnMenu === 'driver_status' && (
+                                <div className="th-filter-popover popover-align-right" onClick={(e) => e.stopPropagation()}>
+                                  <div className="th-popover-title">Filter Status Driver</div>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${driverTab === 'all' && driverSortKey !== 'status' ? 'active' : ''}`}
+                                    onClick={() => { setDriverTab('all'); setDriverSortKey('created_at'); setActiveColumnMenu(null); }}
+                                  >
+                                    <span>Semua Status</span>
+                                    {driverTab === 'all' && driverSortKey !== 'status' && <Check size={13} />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${driverTab === 'pending' ? 'active' : ''}`}
+                                    onClick={() => { setDriverTab('pending'); setActiveColumnMenu(null); }}
+                                  >
+                                    <span>Menunggu Review</span>
+                                    {driverTab === 'pending' && <Check size={13} />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${driverTab === 'approved' ? 'active' : ''}`}
+                                    onClick={() => { setDriverTab('approved'); setActiveColumnMenu(null); }}
+                                  >
+                                    <span>Disetujui</span>
+                                    {driverTab === 'approved' && <Check size={13} />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${driverTab === 'rejected' ? 'active' : ''}`}
+                                    onClick={() => { setDriverTab('rejected'); setActiveColumnMenu(null); }}
+                                  >
+                                    <span>Ditolak</span>
+                                    {driverTab === 'rejected' && <Check size={13} />}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </th>
                         <th className="tailadmin-th text-right">Aksi Verifikasi</th>
                       </tr>
                     </thead>
@@ -1366,6 +2384,16 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                           const ktpDoc = driverDocs.find((d) => d.document_type === 'ktp');
                           const simDoc = driverDocs.find((d) => d.document_type === 'sim');
                           const stnkDoc = driverDocs.find((d) => d.document_type === 'stnk');
+
+                          const hasKtp = Boolean(ktpDoc?.document_url || driver.ktpUrl);
+                          const hasSim = Boolean(simDoc?.document_url || driver.simUrl);
+                          const hasStnk = Boolean(stnkDoc?.document_url || driver.stnkUrl);
+                          const isDocsComplete = hasKtp && hasSim && hasStnk;
+                          const missingDocs = [
+                            !hasKtp && 'KTP',
+                            !hasSim && 'SIM',
+                            !hasStnk && 'STNK'
+                          ].filter(Boolean);
 
                           const isPending = driver.verification_status === 'pending';
                           const isApproved = (driver.verification_status || 'approved') === 'approved';
@@ -1423,72 +2451,37 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 </div>
                               </td>
                               <td className="tailadmin-td docs-td">
-                                <div className="table-docs-group">
-                                  <button
-                                    type="button"
-                                    className={`table-doc-pill ${ktpDoc?.document_url ? 'ready' : 'missing'}`}
-                                    onClick={(e) => {
+                                <span
+                                  className={`table-status-pill docs-status-pill ${isDocsComplete ? 'active' : 'pending'}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenEditDriver(driver, 'dokumen');
+                                  }}
+                                  role="button"
+                                  tabIndex={0}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
                                       e.stopPropagation();
-                                      if (ktpDoc?.document_url) {
-                                        setPreviewDoc({
-                                          type: 'KTP',
-                                          title: 'Foto KTP Asli',
-                                          url: ktpDoc.document_url,
-                                          driverName: driver.name
-                                        });
-                                      }
-                                    }}
-                                    title={ktpDoc?.document_url ? 'Lihat Foto KTP' : 'KTP belum diunggah'}
-                                  >
-                                    <FileText size={12} />
-                                    <span>KTP</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    className={`table-doc-pill ${simDoc?.document_url ? 'ready' : 'missing'}`}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (simDoc?.document_url) {
-                                        setPreviewDoc({
-                                          type: 'SIM',
-                                          title: `Foto ${driver.vehicleType === 'mobil' ? 'SIM A' : 'SIM C'} Asli`,
-                                          url: simDoc.document_url,
-                                          driverName: driver.name
-                                        });
-                                      }
-                                    }}
-                                    title={simDoc?.document_url ? 'Lihat Foto SIM' : 'SIM belum diunggah'}
-                                  >
-                                    <FileText size={12} />
-                                    <span>SIM</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    className={`table-doc-pill ${stnkDoc?.document_url ? 'ready' : 'missing'}`}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (stnkDoc?.document_url) {
-                                        setPreviewDoc({
-                                          type: 'STNK',
-                                          title: 'Foto STNK Kendaraan Asli',
-                                          url: stnkDoc.document_url,
-                                          driverName: driver.name
-                                        });
-                                      }
-                                    }}
-                                    title={stnkDoc?.document_url ? 'Lihat Foto STNK' : 'STNK belum diunggah'}
-                                  >
-                                    <FileText size={12} />
-                                    <span>STNK</span>
-                                  </button>
-                                </div>
+                                      handleOpenEditDriver(driver, 'dokumen');
+                                    }
+                                  }}
+                                  title={
+                                    isDocsComplete
+                                      ? 'Dokumen KTP, SIM, dan STNK lengkap. Klik untuk kelola berkas.'
+                                      : `Dokumen belum lengkap (Belum ada: ${missingDocs.join(', ')}). Klik untuk lengkapi berkas.`
+                                  }
+                                >
+                                  {isDocsComplete ? 'Dokumen Lengkap' : 'Belum Lengkap'}
+                                </span>
                               </td>
                               <td className="tailadmin-td area-td">
                                 <div className="table-cell-meta">
-                                  <span className="table-primary-text">
-                                    {driver.operationalArea || 'Makassar dan sekitarnya'}
+                                  <span
+                                    className="table-primary-text area-truncate"
+                                    title={driver.operationalArea || 'Makassar dan sekitarnya'}
+                                  >
+                                    {formatOperationalArea(driver.operationalArea)}
                                   </span>
                                   <span className="table-secondary-text">
                                     {driver.created_at
@@ -1507,44 +2500,45 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 </span>
                               </td>
                               <td className="tailadmin-td action-td text-right">
-                                <div className="table-action-group">
+                                <div className="table-action-group table-action-icons-row">
                                   <button
                                     type="button"
-                                    className="btn-table-edit"
+                                    className="btn-table-icon-action btn-icon-edit"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleOpenEditDriver(driver);
                                     }}
-                                    title="Lengkapi atau Edit Data Driver"
+                                    title="Edit & Lengkapi Data Driver"
+                                    aria-label="Edit Data Driver"
                                   >
-                                    Edit
+                                    <Edit3 size={15} />
                                   </button>
 
                                   {isPending && (
                                     <>
                                       <button
                                         type="button"
-                                        className="btn-table-approve"
+                                        className="btn-table-icon-action btn-icon-approve"
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           setApproveConfirmDriver(driver);
                                         }}
-                                        title="Setujui permohonan driver ini"
+                                        title="Setujui Permohonan Driver"
+                                        aria-label="Setujui Driver"
                                       >
-                                        <CheckCircle2 size={13} />
-                                        <span>Setujui</span>
+                                        <CheckCircle2 size={15} />
                                       </button>
                                       <button
                                         type="button"
-                                        className="btn-table-reject"
+                                        className="btn-table-icon-action btn-icon-reject"
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           setRejectModalDriver(driver);
                                         }}
-                                        title="Tolak permohonan berkas driver"
+                                        title="Tolak Berkas Driver"
+                                        aria-label="Tolak Driver"
                                       >
-                                        <XCircle size={13} />
-                                        <span>Tolak</span>
+                                        <XCircle size={15} />
                                       </button>
                                     </>
                                   )}
@@ -1552,29 +2546,30 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                   {isApproved && (
                                     <button
                                       type="button"
-                                      className="btn-table-revoke"
+                                      className="btn-table-icon-action btn-icon-revoke"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setRejectModalDriver(driver);
                                       }}
-                                      title="Cabut status persetujuan"
+                                      title="Cabut Status Persetujuan"
+                                      aria-label="Cabut Status Persetujuan"
                                     >
-                                      Cabut Status
+                                      <XCircle size={15} />
                                     </button>
                                   )}
 
                                   {isRejected && (
                                     <button
                                       type="button"
-                                      className="btn-table-approve"
+                                      className="btn-table-icon-action btn-icon-approve"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setApproveConfirmDriver(driver);
                                       }}
-                                      title="Tinjau ulang & setujui"
+                                      title="Tinjau Ulang & Setujui"
+                                      aria-label="Setujui Ulang"
                                     >
-                                      <CheckCircle2 size={13} />
-                                      <span>Setujui Ulang</span>
+                                      <CheckCircle2 size={15} />
                                     </button>
                                   )}
                                 </div>
@@ -1745,10 +2740,209 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                   <table className="tailadmin-project-table">
                     <thead>
                       <tr className="tailadmin-th-row">
-                        <th className="tailadmin-th text-left">Pelanggan</th>
-                        <th className="tailadmin-th text-left">Kontak & WhatsApp</th>
-                        <th className="tailadmin-th text-left">Aktivitas & Bergabung</th>
-                        <th className="tailadmin-th text-left">Status</th>
+                        <th className="tailadmin-th text-left">
+                          <div className="th-header-inner">
+                            <span>Pelanggan</span>
+                            <div className="th-filter-dropdown-container">
+                              <button
+                                type="button"
+                                className={`th-filter-btn ${customerSortKey === 'name' || customerSortKey === 'created_at' ? 'is-active' : ''}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleColumnMenu('cust_name');
+                                }}
+                                title="Filter & Urutkan Pelanggan"
+                                aria-label="Filter & Urutkan Pelanggan"
+                              >
+                                <ArrowUpDown size={12} />
+                              </button>
+                              {activeColumnMenu === 'cust_name' && (
+                                <div className="th-filter-popover" onClick={(e) => e.stopPropagation()}>
+                                  <div className="th-popover-title">Urutkan Pelanggan</div>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${customerSortKey === 'created_at' && customerSortDir === 'desc' ? 'active' : ''}`}
+                                    onClick={() => handleSetCustomerSort('created_at', 'desc')}
+                                  >
+                                    <span>Data Terbaru (Bergabung)</span>
+                                    {customerSortKey === 'created_at' && customerSortDir === 'desc' && <Check size={13} />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${customerSortKey === 'created_at' && customerSortDir === 'asc' ? 'active' : ''}`}
+                                    onClick={() => handleSetCustomerSort('created_at', 'asc')}
+                                  >
+                                    <span>Data Terlama (Bergabung)</span>
+                                    {customerSortKey === 'created_at' && customerSortDir === 'asc' && <Check size={13} />}
+                                  </button>
+                                  <div className="th-popover-divider" />
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${customerSortKey === 'name' && customerSortDir === 'asc' ? 'active' : ''}`}
+                                    onClick={() => handleSetCustomerSort('name', 'asc')}
+                                  >
+                                    <span>Nama (A → Z)</span>
+                                    {customerSortKey === 'name' && customerSortDir === 'asc' && <Check size={13} />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${customerSortKey === 'name' && customerSortDir === 'desc' ? 'active' : ''}`}
+                                    onClick={() => handleSetCustomerSort('name', 'desc')}
+                                  >
+                                    <span>Nama (Z → A)</span>
+                                    {customerSortKey === 'name' && customerSortDir === 'desc' && <Check size={13} />}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </th>
+                        <th className="tailadmin-th text-left">
+                          <div className="th-header-inner">
+                            <span>Kontak & WhatsApp</span>
+                            <div className="th-filter-dropdown-container">
+                              <button
+                                type="button"
+                                className={`th-filter-btn ${customerSortKey === 'phone' ? 'is-active' : ''}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleColumnMenu('cust_phone');
+                                }}
+                                title="Urutkan Kontak"
+                                aria-label="Urutkan Kontak"
+                              >
+                                <ArrowUpDown size={12} />
+                              </button>
+                              {activeColumnMenu === 'cust_phone' && (
+                                <div className="th-filter-popover" onClick={(e) => e.stopPropagation()}>
+                                  <div className="th-popover-title">Urutkan Nomor Kontak</div>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${customerSortKey === 'phone' && customerSortDir === 'asc' ? 'active' : ''}`}
+                                    onClick={() => handleSetCustomerSort('phone', 'asc')}
+                                  >
+                                    <span>Nomor HP (0 → 9)</span>
+                                    {customerSortKey === 'phone' && customerSortDir === 'asc' && <Check size={13} />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${customerSortKey === 'phone' && customerSortDir === 'desc' ? 'active' : ''}`}
+                                    onClick={() => handleSetCustomerSort('phone', 'desc')}
+                                  >
+                                    <span>Nomor HP (9 → 0)</span>
+                                    {customerSortKey === 'phone' && customerSortDir === 'desc' && <Check size={13} />}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </th>
+                        <th className="tailadmin-th text-left">
+                          <div className="th-header-inner">
+                            <span>Aktivitas & Bergabung</span>
+                            <div className="th-filter-dropdown-container">
+                              <button
+                                type="button"
+                                className={`th-filter-btn ${customerSortKey === 'created_at' || customerSortKey === 'orders' ? 'is-active' : ''}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleColumnMenu('cust_activity');
+                                }}
+                                title="Filter & Urutkan Aktivitas"
+                                aria-label="Filter & Urutkan Aktivitas"
+                              >
+                                <ArrowUpDown size={12} />
+                              </button>
+                              {activeColumnMenu === 'cust_activity' && (
+                                <div className="th-filter-popover popover-align-right" onClick={(e) => e.stopPropagation()}>
+                                  <div className="th-popover-title">Waktu Bergabung</div>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${customerSortKey === 'created_at' && customerSortDir === 'desc' ? 'active' : ''}`}
+                                    onClick={() => handleSetCustomerSort('created_at', 'desc')}
+                                  >
+                                    <span>Data Terbaru (Bergabung)</span>
+                                    {customerSortKey === 'created_at' && customerSortDir === 'desc' && <Check size={13} />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${customerSortKey === 'created_at' && customerSortDir === 'asc' ? 'active' : ''}`}
+                                    onClick={() => handleSetCustomerSort('created_at', 'asc')}
+                                  >
+                                    <span>Data Terlama (Bergabung)</span>
+                                    {customerSortKey === 'created_at' && customerSortDir === 'asc' && <Check size={13} />}
+                                  </button>
+                                  <div className="th-popover-divider" />
+                                  <div className="th-popover-title">Jumlah Pesanan</div>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${customerSortKey === 'orders' && customerSortDir === 'desc' ? 'active' : ''}`}
+                                    onClick={() => handleSetCustomerSort('orders', 'desc')}
+                                  >
+                                    <span>Pesanan Terbanyak</span>
+                                    {customerSortKey === 'orders' && customerSortDir === 'desc' && <Check size={13} />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${customerSortKey === 'orders' && customerSortDir === 'asc' ? 'active' : ''}`}
+                                    onClick={() => handleSetCustomerSort('orders', 'asc')}
+                                  >
+                                    <span>Pesanan Tersedikit</span>
+                                    {customerSortKey === 'orders' && customerSortDir === 'asc' && <Check size={13} />}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </th>
+                        <th className="tailadmin-th text-left">
+                          <div className="th-header-inner">
+                            <span>Status</span>
+                            <div className="th-filter-dropdown-container">
+                              <button
+                                type="button"
+                                className={`th-filter-btn ${customerTab !== 'all' || customerSortKey === 'status' ? 'is-active' : ''}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleColumnMenu('cust_status');
+                                }}
+                                title="Filter & Urutkan Status"
+                                aria-label="Filter & Urutkan Status"
+                              >
+                                <ArrowUpDown size={12} />
+                              </button>
+                              {activeColumnMenu === 'cust_status' && (
+                                <div className="th-filter-popover popover-align-right" onClick={(e) => e.stopPropagation()}>
+                                  <div className="th-popover-title">Filter Status Pelanggan</div>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${customerTab === 'all' && customerSortKey !== 'status' ? 'active' : ''}`}
+                                    onClick={() => { setCustomerTab('all'); setCustomerSortKey('created_at'); setActiveColumnMenu(null); }}
+                                  >
+                                    <span>Semua Status</span>
+                                    {customerTab === 'all' && <Check size={13} />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${customerTab === 'active' ? 'active' : ''}`}
+                                    onClick={() => { setCustomerTab('active'); setActiveColumnMenu(null); }}
+                                  >
+                                    <span>Hanya Aktif</span>
+                                    {customerTab === 'active' && <Check size={13} />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`th-popover-item ${customerTab === 'suspended' ? 'active' : ''}`}
+                                    onClick={() => { setCustomerTab('suspended'); setActiveColumnMenu(null); }}
+                                  >
+                                    <span>Hanya Ditangguhkan</span>
+                                    {customerTab === 'suspended' && <Check size={13} />}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </th>
                         <th className="tailadmin-th text-right">Aksi Kelola</th>
                       </tr>
                     </thead>
@@ -1853,40 +3047,44 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 </span>
                               </td>
                               <td className="tailadmin-td action-td text-right">
-                                <div className="table-action-group">
+                                <div className="table-action-group table-action-icons-row">
                                   <button
                                     type="button"
-                                    className="btn-table-action"
+                                    className="btn-table-icon-action btn-icon-detail"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setSelectedCustomerDetail(cust);
                                     }}
+                                    title="Lihat Detail Profil Pelanggan"
+                                    aria-label="Detail Pelanggan"
                                   >
-                                    Detail
+                                    <Eye size={15} />
                                   </button>
 
                                   <button
                                     type="button"
-                                    className={`btn-table-action-toggle ${isSuspended ? 'activate' : 'suspend'}`}
+                                    className={`btn-table-icon-action ${isSuspended ? 'btn-icon-activate' : 'btn-icon-suspend'}`}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setCustomerStatusConfirm(cust);
                                     }}
-                                    title={isSuspended ? 'Aktifkan kembali akun' : 'Tangguhkan akun'}
+                                    title={isSuspended ? 'Aktifkan Kembali Akun Pelanggan' : 'Tangguhkan Akun Pelanggan'}
+                                    aria-label={isSuspended ? 'Aktifkan Akun' : 'Tangguhkan Akun'}
                                   >
-                                    {isSuspended ? 'Aktifkan' : 'Tangguhkan'}
+                                    {isSuspended ? <UserCheck size={15} /> : <UserX size={15} />}
                                   </button>
 
                                   <button
                                     type="button"
-                                    className="btn-table-action-del"
+                                    className="btn-table-icon-action btn-icon-delete"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setCustomerDeleteConfirm(cust);
                                     }}
-                                    title="Hapus data pelanggan ini"
+                                    title="Hapus Data Pelanggan Ini"
+                                    aria-label="Hapus Pelanggan"
                                   >
-                                    <Trash2 size={13} />
+                                    <Trash2 size={15} />
                                   </button>
                                 </div>
                               </td>
@@ -2123,7 +3321,6 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
             <div className="dialog-header">
               <div>
                 <h3 className="dialog-title">Detail Profil Pelanggan</h3>
-                <span className="dialog-sub">ID: {selectedCustomerDetail.id}</span>
               </div>
               <button
                 type="button"
@@ -2387,7 +3584,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                       : 'Disetujui'}
                   </span>
                 </div>
-                <span className="dialog-sub">ID: {editingDriver.id} • {editingDriver.name}</span>
+                <span className="dialog-sub">{editingDriver.name}</span>
               </div>
               <button
                 type="button"

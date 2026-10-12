@@ -105,3 +105,21 @@ test('Seam 4: OTWJek Kirim Paket Booking Message Formatter', () => {
   assert.ok(message.includes('Titip di meja resepsionis lantai 1'));
 });
 
+import { normalizePhone, formatStandardPhone } from '../src/services/dbService.js';
+
+test('Seam 5: Phone Number Normalization and Standard Formatting', () => {
+  // Test berbagai variasi input nomor telepon Indonesia
+  assert.equal(normalizePhone('081234567890'), '81234567890');
+  assert.equal(normalizePhone('+6281234567890'), '81234567890');
+  assert.equal(normalizePhone('+62 812-3456-7890'), '81234567890');
+  assert.equal(normalizePhone('+62081234567890'), '81234567890');
+  assert.equal(normalizePhone('812 3456 7890'), '81234567890');
+  assert.equal(normalizePhone('0812-3456-7890'), '81234567890');
+
+  // Test format standar (+62)
+  assert.equal(formatStandardPhone('081234567890'), '+6281234567890');
+  assert.equal(formatStandardPhone('+62081234567890'), '+6281234567890');
+  assert.equal(formatStandardPhone('81234567890'), '+6281234567890');
+});
+
+

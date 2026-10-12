@@ -356,56 +356,6 @@
   border-color: #CBD5E1;
 }
 
-/* TailAdmin Search Bar with ⌘K Badge */
-.tailadmin-topbar-search {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background-color: #FFFFFF;
-  border: 1px solid #E2E8F0;
-  border-radius: 8px;
-  padding: 7px 12px;
-  width: 320px;
-  transition: all 0.15s ease;
-  box-shadow: none;
-}
-
-.tailadmin-topbar-search:focus-within {
-  border-color: #3C50E0;
-  box-shadow: 0 0 0 2px rgba(60, 80, 224, 0.1);
-}
-
-.tailadmin-search-icon {
-  color: #64748B;
-  flex-shrink: 0;
-}
-
-.tailadmin-search-input {
-  border: none;
-  background: transparent;
-  outline: none;
-  font-size: 13.5px;
-  font-family: inherit;
-  color: #1C2434;
-  width: 100%;
-}
-
-.tailadmin-search-input::placeholder {
-  color: #94A3B8;
-}
-
-.topbar-search-kbd {
-  background-color: #F1F5F9;
-  border: 1px solid #E2E8F0;
-  border-radius: 5px;
-  padding: 2px 6px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #64748B;
-  user-select: none;
-  line-height: 1.2;
-}
-
 /* Topbar Right Area */
 .topbar-right {
   display: flex;
@@ -952,6 +902,138 @@
   padding: 14px 22px;
   border-bottom: 1px solid #E2E8F0;
   white-space: nowrap;
+  position: relative;
+}
+
+/* Header Cell with Inline Sort/Filter Button */
+.th-header-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+  user-select: none;
+}
+
+.th-filter-dropdown-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.th-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background-color: transparent;
+  color: #94A3B8;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.th-filter-btn:hover {
+  background-color: #EFF2F7;
+  color: #1C2434;
+  border-color: #E2E8F0;
+}
+
+.th-filter-btn.is-active {
+  background-color: #EFF2F7;
+  color: #3C50E0;
+  border-color: #CBD5E1;
+}
+
+/* Popover Dropdown */
+.th-filter-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 120;
+  min-width: 195px;
+  background-color: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: popoverFadeIn 0.15s ease-out;
+}
+
+.th-filter-popover.popover-align-right {
+  left: auto;
+  right: 0;
+}
+
+@keyframes popoverFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.th-popover-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94A3B8;
+  padding: 6px 8px 3px 8px;
+  user-select: none;
+}
+
+.th-popover-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 5px;
+  border: none;
+  background: transparent;
+  color: #334155;
+  font-size: 12.5px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.th-popover-item:hover {
+  background-color: #F1F5F9;
+  color: #0F172A;
+}
+
+.th-popover-item.active {
+  background-color: #EFF2F7;
+  color: #3C50E0;
+  font-weight: 600;
+}
+
+.th-popover-divider {
+  height: 1px;
+  background-color: #F1F5F9;
+  margin: 3px 0;
+}
+
+.overview-split-card.tailadmin-table-card {
+  overflow: visible;
+}
+
+.tailadmin-table-responsive {
+  min-height: auto;
 }
 
 .tailadmin-project-table tbody tr {
@@ -1058,6 +1140,18 @@
   color: #64748B;
   font-weight: 400;
   white-space: nowrap;
+}
+
+.area-td {
+  max-width: 180px;
+}
+
+.area-truncate {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
 }
 
 /* Column 4: Status Pill */
@@ -1228,7 +1322,23 @@
   }
 }
 
-/* Document Pills in Driver Table */
+/* Document Pills & Status in Driver Table */
+.table-status-pill.docs-status-pill {
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.table-status-pill.docs-status-pill:hover {
+  filter: brightness(0.95);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.table-status-pill.docs-status-pill:active {
+  transform: translateY(0);
+}
+
 .table-docs-group {
   display: flex;
   align-items: center;
@@ -1275,6 +1385,100 @@
   justify-content: flex-end;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+/* Horizontal icon action group specifically for Aksi Verifikasi */
+.table-action-group.table-action-icons-row {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.tailadmin-td.action-td {
+  white-space: nowrap;
+  min-width: 140px;
+}
+
+/* Icon-only action button for Tables - All White Buttons with Solid Black Icons */
+.btn-table-icon-action {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background-color: #FFFFFF;
+  border: 1px solid #D1D5DB;
+  color: #111827;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.btn-table-icon-action svg {
+  color: #111827;
+  stroke: #111827;
+  transition: all 0.15s ease;
+}
+
+.btn-table-icon-action:hover {
+  background-color: #F8FAFC;
+  border-color: #64748B;
+  color: #000000;
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.btn-table-icon-action:hover svg {
+  color: #000000;
+  stroke: #000000;
+}
+
+.btn-table-icon-action:active {
+  transform: translateY(0);
+  background-color: #F1F5F9;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.btn-table-icon-action:focus-visible {
+  outline: 2px solid #111827;
+  outline-offset: 2px;
+}
+
+/* All action variants use uniform solid black icons (no colors) */
+.btn-table-icon-action.btn-icon-edit,
+.btn-table-icon-action.btn-icon-approve,
+.btn-table-icon-action.btn-icon-reject,
+.btn-table-icon-action.btn-icon-revoke,
+.btn-table-icon-action.btn-icon-detail,
+.btn-table-icon-action.btn-icon-activate,
+.btn-table-icon-action.btn-icon-suspend,
+.btn-table-icon-action.btn-icon-delete {
+  background-color: #FFFFFF;
+  color: #111827;
+  border: 1px solid #D1D5DB;
+}
+
+.btn-table-icon-action.btn-icon-edit:hover,
+.btn-table-icon-action.btn-icon-approve:hover,
+.btn-table-icon-action.btn-icon-reject:hover,
+.btn-table-icon-action.btn-icon-revoke:hover,
+.btn-table-icon-action.btn-icon-detail:hover,
+.btn-table-icon-action.btn-icon-activate:hover,
+.btn-table-icon-action.btn-icon-suspend:hover,
+.btn-table-icon-action.btn-icon-delete:hover {
+  background-color: #F8FAFC;
+  border-color: #64748B;
+  color: #000000;
 }
 
 .btn-table-approve {
@@ -1655,6 +1859,7 @@
   background-color: #FFFFFF;
   color: #3C50E0;
 }
+
 
 .dash-search-box {
   display: flex;

@@ -12,7 +12,6 @@ import BottomNavBar from './components/BottomNavBar.jsx';
 import { ActivityView, MessageView, AccountView, PaymentView } from './components/SecondaryViews.jsx';
 
 import { DEFAULT_PICKUP, DEFAULT_DROPOFF, POPULAR_LOCATIONS } from './data/popularLocations.js';
-import { VERIFIED_DRIVERS } from './data/drivers.js';
 import { calculateFare, formatRupiah } from './utils/fareCalculator.js';
 import { fetchOSRMRoute, searchNominatim, reverseGeocodeNominatim, calculateHaversineDistance } from './utils/geoUtils.js';
 import { buildWhatsAppLink, formatBookingMessage, openWhatsApp } from './utils/whatsappTemplate.js';
@@ -43,9 +42,10 @@ import {
   Loader2
 } from 'lucide-react';
 
+// View yang tidak perlu di-restore saat refresh (form data tidak tersimpan)
+const TRANSIENT_VIEWS = new Set(['welcome', 'signup', 'personal-info', 'login']);
+
 export default function App() {
-  // View yang tidak perlu di-restore saat refresh (form data tidak tersimpan)
-  const TRANSIENT_VIEWS = new Set(['welcome', 'signup', 'personal-info', 'login']);
 
   // Deteksi apakah pengguna mengakses rute URL /admin
   const checkIsAdminPath = () => {
@@ -109,6 +109,22 @@ export default function App() {
   // Selected Ride & Driver state
   const [selectedRideId, setSelectedRideId] = useState('protect');
   const [selectedDriver, setSelectedDriver] = useState(null);
+
+  // Mitra Driver Riil Terverifikasi dari Database Lokal
+  const [approvedDrivers, setApprovedDrivers] = useState(() => {
+    try {
+      return dbService.drivers.getApprovedDrivers();
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    const unsub = dbService.subscribe(() => {
+      setApprovedDrivers(dbService.drivers.getApprovedDrivers());
+    });
+    return unsub;
+  }, []);
   const [isDriverCatalogOpen, setIsDriverCatalogOpen] = useState(false);
   const [selectedAdminId, setSelectedAdminId] = useState('admin-1');
   const [activeRideBooking, setActiveRideBooking] = useState(null);
@@ -771,7 +787,18 @@ export default function App() {
             isDriver={registrationRole === 'driver'}
             onBack={() => setCurrentView('welcome')}
             onSuccess={(data) => {
-              setRegisteredUserData({ ...data, role: registrationRole });
+              const fullUserData = { ...data, role: registrationRole };
+              // Simpan langsung akun dasar ke dbService agar tidak hilang
+              let existing = dbService.users.findByPhone(data.phone);
+              let savedUser;
+              if (existing) {
+                savedUser = dbService.users.update(existing.id, fullUserData);
+              } else {
+                savedUser = dbService.users.create(fullUserData);
+              }
+              setRegisteredUserData(savedUser);
+              dbService.session.setCurrentUser(savedUser);
+              setCurrentUser(savedUser);
               setCurrentView('personal-info');
             }}
             onGoToSignIn={() => setCurrentView('login')}
@@ -786,26 +813,29 @@ export default function App() {
       <div className="app-viewport-wrapper">
         <div className="bolt-app-shell">
           <PersonalInfoPage
-            initialData={registeredUserData}
+            initialData={registeredUserData || currentUser}
             isDriver={registrationRole === 'driver'}
             onBack={() => setCurrentView('signup')}
             onSuccess={(profileData) => {
+              const merged = { ...(registeredUserData || currentUser || {}), ...profileData };
               if (registrationRole === 'driver') {
                 const res = dbService.drivers.registerDriver(
-                  { ...registeredUserData, ...profileData },
+                  merged,
                   profileData.vehicleData || {},
                   profileData.documents
                 );
                 dbService.session.setCurrentUser(res.user);
                 setCurrentUser(res.user);
               } else {
-                const newUser = dbService.users.create({
-                  ...registeredUserData,
-                  ...profileData,
-                  role: 'customer'
-                });
-                dbService.session.setCurrentUser(newUser);
-                setCurrentUser(newUser);
+                let existing = dbService.users.findByPhone(merged.phone);
+                let savedUser;
+                if (existing) {
+                  savedUser = dbService.users.update(existing.id, { ...merged, role: 'customer' });
+                } else {
+                  savedUser = dbService.users.create({ ...merged, role: 'customer' });
+                }
+                dbService.session.setCurrentUser(savedUser);
+                setCurrentUser(savedUser);
               }
               setCurrentView('home');
             }}
@@ -1560,7 +1590,7 @@ export default function App() {
           pickup={pickup}
           dropoff={dropoff}
           routePolyline={routePolyline}
-          drivers={VERIFIED_DRIVERS}
+          drivers={approvedDrivers}
           showRoute={true}
         />
       </main>

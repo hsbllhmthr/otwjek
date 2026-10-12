@@ -19,14 +19,15 @@ import {
   Phone
 } from 'lucide-react';
 import { compressImageFile } from '../utils/imageCompressor.js';
+import { normalizePhone, formatStandardPhone } from '../services/dbService.js';
 
 export default function PersonalInfoPage({ initialData = {}, isDriver = false, onBack, onSuccess }) {
   const isDriverRegistration = Boolean(isDriver || initialData?.role === 'driver');
 
   // 1. Data Diri Umum
-  const [fullName, setFullName] = useState(initialData.fullName || '');
+  const [fullName, setFullName] = useState(initialData.fullName || initialData.full_name || '');
   const [email, setEmail] = useState(initialData.email || '');
-  const [phone, setPhone] = useState(initialData.phone ? initialData.phone.replace(/^\+?62|^0/, '') : '');
+  const [phone, setPhone] = useState(initialData.phone ? normalizePhone(initialData.phone) : '');
   const gender = 'Perempuan'; // Permanen terkunci khusus perempuan
   const [birthDate, setBirthDate] = useState('');
   const [avatarUrl, setAvatarUrl] = useState(null);
@@ -180,7 +181,7 @@ export default function PersonalInfoPage({ initialData = {}, isDriver = false, o
           // Data Akun
           fullName,
           email,
-          phone: `+62${phone}`,
+          phone: formatStandardPhone(phone),
           gender: 'Perempuan',
           birthDate,
           avatarUrl,
@@ -201,9 +202,7 @@ export default function PersonalInfoPage({ initialData = {}, isDriver = false, o
                 simExpiry,
                 stnkExpiry,
                 emergencyContactName: emergencyContactName.trim(),
-                emergencyContactPhone: emergencyContactPhone.startsWith('+62')
-                  ? emergencyContactPhone.trim()
-                  : `+62${emergencyContactPhone.replace(/^0/, '').trim()}`
+                emergencyContactPhone: emergencyContactPhone ? formatStandardPhone(emergencyContactPhone) : ''
               }
             : null,
 

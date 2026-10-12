@@ -23,7 +23,7 @@ import {
   ShieldCheck,
   Check
 } from 'lucide-react';
-import dbService from '../services/dbService.js';
+import dbService, { normalizePhone } from '../services/dbService.js';
 import { compressImageFile } from '../utils/imageCompressor.js';
 
 export default function ProfilePage({ user: propUser, onBack, onLogout }) {
@@ -65,6 +65,7 @@ export default function ProfilePage({ user: propUser, onBack, onLogout }) {
       drivers.find(
         (d) =>
           (currentUser.id && d.user_id === currentUser.id) ||
+          (currentUser.phone && normalizePhone(d.phone) === normalizePhone(currentUser.phone)) ||
           (cName && d.name?.toLowerCase().trim() === cName)
       ) || null
     );

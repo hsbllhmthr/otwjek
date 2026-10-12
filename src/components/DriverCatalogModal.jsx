@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
 import { X, Star, Check, Sparkles, User } from 'lucide-react';
-import { VERIFIED_DRIVERS } from '../data/drivers.js';
 import dbService from '../services/dbService.js';
 import driverPlaceholder from '../assets/driver_placeholder.svg';
 
@@ -13,9 +12,9 @@ export default function DriverCatalogModal({
   const approvedDrivers = useMemo(() => {
     try {
       const list = dbService.drivers.getApprovedDrivers();
-      return list && list.length > 0 ? list : VERIFIED_DRIVERS;
+      return Array.isArray(list) ? list : [];
     } catch {
-      return VERIFIED_DRIVERS;
+      return [];
     }
   }, [isOpen]);
 
@@ -94,7 +93,12 @@ export default function DriverCatalogModal({
 
         {/* Driver List */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 340, overflowY: 'auto' }}>
-          {approvedDrivers.map((driver) => {
+          {approvedDrivers.length === 0 ? (
+            <div style={{ padding: '24px 12px', textAlign: 'center', color: '#64748B', fontSize: 12.5, lineHeight: 1.5 }}>
+              Belum ada mitra driver aktif terdaftar. Pilihan "Driver Terdekat Otomatis" akan digunakan saat Anda memesan.
+            </div>
+          ) : (
+            approvedDrivers.map((driver) => {
             const isSelected = selectedDriver?.id === driver.id;
             return (
               <div
@@ -160,7 +164,7 @@ export default function DriverCatalogModal({
                 )}
               </div>
             );
-          })}
+          }))}
         </div>
       </div>
     </div>

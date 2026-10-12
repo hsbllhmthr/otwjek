@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './LoginPage.css';
 import { ArrowLeft, Check, Loader2 } from 'lucide-react';
-import dbService from '../services/dbService.js';
+import dbService, { normalizePhone } from '../services/dbService.js';
 
 export default function LoginPage({ onBack, onSuccess, onGoToSignUp }) {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -13,7 +13,6 @@ export default function LoginPage({ onBack, onSuccess, onGoToSignUp }) {
     let val = e.target.value;
     // Allow digits, spaces, and hyphens
     if (/^[0-9\s-]*$/.test(val)) {
-      // If user accidentally types starting with 0 or 62, handle gracefully or keep clean
       setPhoneNumber(val);
       if (errorMessage) setErrorMessage('');
     }
@@ -21,28 +20,53 @@ export default function LoginPage({ onBack, onSuccess, onGoToSignUp }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const cleanNumber = phoneNumber.replace(/[\s-]/g, '');
-    if (!cleanNumber) {
+    const cleanDigits = phoneNumber.replace(/\D/g, '');
+    if (!cleanDigits) {
       setErrorMessage('Silakan masukkan nomor telepon Anda.');
       return;
     }
 
     setIsLoading(true);
-    // Simulate authentication processing with dbService
+    setErrorMessage('');
+
     setTimeout(() => {
       setIsLoading(false);
-      let existingUser = dbService.users.findByPhone(cleanNumber);
+      const existingUser = dbService.users.findByPhone(phoneNumber);
       if (!existingUser) {
-        // Create user session if first time logging in
-        existingUser = dbService.users.create({
-          fullName: 'Pelanggan SheRide',
-          phone: cleanNumber,
-          role: 'customer'
-        });
+        setErrorMessage(
+          'Nomor telepon ini belum terdaftar. Silakan klik "Daftar" di bawah untuk membuat akun baru.'
+        );
+        return;
       }
+
+      // Pastikan data profil driver ditautkan ke sesi jika terdaftar sebagai mitra driver
+      if (existingUser.role === 'driver') {
+        const allDrivers = dbService.drivers.getAll();
+        const driverProfile =
+          dbService.drivers.getDriverByUserId(existingUser.id) ||
+          allDrivers.find((d) => normalizePhone(d.phone) === normalizePhone(existingUser.phone));
+        if (driverProfile) {
+          existingUser.driver = driverProfile;
+          existingUser.vehicleData = {
+            vehicleType: driverProfile.vehicleType,
+            vehicleBrand: driverProfile.vehicleBrand,
+            vehicleModel: driverProfile.vehicleModel,
+            vehicleColor: driverProfile.vehicleColor,
+            plateNumber: driverProfile.plateNumber,
+            operationalArea: driverProfile.operationalArea,
+            nik: driverProfile.nik,
+            simNumber: driverProfile.simNumber,
+            simExpiry: driverProfile.simExpiry,
+            stnkExpiry: driverProfile.stnkExpiry,
+            emergencyContactName: driverProfile.emergencyContactName,
+            emergencyContactPhone: driverProfile.emergencyContactPhone
+          };
+        }
+      }
+
       dbService.session.setCurrentUser(existingUser);
       if (onSuccess) onSuccess(existingUser);
-    }, 600);
+    }, 450);
   };
 
   return (

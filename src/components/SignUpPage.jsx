@@ -9,6 +9,7 @@ import {
   EyeOff,
   ArrowRight
 } from 'lucide-react';
+import { formatStandardPhone } from '../services/dbService.js';
 
 export default function SignUpPage({ isDriver = false, onBack, onSuccess, onGoToSignIn }) {
   const [formData, setFormData] = useState({
@@ -56,7 +57,12 @@ export default function SignUpPage({ isDriver = false, onBack, onSuccess, onGoTo
     // Simulate swift account creation
     setTimeout(() => {
       setIsLoading(false);
-      if (onSuccess) onSuccess(formData);
+      if (onSuccess) {
+        onSuccess({
+          ...formData,
+          phone: formatStandardPhone(formData.phone)
+        });
+      }
     }, 400);
   };
 
