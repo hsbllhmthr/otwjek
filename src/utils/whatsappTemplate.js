@@ -232,7 +232,7 @@ export function formatFoodOrderMessage({
 
   const formatRp = (num) => `Rp ${Number(num || 0).toLocaleString('id-ID')}`;
 
-  return `Halo Admin OTWJek, saya ingin pesan layanan *Titip Beli Makanan (OTWFood)*:
+  return `Halo Admin OTWJek, saya ingin pesan layanan *Titip Beli Makanan*:
 
 🏪 *Lokasi Pembelian / Resto*:
 - Nama Resto/Warung: *${restaurantName || 'Resto Pilihan'}*

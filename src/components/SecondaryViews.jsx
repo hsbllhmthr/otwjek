@@ -1,5 +1,7 @@
 import React from 'react';
 import { ChevronLeft, Clock, Wallet, MessageSquare, User } from 'lucide-react';
+import ActivityPage from './ActivityPage.jsx';
+import ProfilePage from './ProfilePage.jsx';
 
 function MinimalEmptyState({ onBack, icon: IconComponent, title, subtitle }) {
   return (
@@ -20,15 +22,8 @@ function MinimalEmptyState({ onBack, icon: IconComponent, title, subtitle }) {
   );
 }
 
-export function ActivityView({ onBack }) {
-  return (
-    <MinimalEmptyState
-      onBack={onBack}
-      icon={Clock}
-      title="Segera Hadir"
-      subtitle="Fitur riwayat aktivitas akan segera hadir"
-    />
-  );
+export function ActivityView({ onBack, currentUser }) {
+  return <ActivityPage onBack={onBack} currentUser={currentUser} />;
 }
 
 export function PaymentView({ onBack }) {
@@ -52,8 +47,6 @@ export function MessageView({ onBack }) {
     />
   );
 }
-
-import ProfilePage from './ProfilePage.jsx';
 
 export function AccountView({ onBack, onLogout, user }) {
   return <ProfilePage onBack={onBack} onLogout={onLogout} user={user} />;

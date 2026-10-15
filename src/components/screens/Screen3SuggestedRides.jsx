@@ -25,16 +25,16 @@ export default function Screen3SuggestedRides({
   const rideOptions = [
     {
       id: 'protect',
-      name: 'SheRide Protect',
-      desc: '100% Mitra Perempuan Terverifikasi, Helm Steril',
+      name: 'Motor Protect',
+      desc: '100% Mitra Driver Terverifikasi, Helm Steril',
       price: baseFare + 2000,
       icon: '🛵',
       highlight: true
     },
     {
       id: 'regular',
-      name: 'SheRide Motor',
-      desc: 'Cepat & praktis sesama perempuan',
+      name: 'Motor',
+      desc: 'Cepat & praktis untuk perjalanan harian',
       price: baseFare,
       originalPrice: baseFare + 3000,
       icon: '🛵',
@@ -42,7 +42,7 @@ export default function Screen3SuggestedRides({
     },
     {
       id: 'car',
-      name: 'SheRide Mobil (Car)',
+      name: 'Mobil',
       desc: 'Kabin AC sejuk, bebas asap rokok, 4 kursi',
       price: Math.round(baseFare * 1.8),
       icon: '🚗',
@@ -50,8 +50,8 @@ export default function Screen3SuggestedRides({
     },
     {
       id: 'send',
-      name: 'SheSend Express',
-      desc: 'Kurir barang & dokumen terpercaya',
+      name: 'Paket',
+      desc: 'Kurir pengiriman barang & dokumen terpercaya',
       price: Math.round(baseFare * 1.1),
       icon: '📦',
       highlight: false
@@ -85,6 +85,24 @@ export default function Screen3SuggestedRides({
       packageDetails: currentRide.id === 'send' ? 'Paket / Makanan' : '',
       paymentMethod: 'cash'
     });
+
+    try {
+      dbService?.bookings?.create({
+        customerId: sessionUser?.id,
+        customerPhone: resolvedPhone,
+        customerName: resolvedName,
+        pickup: { name: pickup?.name || pickup?.address || 'Titik Jemput', address: pickup?.address || '' },
+        dropoff: { name: dropoff?.name || dropoff?.address || 'Titik Tujuan', address: dropoff?.address || '' },
+        serviceType: currentRide.id === 'car' ? 'mobil' : currentRide.id === 'send' ? 'paket' : 'motor',
+        distanceKm,
+        durationMinutes,
+        fareAmount: currentRide.price,
+        paymentMethod: 'cash',
+        bookingStatus: 'completed'
+      });
+    } catch {
+      // ignore
+    }
 
     const url = buildWhatsAppLink(targetAdmin.phone, message);
     openWhatsApp(url);

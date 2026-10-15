@@ -588,12 +588,12 @@ export default function RideConfirmationPage({
   const [selectedRide, setSelectedRide] = useState(defaultRide);
   const [toastMessage, setToastMessage] = useState(null);
 
-  // SheSend Package Info for booking payload
+  // Package Info for booking payload
   const [packageData] = useState({
-    itemName: 'Paket SheSend',
+    itemName: 'Paket',
     category: 'goods',
     weightTier: 'light',
-    senderName: 'Pelanggan SheRide',
+    senderName: 'Pelanggan',
     senderPhone: '',
     recipientName: '',
     recipientPhone: '',
@@ -653,7 +653,7 @@ export default function RideConfirmationPage({
     ? [
         {
           id: 'shesend-instant',
-          name: 'SheSend Instant',
+          name: 'Paket Instant',
           eta: `${Math.min(5, Math.max(2, Math.round(actualDur * 0.3)))} mins away`,
           capacity: 'Max 10 kg',
           price: baseSendInstantFare,
@@ -662,7 +662,7 @@ export default function RideConfirmationPage({
         },
         {
           id: 'shesend-hemat',
-          name: 'SheSend Hemat',
+          name: 'Paket Hemat',
           eta: `${Math.min(6, Math.max(3, Math.round(actualDur * 0.35)))} mins away`,
           capacity: 'Max 5 kg',
           price: baseSendHematFare,
@@ -671,7 +671,7 @@ export default function RideConfirmationPage({
         },
         {
           id: 'shesend-cargo',
-          name: 'SheSend Car Cargo',
+          name: 'Paket Mobil',
           eta: `${Math.min(7, Math.max(4, Math.round(actualDur * 0.45)))} mins away`,
           capacity: 'Max 50 kg',
           price: baseSendCarFare,
@@ -682,7 +682,7 @@ export default function RideConfirmationPage({
     : [
         {
           id: 'standard-bike',
-          name: 'Standard Bike',
+          name: 'Motor Standar',
           eta: `${Math.min(5, Math.max(2, Math.round(actualDur * 0.3)))} mins away`,
           capacity: '1',
           price: standardBikePrice,
@@ -691,7 +691,7 @@ export default function RideConfirmationPage({
         },
         {
           id: 'hemat-bike',
-          name: 'Hemat Bike',
+          name: 'Motor Hemat',
           eta: `${Math.min(5, Math.max(2, Math.round(actualDur * 0.3)))} mins away`,
           capacity: '1',
           price: hematBikePrice,
@@ -700,7 +700,7 @@ export default function RideConfirmationPage({
         },
         {
           id: 'hemat-car',
-          name: 'Hemat Car',
+          name: 'Mobil Hemat',
           eta: `${Math.min(6, Math.max(3, Math.round(actualDur * 0.4)))} mins away`,
           capacity: '4',
           price: hematCarPrice,

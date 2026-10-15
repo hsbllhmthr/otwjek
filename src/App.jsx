@@ -445,30 +445,30 @@ export default function App() {
   const rideOptions = [
     {
       id: 'protect',
-      name: 'SheRide Protect',
-      desc: '100% Mitra Driver Perempuan Terverifikasi, Helm Steril',
+      name: 'Motor Protect',
+      desc: '100% Mitra Driver Terverifikasi, Helm Steril',
       price: motorPrice + 2000,
       icon: '🛵'
     },
     {
       id: 'regular',
-      name: 'SheRide Motor',
-      desc: 'Cepat & praktis sesama perempuan',
+      name: 'Motor',
+      desc: 'Cepat & praktis untuk perjalanan harian',
       price: motorPrice,
       originalPrice: motorPrice + 3000,
       icon: '🛵'
     },
     {
       id: 'car',
-      name: 'SheRide Mobil (Car)',
+      name: 'Mobil',
       desc: 'Kabin AC sejuk, bebas asap rokok, 4 kursi',
       price: carPrice,
       icon: '🚗'
     },
     {
       id: 'send',
-      name: 'SheSend Express',
-      desc: 'Kurir barang & makanan aman terpercaya',
+      name: 'Paket',
+      desc: 'Kurir pengiriman barang & makanan aman terpercaya',
       price: sendPrice,
       icon: '📦'
     }
@@ -527,6 +527,23 @@ export default function App() {
       pickupCoords: pickup?.lat && pickup?.lng ? { lat: pickup.lat, lng: pickup.lng } : null,
       dropoffCoords: dropoff?.lat && dropoff?.lng ? { lat: dropoff.lat, lng: dropoff.lng } : null
     });
+
+    try {
+      dbService?.bookings?.create({
+        customerId: currentUser?.id,
+        customerName: customerDisplayName || 'Pelanggan OTWJek',
+        pickup: { name: pickup?.name || pickup?.address || 'Titik Jemput di Peta', address: pickup?.address || '' },
+        dropoff: { name: dropoff?.name || dropoff?.address || 'Titik Tujuan di Peta', address: dropoff?.address || '' },
+        serviceType: 'paket',
+        distanceKm: distanceKm || 4.5,
+        durationMinutes: durationMinutes || 18,
+        fareAmount: ride.price || 15200,
+        paymentMethod: pMethod,
+        bookingStatus: 'completed'
+      });
+    } catch {
+      // ignore
+    }
 
     const url = buildWhatsAppLink(targetAdmin.phone, message);
     openWhatsApp(url);
@@ -998,7 +1015,7 @@ export default function App() {
     return (
       <div className="app-viewport-wrapper">
         <div className="bolt-app-shell">
-          <ActivityView onBack={() => setCurrentView('home')} />
+          <ActivityView onBack={() => setCurrentView('home')} currentUser={currentUser} />
           <BottomNavBar
             activeTab="activity"
             onChangeTab={(tab) => setCurrentView(tab)}

@@ -133,7 +133,7 @@ export default function AdminDispatchModal({
           <div className="summary-top-row">
             <div className="service-info-badge">
               <span className="service-icon">{serviceType === 'send' ? '📦' : ride.id?.includes('car') ? '🚗' : '🛵'}</span>
-              <span className="service-name">{ride.name || (serviceType === 'send' ? 'SheSend' : 'SheRide')}</span>
+              <span className="service-name">{ride.name || (serviceType === 'send' ? 'Paket' : ride.id?.includes('car') ? 'Mobil' : 'Motor')}</span>
             </div>
             <div className="fare-badge">{formattedFare}</div>
           </div>

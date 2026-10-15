@@ -136,7 +136,7 @@ export default function DriverCatalogModal({
                       </span>
                     </div>
                     <div style={{ fontSize: 11, color: '#FF337F', fontWeight: 600 }}>
-                      {driver.vehicleModel || (driver.vehicleType === 'mobil' ? 'SheCar' : 'SheRide')} · {driver.plateNumber || 'DD XXXX'}
+                      {driver.vehicleModel || (driver.vehicleType === 'mobil' ? 'Mobil' : 'Motor')} · {driver.plateNumber || 'DD XXXX'}
                     </div>
                     <div style={{ fontSize: 10, color: '#8E8E93', marginTop: 2 }}>
                       {driver.operationalArea} · {driver.tripsCount} trips

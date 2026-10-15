@@ -362,7 +362,7 @@ export default function FoodPage({
         <div className="whereto-ref2-header">
           <img
             src={sherideHeroArt}
-            alt="OTWFood Fleet"
+            alt="Fleet"
             className="whereto-ref2-header-bg"
           />
           <div className="whereto-ref2-header-overlay" />

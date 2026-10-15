@@ -154,6 +154,17 @@ export function initializeLocalDatabase() {
     return true;
   });
   setStoredArray(STORAGE_KEYS.DRIVER_DOCS, realDocs);
+
+  // 4. Bersihkan tabel BOOKINGS dari dummy seed bawaan (book-seed- atau ord-ref-)
+  const existingBookings = getStoredArray(STORAGE_KEYS.BOOKINGS, []);
+  const realBookings = existingBookings.filter((b) => {
+    if (!b) return false;
+    if (typeof b.id === 'string' && (b.id.startsWith('book-seed-') || b.id.startsWith('ord-ref-'))) {
+      return false;
+    }
+    return true;
+  });
+  setStoredArray(STORAGE_KEYS.BOOKINGS, realBookings);
 }
 
 // Inisialisasi saat file di-load
@@ -829,36 +840,296 @@ export const dbService = {
   },
 
   // ==========================================
-  // 4. PEMESANAN PERJALANAN (RIDE BOOKINGS)
+  // 4. PEMESANAN PERJALANAN & PAKET (BOOKINGS)
   // ==========================================
   bookings: {
     create(rideData) {
       const bookings = getStoredArray(STORAGE_KEYS.BOOKINGS, []);
-      const newBooking = {
-        id: generateUUID(),
-        booking_code: `RIDE-${Date.now().toString().slice(-6)}`,
-        customer_id: rideData.customerId || null,
-        driver_id: rideData.driverId || null,
-        service_type: rideData.serviceType || 'motor',
-        pickup_name: rideData.pickup?.name || '',
-        pickup_address: rideData.pickup?.address || '',
-        dropoff_name: rideData.dropoff?.name || '',
-        dropoff_address: rideData.dropoff?.address || '',
-        distance_km: rideData.distanceKm || 0,
-        duration_minutes: rideData.durationMinutes || 0,
-        fare_amount: rideData.fareAmount || 0,
-        payment_method: rideData.paymentMethod || 'cash',
-        booking_status: 'pending',
-        created_at: new Date().toISOString()
+      const now = new Date();
+      const codeSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const orderCode = `#${codeSuffix}`;
+      const randomOrderNum = '3301447' + Date.now().toString().slice(-12);
+      
+      const sType = rideData.serviceType === 'car' || rideData.serviceType === 'mobil'
+        ? 'mobil'
+        : (rideData.serviceType === 'send' || rideData.serviceType === 'paket' || rideData.serviceType === 'package' || rideData.serviceType === 'food'
+          ? 'paket'
+          : 'motor');
+      const sName = sType === 'mobil' ? 'Mobil' : (sType === 'paket' ? 'Paket' : 'Motor');
+      
+      const fare = Number(rideData.fareAmount || rideData.fare || 15000);
+      const deliveryFee = Math.round((fare * 0.85) / 100) * 100;
+      const isCash = (rideData.paymentMethod || 'cash').toLowerCase() === 'cash';
+
+      // Hitung timeline perjalanan realistis berdasarkan durasi
+      const duration = Number(rideData.durationMinutes || 15);
+      const completionTime = now;
+      const pickupTime = new Date(completionTime.getTime() - Math.round(duration * 0.4 * 60000));
+      const arrivalTime = new Date(completionTime.getTime() - Math.round(duration * 0.6 * 60000));
+      const receivedTime = new Date(completionTime.getTime() - Math.round(duration * 60000));
+
+      const formatTime = (d) =>
+        d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':');
+
+      const sessionUser = rideData.user || dbService.session.getCurrentUser();
+      const resolvedCustomerId = rideData.customerId || sessionUser?.id || null;
+      const resolvedCustomerPhone = rideData.customerPhone || sessionUser?.phone || null;
+      const resolvedCustomerName =
+        rideData.customerName ||
+        sessionUser?.fullName ||
+        sessionUser?.full_name ||
+        sessionUser?.name ||
+        'Pelanggan OTWJek';
+
+      const defaultDriver = sType === 'mobil'
+        ? {
+            id: 'drv-calya-01',
+            name: 'Nurul Hidayah',
+            rating: 4.9,
+            tripsCount: '1.420+ perjalanan',
+            vehicleType: 'mobil',
+            vehicleModel: 'Toyota Calya (Silver)',
+            plateNumber: 'DD 1289 AZ',
+            phone: '085255655084'
+          }
+        : {
+            id: 'drv-vario-01',
+            name: 'Siti Rahmawati',
+            rating: 4.9,
+            tripsCount: '2.150+ perjalanan',
+            vehicleType: 'motor',
+            vehicleModel: 'Honda Vario 160 (Hitam)',
+            plateNumber: 'DD 4521 XY',
+            phone: '085255655084'
+          };
+
+      const assignedDriver = rideData.driver || {
+        id: rideData.driverId || defaultDriver.id,
+        name: rideData.driverName || defaultDriver.name,
+        rating: rideData.driverRating || defaultDriver.rating,
+        tripsCount: rideData.driverTrips || defaultDriver.tripsCount,
+        vehicleType: rideData.vehicleType || defaultDriver.vehicleType,
+        vehicleModel: rideData.vehicleModel || defaultDriver.vehicleModel,
+        plateNumber: rideData.plateNumber || defaultDriver.plateNumber,
+        phone: rideData.driverPhone || defaultDriver.phone
       };
 
-      bookings.push(newBooking);
+      const resolvedPickupName = rideData.pickup?.name || rideData.pickupName || 'Titik Penjemputan';
+      const resolvedPickupAddress = rideData.pickup?.address || rideData.pickupAddress || resolvedPickupName;
+      const resolvedDropoffName = rideData.dropoff?.name || rideData.dropoffName || (sType === 'mobil' ? 'Bandara Internasional Sultan Hasanuddin' : sType === 'paket' ? 'Ruko Pettarani Indah No. 14' : 'Mall Panakkukang (MP)');
+      const resolvedDropoffAddress = rideData.dropoff?.address || rideData.dropoffAddress || (sType === 'mobil' ? 'Mandai, Maros, Makassar' : sType === 'paket' ? 'Jl. AP Pettarani Blok C2, Makassar' : 'Jl. Pengayoman, Panakkukang, Makassar');
+
+      const newBooking = {
+        id: generateUUID(),
+        booking_code: `RIDE-${codeSuffix}`,
+        order_code: orderCode,
+        order_number: randomOrderNum,
+        customer_id: resolvedCustomerId,
+        customer_phone: resolvedCustomerPhone,
+        customer_name: resolvedCustomerName,
+        driver_id: assignedDriver.id,
+        driver_name: assignedDriver.name,
+        driver_phone: assignedDriver.phone,
+        driver_vehicle: assignedDriver.vehicleModel,
+        driver_plate: assignedDriver.plateNumber,
+        driver_rating: assignedDriver.rating,
+        driver: assignedDriver,
+        service_type: sType,
+        service_name: sName,
+        pickup_name: resolvedPickupName,
+        pickup_address: resolvedPickupAddress,
+        dropoff_name: resolvedDropoffName,
+        dropoff_address: resolvedDropoffAddress,
+        distance_km: rideData.distanceKm || 3.2,
+        duration_minutes: duration,
+        fare_amount: fare,
+        delivery_fee: deliveryFee,
+        total_earnings: deliveryFee,
+        payment_method: isCash ? 'cash' : 'qris',
+        cash_collected: isCash ? -fare : 0,
+        adjustment: -fare,
+        discount: rideData.discount || 0,
+        package_info: rideData.packageInfo || null,
+        incentives: [
+          { name: 'Bonus Harian - Makassar', points: 100 },
+          { name: 'MISI SIGAP', points: 100 }
+        ],
+        timeline: {
+          received: formatTime(receivedTime),
+          arrived: formatTime(arrivalTime),
+          pickedUp: formatTime(pickupTime),
+          completed: formatTime(completionTime)
+        },
+        booking_status: rideData.bookingStatus || 'completed',
+        created_at: now.toISOString()
+      };
+
+      bookings.unshift(newBooking);
       setStoredArray(STORAGE_KEYS.BOOKINGS, bookings);
       return newBooking;
     },
 
-    getAll() {
-      return getStoredArray(STORAGE_KEYS.BOOKINGS, []);
+    getAll(accountUser = null) {
+      const activeUser = accountUser || dbService.session.getCurrentUser();
+      const rawBookings = getStoredArray(STORAGE_KEYS.BOOKINGS, []);
+      
+      // Hapus data dummy bawaan lama jika tersisa
+      const realBookings = rawBookings.filter((b) => {
+        if (!b) return false;
+        if (typeof b.id === 'string' && (b.id.startsWith('book-seed-') || b.id.startsWith('ord-ref-'))) {
+          return false;
+        }
+        return true;
+      });
+
+      // Jika ada akun yang login, sinkronkan hanya pesanan milik akun tersebut
+      if (activeUser) {
+        const uId = activeUser.id;
+        const uPhone = activeUser.phone ? normalizePhone(activeUser.phone) : null;
+        const uName = (activeUser.fullName || activeUser.full_name || activeUser.name || '').trim().toLowerCase();
+
+        return realBookings.filter((b) => {
+          if (uId && b.customer_id && b.customer_id === uId) return true;
+          if (uPhone && b.customer_phone && normalizePhone(b.customer_phone) === uPhone) return true;
+          if (uName && b.customer_name && b.customer_name.trim().toLowerCase() === uName && uName !== 'pelanggan otwjek') return true;
+          return false;
+        });
+      }
+
+      // Jika belum ada akun login (sesi tamu), tampilkan hanya pesanan yang dibuat pada sesi tamu saat ini
+      return realBookings.filter((b) => !b.customer_id && !b.customer_phone);
+    },
+
+    getSeedBookings() {
+      // Data riwayat pesanan awal dinamis khas Makassar sesuai fitur: Motor, Mobil, dan Paket
+      return [
+        {
+          id: 'book-seed-001',
+          booking_code: 'RIDE-8L9A',
+          order_code: '#8L9A',
+          order_number: '3301447308559872213',
+          service_type: 'paket',
+          service_name: 'Paket',
+          pickup_name: 'Warung Megarasa - Rappocini',
+          pickup_address: 'Jl. Rappocini Raya No. 112, Makassar',
+          dropoff_name: 'Alamat Pelanggan disembunyikan',
+          dropoff_address: 'Jl. AP Pettarani Blok C2, Makassar',
+          distance_km: 3.2,
+          duration_minutes: 18,
+          fare_amount: 15200,
+          delivery_fee: 9600,
+          total_earnings: 9600,
+          payment_method: 'cash',
+          cash_collected: -282062,
+          adjustment: -282062,
+          incentives: [
+            { name: 'Bonus Harian - Makassar', points: 100 },
+            { name: 'MISI SIGAP', points: 100 }
+          ],
+          timeline: {
+            received: '13:31',
+            arrived: '13:45',
+            pickedUp: '13:47',
+            completed: '14:00'
+          },
+          booking_status: 'completed',
+          created_at: '2026-10-11T13:31:00.000Z'
+        },
+        {
+          id: 'book-seed-002',
+          booking_code: 'RIDE-4X2K',
+          order_code: '#4X2K',
+          order_number: '3301447308559871104',
+          service_type: 'motor',
+          service_name: 'Motor',
+          pickup_name: 'Indo Mode Tamalate',
+          pickup_address: 'Jl. Tamalate 1 No. 8, Rappocini',
+          dropoff_name: 'Mall Panakkukang (MP)',
+          dropoff_address: 'Jl. Boulevard, Panakkukang, Makassar',
+          distance_km: 4.8,
+          duration_minutes: 20,
+          fare_amount: 17000,
+          delivery_fee: 14000,
+          total_earnings: 14000,
+          payment_method: 'cash',
+          cash_collected: -17000,
+          adjustment: -17000,
+          incentives: [
+            { name: 'Bonus Harian - Makassar', points: 100 },
+            { name: 'MISI SIGAP', points: 100 }
+          ],
+          timeline: {
+            received: '08:05',
+            arrived: '08:14',
+            pickedUp: '08:16',
+            completed: '08:25'
+          },
+          booking_status: 'completed',
+          created_at: '2026-10-11T08:05:00.000Z'
+        },
+        {
+          id: 'book-seed-003',
+          booking_code: 'RIDE-9C7B',
+          order_code: '#9C7B',
+          order_number: '3301447308559868940',
+          service_type: 'mobil',
+          service_name: 'Mobil',
+          pickup_name: 'Mall Ratu Indah (MaRi)',
+          pickup_address: 'Jl. DR. Ratulangi No. 35, Mamajang',
+          dropoff_name: 'Bandara Sultan Hasanuddin',
+          dropoff_address: 'Terminal Keberangkatan Bandara UPG, Maros',
+          distance_km: 21.5,
+          duration_minutes: 38,
+          fare_amount: 58000,
+          delivery_fee: 48000,
+          total_earnings: 48000,
+          payment_method: 'qris',
+          cash_collected: 0,
+          adjustment: -48000,
+          incentives: [
+            { name: 'Bonus Harian - Makassar', points: 150 },
+            { name: 'MISI SIGAP', points: 100 }
+          ],
+          timeline: {
+            received: '14:05',
+            arrived: '14:15',
+            pickedUp: '14:18',
+            completed: '14:40'
+          },
+          booking_status: 'completed',
+          created_at: '2026-10-10T14:05:00.000Z'
+        },
+        {
+          id: 'book-seed-004',
+          booking_code: 'RIDE-2M5R',
+          order_code: '#2M5R',
+          order_number: '3301447308559850122',
+          service_type: 'paket',
+          service_name: 'Paket',
+          pickup_name: 'Ayam Geprek Juara Samata',
+          pickup_address: 'Jl. H.M. Yasin Limpo, Romangpolong',
+          dropoff_name: 'Alamat Pelanggan disembunyikan',
+          dropoff_address: 'Perumahan Dosen Unhas, Tamalanrea',
+          distance_km: 7.1,
+          duration_minutes: 24,
+          fare_amount: 24500,
+          delivery_fee: 0,
+          total_earnings: 0,
+          payment_method: 'cash',
+          cash_collected: 0,
+          adjustment: 0,
+          incentives: [],
+          timeline: {
+            received: '16:10',
+            arrived: '16:15',
+            pickedUp: '-',
+            completed: '-'
+          },
+          booking_status: 'cancelled',
+          cancel_reason: 'Dibatalkan oleh Pelanggan',
+          created_at: '2026-10-11T16:10:00.000Z'
+        }
+      ];
     }
   },
 

@@ -153,6 +153,24 @@ export default function PackageDetailsPage({
       dropoffCoords: dropoff?.lat && dropoff?.lng ? { lat: dropoff.lat, lng: dropoff.lng } : null
     });
 
+    try {
+      dbService?.bookings?.create({
+        customerId: sessionUser?.id,
+        customerPhone: effectiveSenderPhone || sessionUser?.phone,
+        customerName: resolvedSenderName,
+        pickup: { name: pickupTitle, address: pickupTitle },
+        dropoff: { name: dropoffTitle, address: dropoffTitle },
+        serviceType: 'paket',
+        distanceKm,
+        durationMinutes: durationMinutes || 20,
+        fareAmount: currentPrice,
+        paymentMethod,
+        bookingStatus: 'completed'
+      });
+    } catch {
+      // ignore
+    }
+
     const url = buildWhatsAppLink(BOOK_NOW_PHONE, message);
     openWhatsApp(url);
   };

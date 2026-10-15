@@ -1,0 +1,399 @@
+/* ========================================================================== */
+/* ACTIVITY PAGE (RIWAYAT PESANAN) STYLES                                     */
+/* Pixel-perfect reproduction matching reference mobile screenshot           */
+/* ========================================================================== */
+
+.activity-page-viewport {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background-color: #F5F6F8;
+  color: #1F2937;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  overflow: hidden;
+  position: relative;
+}
+
+/* 1. Header */
+.activity-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  padding: 0 16px;
+  background-color: #FFFFFF;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.btn-activity-back {
+  background: transparent;
+  border: none;
+  padding: 6px;
+  margin-left: -6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #1F2937;
+  border-radius: 50%;
+  transition: background-color 0.15s ease;
+}
+
+.btn-activity-back:active {
+  background-color: #F3F4F6;
+}
+
+.activity-topbar-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+  letter-spacing: -0.2px;
+}
+
+/* 2. Tabs Bar (Selesai | Dibatalkan) */
+.activity-tabs-row {
+  display: flex;
+  width: 100%;
+  background-color: #FFFFFF;
+  border-bottom: 1px solid #E5E7EB;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.activity-tab-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 13px 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: #6B7280;
+  cursor: pointer;
+  position: relative;
+  text-align: center;
+  transition: color 0.2s ease;
+  user-select: none;
+}
+
+.activity-tab-btn.active {
+  color: #EE4335;
+  font-weight: 700;
+}
+
+.activity-tab-indicator {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2.5px;
+  background-color: #EE4335;
+  border-radius: 2px 2px 0 0;
+}
+
+/* 3. Scrollable List Area */
+.activity-content-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 14px 16px 88px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Date Filter Header Row */
+.activity-date-filter-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin-bottom: 2px;
+}
+
+.btn-activity-date-selector {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  padding: 4px 6px;
+  margin-left: -6px;
+  cursor: pointer;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #1F2937;
+  border-radius: 6px;
+  transition: background-color 0.15s ease;
+}
+
+.btn-activity-date-selector:active {
+  background-color: #E5E7EB;
+}
+
+.activity-date-chevron {
+  color: #4B5563;
+  transition: transform 0.2s ease;
+}
+
+.activity-date-chevron.rotated {
+  transform: rotate(180deg);
+}
+
+/* Date Dropdown Popover */
+.activity-date-dropdown {
+  position: absolute;
+  top: 36px;
+  left: 0;
+  background-color: #FFFFFF;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border: 1px solid #E5E7EB;
+  padding: 6px 0;
+  min-width: 180px;
+  z-index: 20;
+}
+
+.activity-date-dropdown-item {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 9px 16px;
+  font-size: 13.5px;
+  color: #374151;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background-color 0.15s ease;
+}
+
+.activity-date-dropdown-item:hover {
+  background-color: #F9FAFB;
+}
+
+.activity-date-dropdown-item.selected {
+  font-weight: 700;
+  color: #EE4335;
+  background-color: #FEF2F2;
+}
+
+/* 4. Order Card (Matching Reference) */
+.activity-order-card {
+  background-color: #FFFFFF;
+  border-radius: 14px;
+  border: 1px solid #ECEFF1;
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.activity-order-card:hover {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  border-color: #D1D5DB;
+  transform: translateY(-1px);
+}
+
+.activity-order-card:active {
+  transform: scale(0.99);
+  background-color: #F9FAFB;
+}
+
+/* Top Row: Time, Service Tag, Price */
+.activity-card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #F3F4F6;
+}
+
+.activity-card-left-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.activity-card-time {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.activity-service-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #FF337F;
+}
+
+.activity-service-badge.motor,
+.activity-service-badge.ride {
+  color: #FF337F; /* Pink khas Motor */
+}
+
+.activity-service-badge.mobil {
+  color: #10B981; /* Emerald / Hijau Mobil */
+}
+
+.activity-service-badge.paket,
+.activity-service-badge.send,
+.activity-service-badge.food {
+  color: #FF6B00; /* Oranye hangat Paket */
+}
+
+.activity-card-price {
+  font-size: 15px;
+  font-weight: 500;
+  color: #4B5563;
+  letter-spacing: -0.2px;
+}
+
+/* Route / Destination Rows */
+.activity-card-route {
+  display: flex;
+  flex-direction: column;
+  padding-top: 13px;
+  position: relative;
+}
+
+.activity-route-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 28px;
+}
+
+/* Icons */
+.activity-circle-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.activity-circle-icon.pickup {
+  background-color: #FFF3ED;
+  border: 1.5px solid #FF8A48;
+  color: #EE4335;
+}
+
+.activity-circle-icon.dropoff {
+  background-color: #E6F7F5;
+  border: 1.5px solid #0D9488;
+  color: #0D9488;
+}
+
+/* Connector Line */
+.activity-route-connector {
+  width: 1.5px;
+  height: 12px;
+  background-color: #E5E7EB;
+  margin-left: 12px;
+  margin-top: -2px;
+  margin-bottom: -2px;
+}
+
+.activity-route-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1F2937;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.activity-route-text.subtle {
+  color: #6B7280;
+  font-weight: 400;
+}
+
+/* Cancelled Reason / Status Tag */
+.activity-cancelled-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 500;
+  color: #DC2626;
+  background-color: #FEF2F2;
+  border-radius: 6px;
+  padding: 2px 8px;
+  margin-top: 10px;
+  align-self: flex-start;
+}
+
+/* 5. End of list indicator ("Akhir dari daftar") */
+.activity-end-of-list {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 18px;
+  margin-bottom: 12px;
+}
+
+.activity-end-line {
+  flex: 1;
+  max-width: 60px;
+  height: 1px;
+  background-color: #E5E7EB;
+}
+
+.activity-end-text {
+  font-size: 12px;
+  color: #9CA3AF;
+  letter-spacing: 0.2px;
+}
+
+/* 6. Empty State */
+.activity-empty-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+  gap: 10px;
+}
+
+.activity-empty-icon-wrap {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background-color: #F3F4F6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9CA3AF;
+  margin-bottom: 6px;
+}
+
+.activity-empty-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #374151;
+  margin: 0;
+}
+
+.activity-empty-desc {
+  font-size: 13.5px;
+  color: #6B7280;
+  margin: 0;
+  max-width: 260px;
+  line-height: 1.45;
+}

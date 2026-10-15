@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 300" width="720" height="300" fill="none">
+  <defs>
+    <!-- Soft Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF0F5" />
+      <stop offset="50%" stop-color="#FFE4EF" />
+      <stop offset="100%" stop-color="#FCE7F3" />
+    </linearGradient>
+
+    <!-- Subtle Icon Circle Gradient -->
+    <linearGradient id="iconCircleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF337F" stop-opacity="0.22" />
+      <stop offset="100%" stop-color="#E11D48" stop-opacity="0.16" />
+    </linearGradient>
+  </defs>
+
+  <!-- Outer Plain Card Frame (No Border) -->
+  <rect width="720" height="300" rx="20" fill="url(#bgGrad)" />
+
+  <!-- Center Minimal Clean Icon (Subtle & Elegant) -->
+  <g transform="translate(360, 150)">
+    <!-- Soft Background Circle -->
+    <circle cx="0" cy="0" r="42" fill="url(#iconCircleGrad)" />
+    <!-- Clean Minimal Image Placeholder Icon -->
+    <g transform="translate(-18, -18)" stroke="#E11D48" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.6">
+      <rect x="2" y="2" width="32" height="32" rx="6" fill="rgba(255, 255, 255, 0.6)" />
+      <circle cx="11" cy="11" r="3" fill="#E11D48" stroke="none" />
+      <path d="m34 22-8.5-8.5a2.5 2.5 0 0 0-3.5 0L4 29" />
+    </g>
+  </g>
+</svg>

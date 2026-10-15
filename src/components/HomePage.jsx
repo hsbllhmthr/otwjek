@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Search,
   Tag,
@@ -9,6 +9,21 @@ import sherideHeroArt from '../assets/sheride_hero_pink.png';
 import iconSheRide from '../assets/icon_sheride.png';
 import iconSheCar from '../assets/icon_shecar.png';
 import iconSheSend from '../assets/icon_shesend.png';
+import adsBannerAntarJemput from '../assets/ads_banner_antar_jemput.jpg';
+import adsBannerKirimAntarkota from '../assets/ads_banner_kirim_antarkota.jpg';
+
+const BANNER_SLIDES = [
+  {
+    id: 'banner-antar-jemput',
+    src: adsBannerAntarJemput,
+    alt: 'Antar Jemput Aman & Nyaman OTWJek'
+  },
+  {
+    id: 'banner-kirim-antarkota',
+    src: adsBannerKirimAntarkota,
+    alt: 'Sekarang Bisa Kirim Antar Kota OTWJek'
+  }
+];
 
 // Pixel-perfect Red Map Pin with crisp center hole
 function RedLocationPin({ size = 22 }) {
@@ -55,6 +70,28 @@ export default function HomePage({
   currentLocation = 'Makassar, Sulawesi Selatan'
 }) {
   const [toastMessage, setToastMessage] = useState(null);
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [prevSlide, setPrevSlide] = useState(null);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveSlide((curr) => {
+        setPrevSlide(curr);
+        return (curr + 1) % BANNER_SLIDES.length;
+      });
+    }, 3000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (prevSlide !== null) {
+      const resetTimer = setTimeout(() => {
+        setPrevSlide(null);
+      }, 650);
+      return () => clearTimeout(resetTimer);
+    }
+  }, [prevSlide]);
 
   const popularDestinations = [
     {
@@ -202,6 +239,37 @@ export default function HomePage({
                 </div>
                 <span className="service-card-title">Paket</span>
               </div>
+            </div>
+          </section>
+
+          {/* ============================================================== */}
+          {/* Ads Banner Section (Polos / Plain)                             */}
+          {/* ============================================================== */}
+          <section className="ridego-ads-banner-section" aria-label="Banner Promosi">
+            {/* Banner Carousel Card */}
+            <div
+              className="ads-banner-card ads-banner-card-plain"
+              role="region"
+              aria-label="Banner Promosi OTWJek"
+            >
+              {BANNER_SLIDES.map((slide, idx) => {
+                let statusClass = 'slide-idle';
+                if (idx === activeSlide) {
+                  statusClass = 'slide-active';
+                } else if (idx === prevSlide) {
+                  statusClass = 'slide-exiting';
+                }
+
+                return (
+                  <div key={slide.id} className={`ads-banner-slide-item ${statusClass}`}>
+                    <img
+                      src={slide.src}
+                      alt={slide.alt}
+                      className="ads-banner-img"
+                    />
+                  </div>
+                );
+              })}
             </div>
           </section>
 

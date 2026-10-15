@@ -69,7 +69,7 @@ export default function RideDetailsPage({
 
   const isCar = ride?.id?.includes('car') || ride?.name?.toLowerCase().includes('mobil') || ride?.name?.toLowerCase().includes('car');
   const passengerCount = isCar ? '4 passengers' : '1 passenger';
-  const vehicleName = isCar ? 'SheRide Car' : 'SheRide Motor';
+  const vehicleName = isCar ? 'Mobil' : 'Motor';
 
   const pickupTitle = pickup?.name || pickup?.address || 'Bobst Library';
   const dropoffTitle = dropoff?.name || dropoff?.address || 'Larchmont Hotel';
@@ -128,6 +128,23 @@ export default function RideDetailsPage({
       pickupCoords: shareLat && shareLng ? { lat: shareLat, lng: shareLng } : null,
       dropoffCoords: dropoff?.lat && dropoff?.lng ? { lat: dropoff.lat, lng: dropoff.lng } : null
     });
+
+    try {
+      dbService?.bookings?.create({
+        customerId: sessionUser?.id,
+        customerName: resolvedCustomerName,
+        pickup: { name: pickupTitle, address: pickupTitle },
+        dropoff: { name: dropoffTitle, address: dropoffTitle },
+        serviceType: isCar ? 'mobil' : 'motor',
+        distanceKm,
+        durationMinutes: durationMinutes || (isCar ? 25 : 15),
+        fareAmount: currentPrice,
+        paymentMethod,
+        bookingStatus: 'completed'
+      });
+    } catch {
+      // ignore
+    }
 
     const url = buildWhatsAppLink(BOOK_NOW_PHONE, message);
     openWhatsApp(url);
@@ -310,7 +327,7 @@ export default function RideDetailsPage({
           <div className="table-row">
             <span className="table-label">Payment</span>
             <span className="table-value">
-              {paymentMethod === 'qris' ? 'QRIS SheRide' : 'SheRide Cash'}
+              {paymentMethod === 'qris' ? 'QRIS' : 'Tunai'}
             </span>
           </div>
 

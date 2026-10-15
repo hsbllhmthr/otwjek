@@ -33,7 +33,7 @@ export default function ServiceSwitcher({
           onClick={() => setServiceType('ride')}
         >
           <Bike size={18} />
-          <span>SheRide (Penumpang)</span>
+          <span>Motor & Mobil</span>
         </button>
 
         <button
@@ -41,11 +41,11 @@ export default function ServiceSwitcher({
           onClick={() => setServiceType('send')}
         >
           <Package size={18} />
-          <span>SheSend (Kirim Paket)</span>
+          <span>Paket</span>
         </button>
       </div>
 
-      {/* Sub-options for SheRide */}
+      {/* Sub-options for Motor / Mobil */}
       {serviceType === 'ride' && (
         <div className="vehicle-selection-grid">
           <div
@@ -55,7 +55,7 @@ export default function ServiceSwitcher({
             <div className="vehicle-icon-box">🛵</div>
             <div className="vehicle-info">
               <div className="vehicle-name">
-                <span>SheRide Motor</span>
+                <span>Motor</span>
                 <span className="badge-tag">Favorit</span>
               </div>
               <div className="vehicle-desc">Cepat & santun, sedia helm bersih + hairnet</div>
@@ -69,7 +69,7 @@ export default function ServiceSwitcher({
             <div className="vehicle-icon-box">🚗</div>
             <div className="vehicle-info">
               <div className="vehicle-name">
-                <span>SheRide Mobil</span>
+                <span>Mobil</span>
                 <span className="badge-tag" style={{ background: '#F2EDFB', color: '#8C68CD' }}>
                   Keluarga
                 </span>
