@@ -30,15 +30,18 @@ export default function PackageDetailsPage({
   distanceKm = 4.5,
   paymentMethod = 'cash',
   selectedAdmin: initialAdmin = null,
+  bookingId: initialBookingId = null,
+  currentUser = null,
   onBack,
   onCancelDelivery
 }) {
   const [copiedField, setCopiedField] = useState(null);
   const [gpsCoords, setGpsCoords] = useState(null);
   const [selectedAdminId, setSelectedAdminId] = useState(initialAdmin?.id || ADMINS[0]?.id || 'admin-1');
+  const [savedRecordId, setSavedRecordId] = useState(initialBookingId);
   const selectedAdmin = ADMINS.find((a) => a.id === selectedAdminId) || initialAdmin || ADMINS[0];
 
-  const sessionUser = dbService?.session?.getCurrentUser();
+  const sessionUser = currentUser || dbService?.session?.getCurrentUser();
   const effectiveSenderName =
     senderInfo?.name && senderInfo.name !== 'Hasbullah' && senderInfo.name !== 'Pengirim OTWJek'
       ? senderInfo.name
@@ -154,21 +157,49 @@ export default function PackageDetailsPage({
     });
 
     try {
-      dbService?.bookings?.create({
-        customerId: sessionUser?.id,
-        customerPhone: effectiveSenderPhone || sessionUser?.phone,
-        customerName: resolvedSenderName,
-        pickup: { name: pickupTitle, address: pickupTitle },
-        dropoff: { name: dropoffTitle, address: dropoffTitle },
+      const estimatedDuration = deliverySpeed === 'hemat' ? 45 : 20;
+      const pickupAddr = pickup?.address || pickup?.fullAddress || pickupTitle;
+      const dropoffAddr = dropoff?.address || dropoff?.fullAddress || dropoffTitle;
+
+      const created = dbService?.bookings?.create({
+        id: savedRecordId || initialBookingId || undefined,
+        customerId: sessionUser?.id || null,
+        customerPhone: sessionUser?.phone || effectiveSenderPhone || null,
+        customerName: effectiveSenderName,
+        pickup: { name: pickupTitle, address: pickupAddr },
+        dropoff: { name: dropoffTitle, address: dropoffAddr },
         serviceType: 'paket',
         distanceKm,
-        durationMinutes: durationMinutes || 20,
+        durationMinutes: estimatedDuration,
         fareAmount: currentPrice,
         paymentMethod,
+        packageInfo: {
+          itemName: itemInfo?.itemName || itemInfo?.category || 'Paket / Makanan',
+          category: itemInfo?.category || 'Food',
+          size: itemInfo?.size || 'S',
+          weight: itemInfo?.weight || '1',
+          weightTier: itemInfo?.weightTier || 'light',
+          guarantee: itemInfo?.guarantee || '1 Basic',
+          deliverySpeed: deliverySpeed === 'hemat' ? 'Instant - Hemat (2-3 jam)' : 'Instant (30-45 mnt)',
+          vehicleType: isCar ? 'Mobil Kurir (Car Cargo)' : 'Motor Kurir (Bike)',
+          senderName: effectiveSenderName,
+          senderPhone: effectiveSenderPhone,
+          recipientName: recipientInfo?.name || 'Penerima',
+          recipientPhone: recipientInfo?.phone || '-',
+          floorUnit: recipientInfo?.floorUnit || '',
+          notes: recipientInfo?.noteToDriver || '',
+          pickupName: pickupTitle,
+          pickupAddress: pickupAddr,
+          dropoffName: dropoffTitle,
+          dropoffAddress: dropoffAddr
+        },
         bookingStatus: 'completed'
       });
-    } catch {
-      // ignore
+      if (created?.id) {
+        setSavedRecordId(created.id);
+      }
+    } catch (err) {
+      console.error('Error saving package booking:', err);
     }
 
     const url = buildWhatsAppLink(BOOK_NOW_PHONE, message);
@@ -516,7 +547,7 @@ export default function PackageDetailsPage({
           >
             <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Share2 size={18} />
-              <span>Book Now via WhatsApp ({selectedAdmin.name})</span>
+              <span>Pesan Sekarang via WhatsApp ({selectedAdmin.name})</span>
             </span>
           </button>
 

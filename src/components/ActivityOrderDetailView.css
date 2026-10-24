@@ -398,7 +398,7 @@
 
 /* Floating Pill: Saran & Masukan */
 .floating-feedback-pill {
-  position: fixed;
+  position: absolute;
   bottom: 24px;
   right: 18px;
   display: inline-flex;
@@ -426,7 +426,7 @@
 
 /* Feedback Modal Backdrop & Card */
 .feedback-modal-backdrop {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
@@ -590,7 +590,7 @@
 
 /* Toast Message */
 .order-detail-toast {
-  position: fixed;
+  position: absolute;
   bottom: 80px;
   left: 50%;
   transform: translateX(-50%);
@@ -670,8 +670,16 @@
 
 .customer-route-item {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 12px;
+}
+
+.customer-pin-column {
+  width: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .customer-pin-icon {
@@ -682,7 +690,6 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  margin-top: 1px;
 }
 
 .customer-pin-icon.pickup {
@@ -700,6 +707,10 @@
 .customer-point-details {
   flex: 1;
   min-width: 0;
+}
+
+.customer-point-details.pickup-details {
+  padding-bottom: 18px;
 }
 
 .point-title-row {
@@ -741,59 +752,110 @@
   line-height: 1.4;
 }
 
-.customer-route-track {
-  width: 28px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.package-step-badge {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 2px;
+}
+
+.package-step-badge.pickup {
+  color: #059669;
+}
+
+.package-step-badge.dropoff {
+  color: #DC2626;
+}
+
+.point-contact-sub {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: #4B5563;
 }
 
 .track-vertical-line {
   width: 2px;
-  height: 100%;
+  flex: 1;
+  min-height: 16px;
   background-color: #D1D5DB;
 }
 
-/* Package Special Note Box */
-.customer-package-note-box {
-  margin-top: 14px;
-  background-color: #F5F3FF;
-  border: 1px solid #DDD6FE;
-  border-radius: 10px;
-  padding: 10px 12px;
-}
-
-.package-note-title {
-  display: flex;
+/* Detail Paket & Pengiriman Dedicated Card */
+.customer-package-type-badge {
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12.5px;
+  font-size: 11.5px;
   font-weight: 700;
   color: #6D28D9;
-  margin-bottom: 6px;
+  background-color: #F5F3FF;
+  border: 1px solid #DDD6FE;
+  padding: 2px 9px;
+  border-radius: 10px;
 }
 
-.package-note-content {
+.package-detail-card-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
+  gap: 10px;
 }
 
-.package-kv-row {
+.package-detail-row {
   display: flex;
-  gap: 6px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  font-size: 13.5px;
+  line-height: 1.4;
 }
 
-.package-kv-row .kv-label {
-  color: #6D28D9;
+.package-detail-label {
+  color: #6B7280;
+  flex-shrink: 0;
+}
+
+.package-detail-value {
+  color: #111827;
   font-weight: 600;
-  min-width: 60px;
+  text-align: right;
+  word-break: break-word;
 }
 
-.package-kv-row .kv-val {
-  color: #374151;
+.package-detail-Value strong,
+.package-detail-value strong {
+  font-weight: 700;
+  color: #111827;
+}
+
+.package-detail-sub {
+  font-weight: 500;
+  color: #4B5563;
+}
+
+.package-detail-note-bar {
+  margin-top: 4px;
+  background-color: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  padding: 9px 12px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.package-note-bar-label {
+  color: #6B7280;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.package-note-bar-val {
+  color: #1F2937;
+  font-weight: 600;
+  text-align: right;
 }
 
 /* 4. Customer Pricing Breakdown */
@@ -1012,28 +1074,31 @@
 
 /* Customer Fixed Bottom Action Footer */
 .customer-action-footer-spacer {
-  height: 80px;
+  height: 24px;
 }
 
 .customer-action-footer {
-  position: fixed;
+  position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
+  width: 100%;
+  box-sizing: border-box;
   height: 68px;
   background-color: #FFFFFF;
   border-top: 1px solid #ECEEF1;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
-  padding: 0 16px;
+  padding: 0 18px;
   z-index: 1040;
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
 }
 
 .btn-customer-cs-help {
   flex: 1;
-  height: 44px;
+  height: 42px;
   background-color: #FFFFFF;
   border: 1px solid #D1D5DB;
   border-radius: 10px;
@@ -1053,8 +1118,8 @@
 }
 
 .btn-customer-reorder {
-  flex: 2;
-  height: 44px;
+  flex: 1.25;
+  height: 42px;
   background-color: #EE4335;
   border: none;
   border-radius: 10px;
@@ -1062,7 +1127,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
   color: #FFFFFF;
   cursor: pointer;

@@ -2113,13 +2113,15 @@ button, input, select, textarea {
   color: #FFFFFF;
   font-size: 9.5px;
   font-weight: 800;
-  width: 16px;
+  min-width: 16px;
   height: 16px;
-  border-radius: 50%;
+  padding: 0 4px;
+  border-radius: 9999px;
   display: flex;
   align-items: center;
   justify-content: center;
   border: 1.5px solid #FFFFFF;
+  box-sizing: border-box;
 }
 
 .ref-nav-label {

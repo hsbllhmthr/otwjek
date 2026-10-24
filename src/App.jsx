@@ -486,9 +486,43 @@ export default function App() {
     const customerDisplayName = currentUser?.fullName || currentUser?.full_name || currentUser?.name || '';
     const customerDisplayPhone = currentUser?.phone || '';
 
-    // Jika fitur motor atau mobil (ride), buka halaman baru Ride Details (sesuai gambar referensi)
+    // Jika fitur motor atau mobil (ride), simpan ke riwayat pesanan dan buka halaman Ride Details
     if (!isSend) {
+      let savedRideBookingId = null;
+      try {
+        const isCar =
+          ride?.id?.includes('car') ||
+          ride?.name?.toLowerCase().includes('mobil') ||
+          ride?.name?.toLowerCase().includes('car');
+        const pickupTitle = pickup?.name || pickup?.address || 'Titik Jemput';
+        const pickupAddr = pickup?.address || pickup?.fullAddress || pickupTitle;
+        const dropoffTitle = dropoff?.name || dropoff?.address || 'Titik Tujuan';
+        const dropoffAddr = dropoff?.address || dropoff?.fullAddress || dropoffTitle;
+
+        const created = dbService?.bookings?.create({
+          customerId: currentUser?.id || null,
+          customerPhone: currentUser?.phone || customerDisplayPhone || null,
+          customerName: customerDisplayName || 'Pelanggan OTWJek',
+          driver: selectedDriver || null,
+          customerNotes: driverNotes || '',
+          pickup: { name: pickupTitle, address: pickupAddr },
+          dropoff: { name: dropoffTitle, address: dropoffAddr },
+          serviceType: isCar ? 'mobil' : 'motor',
+          distanceKm,
+          durationMinutes: durationMinutes || (isCar ? 25 : 15),
+          fareAmount: ride?.price || 17000,
+          paymentMethod: pMethod,
+          bookingStatus: 'completed'
+        });
+        if (created?.id) {
+          savedRideBookingId = created.id;
+        }
+      } catch {
+        // ignore
+      }
+
       setActiveRideBooking({
+        bookingId: savedRideBookingId,
         ride,
         pickup,
         dropoff,
@@ -529,16 +563,41 @@ export default function App() {
     });
 
     try {
+      const pickupTitle = pickup?.name || pickup?.address || 'Titik Jemput di Peta';
+      const pickupAddr = pickup?.address || pickup?.fullAddress || pickupTitle;
+      const dropoffTitle = dropoff?.name || dropoff?.address || 'Titik Tujuan di Peta';
+      const dropoffAddr = dropoff?.address || dropoff?.fullAddress || dropoffTitle;
+
       dbService?.bookings?.create({
-        customerId: currentUser?.id,
-        customerName: customerDisplayName || 'Pelanggan OTWJek',
-        pickup: { name: pickup?.name || pickup?.address || 'Titik Jemput di Peta', address: pickup?.address || '' },
-        dropoff: { name: dropoff?.name || dropoff?.address || 'Titik Tujuan di Peta', address: dropoff?.address || '' },
+        customerId: currentUser?.id || null,
+        customerPhone: currentUser?.phone || pkgData?.senderPhone || null,
+        customerName: customerDisplayName || pkgData?.senderName || 'Pelanggan OTWJek',
+        pickup: { name: pickupTitle, address: pickupAddr },
+        dropoff: { name: dropoffTitle, address: dropoffAddr },
         serviceType: 'paket',
         distanceKm: distanceKm || 4.5,
         durationMinutes: durationMinutes || 18,
         fareAmount: ride.price || 15200,
         paymentMethod: pMethod,
+        packageInfo: {
+          itemName: pkgData?.itemName || 'Paket / Makanan',
+          category: pkgData?.category || 'Barang',
+          size: pkgData?.size || 'S',
+          weight: pkgData?.weight || '1',
+          weightTier: pkgData?.weightTier || 'light',
+          deliverySpeed: pkgData?.deliverySpeed || 'Instant (30-45 mnt)',
+          vehicleType: ride.id?.includes('car') ? 'Mobil Kurir (Car Cargo)' : 'Motor Kurir (Bike)',
+          senderName: pkgData?.senderName || customerDisplayName || 'Pelanggan OTWJek',
+          senderPhone: pkgData?.senderPhone || customerDisplayPhone || '',
+          recipientName: pkgData?.recipientName || 'Penerima Paket',
+          recipientPhone: pkgData?.recipientPhone || '-',
+          floorUnit: pkgData?.floorUnit || '',
+          notes: pkgData?.specialNotes || driverNotes || '',
+          pickupName: pickupTitle,
+          pickupAddress: pickupAddr,
+          dropoffName: dropoffTitle,
+          dropoffAddress: dropoffAddr
+        },
         bookingStatus: 'completed'
       });
     } catch {
@@ -563,22 +622,24 @@ export default function App() {
     // Preserve active pickup location (Current location / GPS coordinates)
     let currentPickup = pickup;
     if (options.pickupText && options.pickupText !== 'Current location') {
-      const match = POPULAR_LOCATIONS.find(
-        (p) => p.name.toLowerCase() === options.pickupText.toLowerCase()
-      );
-      if (match) {
-        currentPickup = match;
-      } else {
-        currentPickup = {
-          name: options.pickupText,
-          address: options.pickupText,
-          fullAddress: options.pickupText,
-          lat: pickup?.lat || -5.2045,
-          lng: pickup?.lng || 119.4550
-        };
+      if (currentPickup?.name?.toLowerCase() !== options.pickupText.toLowerCase()) {
+        const match = POPULAR_LOCATIONS.find(
+          (p) => p.name.toLowerCase() === options.pickupText.toLowerCase()
+        );
+        if (match) {
+          currentPickup = match;
+        } else {
+          currentPickup = {
+            name: options.pickupText,
+            address: options.pickupText,
+            fullAddress: options.pickupText,
+            lat: pickup?.lat || -5.2045,
+            lng: pickup?.lng || 119.4550
+          };
+        }
+        setPickup(currentPickup);
+        setPickupInput(currentPickup.name);
       }
-      setPickup(currentPickup);
-      setPickupInput(currentPickup.name);
     } else if (
       !currentPickup ||
       !currentPickup.lat ||
@@ -674,6 +735,7 @@ export default function App() {
 
   const handleSelectService = (serviceId, query, vehicleType) => {
     if (serviceId === 'send-package' || (serviceId === 'where-to' && vehicleType === 'express')) {
+      setActivePackageBooking(null);
       setSelectedVehicleType('express');
       setActiveTab('send');
       setSelectedRideId('shesend-instant');
@@ -874,6 +936,7 @@ export default function App() {
           <BottomNavBar
             activeTab="home"
             onChangeTab={(tab) => setCurrentView(tab)}
+            currentUser={currentUser}
           />
         </div>
       </div>
@@ -952,7 +1015,71 @@ export default function App() {
             onSwapLocations={handleSwapLocations}
             onBook={handleBookWhatsApp}
             onReviewOrder={(pkgBooking) => {
-              setActivePackageBooking(pkgBooking);
+              let savedBookingId = activePackageBooking?.bookingId || null;
+              try {
+                const activeUser = currentUser || dbService?.session?.getCurrentUser();
+                const pLoc = pkgBooking?.pickup || pickup;
+                const dLoc = pkgBooking?.dropoff || dropoff;
+                const pickupTitle = pLoc?.name || pLoc?.address || 'Titik Pengambilan Paket';
+                const pickupAddr = pLoc?.address || pLoc?.fullAddress || pickupTitle;
+                const dropoffTitle = dLoc?.name || dLoc?.address || 'Titik Pengantaran Paket';
+                const dropoffAddr = dLoc?.address || dLoc?.fullAddress || dropoffTitle;
+                const sInfo = pkgBooking?.senderInfo || {};
+                const rInfo = pkgBooking?.recipientInfo || {};
+                const iInfo = pkgBooking?.itemInfo || {};
+                const isCar = pkgBooking?.selectedVehicle === 'car';
+                const delivSpeed = pkgBooking?.deliverySpeed || 'instant';
+                const senderName =
+                  sInfo.name && sInfo.name !== 'Hasbullah' && sInfo.name !== 'Pengirim OTWJek'
+                    ? sInfo.name
+                    : (activeUser?.fullName || activeUser?.full_name || activeUser?.name || sInfo.name || 'Pengirim OTWJek');
+                const senderPhone =
+                  sInfo.phone && sInfo.phone !== '+6288705806690'
+                    ? sInfo.phone
+                    : (activeUser?.phone || sInfo.phone || '+6288705806690');
+
+                const created = dbService?.bookings?.create({
+                  id: savedBookingId || undefined,
+                  customerId: activeUser?.id || null,
+                  customerPhone: activeUser?.phone || senderPhone || null,
+                  customerName: senderName,
+                  pickup: { name: pickupTitle, address: pickupAddr },
+                  dropoff: { name: dropoffTitle, address: dropoffAddr },
+                  serviceType: 'paket',
+                  distanceKm: pkgBooking?.actualDistance || distanceKm || 4.5,
+                  durationMinutes: delivSpeed === 'hemat' ? 45 : 20,
+                  fareAmount: pkgBooking?.finalFare || 30500,
+                  paymentMethod: pkgBooking?.paymentMethod || paymentMethod || 'cash',
+                  packageInfo: {
+                    itemName: iInfo.itemName || iInfo.category || 'Paket / Makanan',
+                    category: iInfo.category || 'Food',
+                    size: iInfo.size || 'S',
+                    weight: iInfo.weight || '1',
+                    weightTier: iInfo.weightTier || 'light',
+                    guarantee: iInfo.guarantee || '1 Basic',
+                    deliverySpeed: delivSpeed === 'hemat' ? 'Instant - Hemat (2-3 jam)' : 'Instant (30-45 mnt)',
+                    vehicleType: isCar ? 'Mobil Kurir (Car Cargo)' : 'Motor Kurir (Bike)',
+                    senderName,
+                    senderPhone,
+                    recipientName: rInfo.name || 'Penerima',
+                    recipientPhone: rInfo.phone || '-',
+                    floorUnit: rInfo.floorUnit || '',
+                    notes: rInfo.noteToDriver || '',
+                    pickupName: pickupTitle,
+                    pickupAddress: pickupAddr,
+                    dropoffName: dropoffTitle,
+                    dropoffAddress: dropoffAddr
+                  },
+                  bookingStatus: 'completed'
+                });
+                if (created?.id) {
+                  savedBookingId = created.id;
+                }
+              } catch (err) {
+                console.error('Error saving package order to history:', err);
+              }
+
+              setActivePackageBooking({ ...pkgBooking, bookingId: savedBookingId });
               setCurrentView('package-details');
             }}
             onUpdateDropoff={(newDropoff) => {
@@ -983,6 +1110,8 @@ export default function App() {
             fare={activePackageBooking?.finalFare || 30500}
             distanceKm={activePackageBooking?.actualDistance || distanceKm}
             paymentMethod={activePackageBooking?.paymentMethod || paymentMethod}
+            bookingId={activePackageBooking?.bookingId || null}
+            currentUser={currentUser}
             onBack={() => setCurrentView('delivery-details')}
             onCancelDelivery={() => setCurrentView('home')}
           />
@@ -1019,6 +1148,7 @@ export default function App() {
           <BottomNavBar
             activeTab="activity"
             onChangeTab={(tab) => setCurrentView(tab)}
+            currentUser={currentUser}
           />
         </div>
       </div>
@@ -1033,6 +1163,7 @@ export default function App() {
           <BottomNavBar
             activeTab="message"
             onChangeTab={(tab) => setCurrentView(tab)}
+            currentUser={currentUser}
           />
         </div>
       </div>
@@ -1047,6 +1178,7 @@ export default function App() {
           <BottomNavBar
             activeTab="payment"
             onChangeTab={(tab) => setCurrentView(tab)}
+            currentUser={currentUser}
           />
         </div>
       </div>
@@ -1069,6 +1201,7 @@ export default function App() {
           <BottomNavBar
             activeTab="account"
             onChangeTab={(tab) => setCurrentView(tab)}
+            currentUser={currentUser}
           />
         </div>
       </div>
@@ -1134,6 +1267,7 @@ export default function App() {
             customerName={activeRideBooking?.customerName || currentUser?.fullName || currentUser?.full_name || currentUser?.name || ''}
             customerPhone={activeRideBooking?.customerPhone || currentUser?.phone || ''}
             currentUser={currentUser}
+            bookingId={activeRideBooking?.bookingId || null}
             onBack={() => setCurrentView('ride')}
             onCancelRide={() => setCurrentView('home')}
           />

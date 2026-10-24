@@ -26,11 +26,13 @@ export default function RideDetailsPage({
   customerName = '',
   customerPhone = '',
   currentUser = null,
+  bookingId: initialBookingId = null,
   onBack,
   onCancelRide
 }) {
   const [copiedField, setCopiedField] = useState(null);
   const [selectedAdminId, setSelectedAdminId] = useState(ADMINS[0]?.id || 'admin-1');
+  const [savedRecordId, setSavedRecordId] = useState(initialBookingId);
   const selectedAdmin = ADMINS.find((a) => a.id === selectedAdminId) || ADMINS[0];
 
   // Generate dynamic Transaction & Booking IDs
@@ -130,11 +132,17 @@ export default function RideDetailsPage({
     });
 
     try {
-      dbService?.bookings?.create({
-        customerId: sessionUser?.id,
+      const pickupAddr = pickup?.address || pickup?.fullAddress || pickupTitle;
+      const dropoffAddr = dropoff?.address || dropoff?.fullAddress || dropoffTitle;
+      const created = dbService?.bookings?.create({
+        id: savedRecordId || initialBookingId || undefined,
+        customerId: sessionUser?.id || null,
+        customerPhone: sessionUser?.phone || resolvedCustomerPhone || null,
         customerName: resolvedCustomerName,
-        pickup: { name: pickupTitle, address: pickupTitle },
-        dropoff: { name: dropoffTitle, address: dropoffTitle },
+        driver: selectedDriver || null,
+        customerNotes: driverNotes || '',
+        pickup: { name: pickupTitle, address: pickupAddr },
+        dropoff: { name: dropoffTitle, address: dropoffAddr },
         serviceType: isCar ? 'mobil' : 'motor',
         distanceKm,
         durationMinutes: durationMinutes || (isCar ? 25 : 15),
@@ -142,6 +150,9 @@ export default function RideDetailsPage({
         paymentMethod,
         bookingStatus: 'completed'
       });
+      if (created?.id) {
+        setSavedRecordId(created.id);
+      }
     } catch {
       // ignore
     }
@@ -445,7 +456,7 @@ export default function RideDetailsPage({
             className="btn-share-receipt"
             onClick={handleShareToWhatsApp}
           >
-            <span>Book Now via WhatsApp ({selectedAdmin.name})</span>
+            <span>Pesan Sekarang via WhatsApp ({selectedAdmin.name})</span>
           </button>
 
           <button
@@ -453,7 +464,7 @@ export default function RideDetailsPage({
             className="btn-cancel-ride"
             onClick={() => { if (onCancelRide) onCancelRide(); else if (onBack) onBack(); }}
           >
-            Cancel Booking
+            Batalkan Pesanan
           </button>
         </div>
       </div>

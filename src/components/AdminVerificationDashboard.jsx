@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import './AdminVerificationDashboard.css';
+import './ActivityOrderDetailView.css';
 import {
   LayoutDashboard,
   Menu,
@@ -25,7 +26,18 @@ import {
   Moon,
   Edit3,
   ArrowUpDown,
-  Check
+  Check,
+  Package,
+  Car,
+  MapPin,
+  Phone,
+  RotateCw,
+  MessageCircle,
+  Receipt,
+  FileText,
+  Banknote,
+  QrCode,
+  CheckCheck
 } from 'lucide-react';
 import dbService from '../services/dbService.js';
 import driverPlaceholder from '../assets/driver_placeholder.svg';
@@ -82,12 +94,32 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
   const [customerDeleteConfirm, setCustomerDeleteConfirm] = useState(null);
 
   // =========================================================================
+  // STATE PESANAN & PENUGASAN DRIVER (ORDER DISPATCH)
+  // =========================================================================
+  const [orderTab, setOrderTab] = useState('all'); // 'all' | 'unassigned' | 'assigned'
+  const [orderServiceFilter, setOrderServiceFilter] = useState('all');
+
+  // =========================================================================
+  // STATE: SEMUA PESANAN PELANGGAN (RIWAYAT, SELESAI, DIBATALKAN)
+  // =========================================================================
+  const [allOrdersStatusTab, setAllOrdersStatusTab] = useState('all'); // 'all' | 'completed' | 'in_progress' | 'cancelled'
+  const [allOrdersServiceFilter, setAllOrdersServiceFilter] = useState('all');
+  const [allOrdersSearchQuery, setAllOrdersSearchQuery] = useState('');
+  const [allOrdersViewPage, setAllOrdersViewPage] = useState(1);
+  const [orderDetailModalData, setOrderDetailModalData] = useState(null);
+  const [adminCopiedOrderNum, setAdminCopiedOrderNum] = useState(false); // 'all' | 'motor' | 'mobil' | 'paket'
+  const [orderSearchQuery, setOrderSearchQuery] = useState('');
+  const [ordersViewPage, setOrdersViewPage] = useState(1);
+  const [assignModalOrder, setAssignModalOrder] = useState(null);
+  const [assignDriverSearch, setAssignDriverSearch] = useState('');
+  const [assignVehicleFilter, setAssignVehicleFilter] = useState('recommended'); // 'recommended' | 'all'
+
+  // =========================================================================
   // DATA LOADERS & REALTIME SUBSCRIPTION
   // =========================================================================
   const [bookings, setBookings] = useState(() => {
     try {
-      const stored = localStorage.getItem('otwjek_db_ride_bookings');
-      return stored ? JSON.parse(stored) : [];
+      return dbService.bookings.getAllAdmin();
     } catch {
       return [];
     }
@@ -129,11 +161,21 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
 
   const loadBookings = () => {
     try {
-      const stored = localStorage.getItem('otwjek_db_ride_bookings');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        setBookings((prev) => (prev.length !== parsed.length ? parsed : prev));
-      }
+      const allOrders = dbService.bookings.getAllAdmin();
+      setBookings((prev) => {
+        if (prev.length !== allOrders.length) return [...allOrders];
+        const hasChanged = allOrders.some((b, idx) => {
+          const p = prev[idx];
+          return (
+            !p ||
+            p.id !== b.id ||
+            p.driver_id !== b.driver_id ||
+            p.assignment_status !== b.assignment_status ||
+            p.updated_at !== b.updated_at
+          );
+        });
+        return hasChanged ? [...allOrders] : prev;
+      });
     } catch (e) {
       console.error('Error loading bookings:', e);
     }
@@ -570,6 +612,188 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
   }, [filteredCustomers, currentCustomersViewPage]);
 
   // =========================================================================
+  // ORDERS / DISPATCH COUNTS, FILTERS & HANDLERS
+  // =========================================================================
+  const orderCounts = useMemo(() => {
+    const list = Array.isArray(bookings) ? bookings : [];
+    const total = list.length;
+    const assigned = list.filter((b) => b.assignment_status === 'assigned').length;
+    const unassigned = Math.max(0, total - assigned);
+    return { total, assigned, unassigned };
+  }, [bookings]);
+
+  const filteredOrders = useMemo(() => {
+    let result = Array.isArray(bookings) ? [...bookings] : [];
+
+    if (orderTab === 'unassigned') {
+      result = result.filter((b) => b.assignment_status !== 'assigned');
+    } else if (orderTab === 'assigned') {
+      result = result.filter((b) => b.assignment_status === 'assigned');
+    }
+
+    if (orderServiceFilter !== 'all') {
+      result = result.filter((b) => {
+        const sType = String(b.service_type || '').toLowerCase();
+        if (orderServiceFilter === 'mobil') return sType === 'mobil' || sType === 'car';
+        if (orderServiceFilter === 'paket') return sType === 'paket' || sType === 'send' || sType === 'package' || sType === 'food';
+        return sType === 'motor' || sType === 'ride' || (!sType && orderServiceFilter === 'motor');
+      });
+    }
+
+    if (orderSearchQuery.trim()) {
+      const q = orderSearchQuery.toLowerCase().trim();
+      result = result.filter(
+        (b) =>
+          b.order_code?.toLowerCase().includes(q) ||
+          b.booking_code?.toLowerCase().includes(q) ||
+          b.customer_name?.toLowerCase().includes(q) ||
+          b.customer_phone?.toLowerCase().includes(q) ||
+          b.pickup_name?.toLowerCase().includes(q) ||
+          b.dropoff_name?.toLowerCase().includes(q) ||
+          b.driver_name?.toLowerCase().includes(q) ||
+          b.driver_plate?.toLowerCase().includes(q)
+      );
+    }
+
+    return result;
+  }, [bookings, orderTab, orderServiceFilter, orderSearchQuery]);
+
+  useEffect(() => {
+    setOrdersViewPage(1);
+  }, [orderTab, orderServiceFilter, orderSearchQuery]);
+
+  const totalOrdersViewPages = Math.max(1, Math.ceil(filteredOrders.length / TABLE_PAGE_SIZE));
+  const currentOrdersViewPage = Math.min(ordersViewPage, totalOrdersViewPages);
+  // =========================================================================
+  // MEMO: METRIK & FILTER SEMUA PESANAN PELANGGAN
+  // =========================================================================
+  const allOrdersMetrics = useMemo(() => {
+    const list = Array.isArray(bookings) ? bookings : [];
+    const total = list.length;
+    const completed = list.filter((b) => b.booking_status === 'completed').length;
+    const cancelled = list.filter((b) => b.booking_status === 'cancelled').length;
+    const inProgress = list.filter(
+      (b) => b.booking_status !== 'completed' && b.booking_status !== 'cancelled'
+    ).length;
+    const totalRevenue = list
+      .filter((b) => b.booking_status === 'completed')
+      .reduce((sum, b) => sum + Number(b.fare_amount || 0), 0);
+
+    return { total, completed, cancelled, inProgress, totalRevenue };
+  }, [bookings]);
+
+  const filteredAllOrders = useMemo(() => {
+    let result = Array.isArray(bookings) ? [...bookings] : [];
+
+    // Filter status tab
+    if (allOrdersStatusTab === 'completed') {
+      result = result.filter((b) => b.booking_status === 'completed');
+    } else if (allOrdersStatusTab === 'cancelled') {
+      result = result.filter((b) => b.booking_status === 'cancelled');
+    } else if (allOrdersStatusTab === 'in_progress') {
+      result = result.filter(
+        (b) => b.booking_status !== 'completed' && b.booking_status !== 'cancelled'
+      );
+    }
+
+    // Filter layanan
+    if (allOrdersServiceFilter !== 'all') {
+      result = result.filter((b) => {
+        const sType = String(b.service_type || '').toLowerCase();
+        if (allOrdersServiceFilter === 'mobil') return sType === 'mobil' || sType === 'car';
+        if (allOrdersServiceFilter === 'paket')
+          return sType === 'paket' || sType === 'send' || sType === 'package' || sType === 'food';
+        return sType === 'motor' || sType === 'ride' || (!sType && allOrdersServiceFilter === 'motor');
+      });
+    }
+
+    // Filter pencarian
+    if (allOrdersSearchQuery.trim()) {
+      const q = allOrdersSearchQuery.toLowerCase().trim();
+      result = result.filter(
+        (b) =>
+          b.order_code?.toLowerCase().includes(q) ||
+          b.order_number?.toLowerCase().includes(q) ||
+          b.booking_code?.toLowerCase().includes(q) ||
+          b.customer_name?.toLowerCase().includes(q) ||
+          b.customer_phone?.toLowerCase().includes(q) ||
+          b.pickup_name?.toLowerCase().includes(q) ||
+          b.dropoff_name?.toLowerCase().includes(q) ||
+          b.driver_name?.toLowerCase().includes(q) ||
+          b.driver_plate?.toLowerCase().includes(q) ||
+          b.package_info?.recipientName?.toLowerCase().includes(q) ||
+          b.package_info?.itemName?.toLowerCase().includes(q)
+      );
+    }
+
+    return result;
+  }, [bookings, allOrdersStatusTab, allOrdersServiceFilter, allOrdersSearchQuery]);
+
+  useEffect(() => {
+    setAllOrdersViewPage(1);
+  }, [allOrdersStatusTab, allOrdersServiceFilter, allOrdersSearchQuery]);
+
+  const totalAllOrdersPages = Math.max(1, Math.ceil(filteredAllOrders.length / TABLE_PAGE_SIZE));
+  const currentAllOrdersPage = Math.min(allOrdersViewPage, totalAllOrdersPages);
+  const paginatedAllOrdersView = useMemo(() => {
+    const start = (currentAllOrdersPage - 1) * TABLE_PAGE_SIZE;
+    return filteredAllOrders.slice(start, start + TABLE_PAGE_SIZE);
+  }, [filteredAllOrders, currentAllOrdersPage]);
+
+  const handleUpdateOrderStatus = (orderId, newStatus, statusNote = '') => {
+    if (!orderId || !newStatus) return;
+    dbService.bookings.updateBookingStatus(orderId, newStatus, statusNote);
+    loadBookings();
+    if (orderDetailModalData && orderDetailModalData.id === orderId) {
+      setOrderDetailModalData((prev) => (prev ? { ...prev, booking_status: newStatus, status_note: statusNote } : null));
+    }
+    const label = newStatus === 'completed' ? 'diselesaikan' : newStatus === 'cancelled' ? 'dibatalkan' : 'diperbarui';
+    setToastMessage(`Status pesanan berhasil diubah menjadi ${label}!`);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const paginatedOrdersView = useMemo(() => {
+    const start = (currentOrdersViewPage - 1) * TABLE_PAGE_SIZE;
+    return filteredOrders.slice(start, start + TABLE_PAGE_SIZE);
+  }, [filteredOrders, currentOrdersViewPage]);
+
+  const buildDriverTaskWhatsAppUrl = (booking, driver) => {
+    const rawPhone = driver?.phone || booking?.driver_phone || '';
+    const cleanPhone = String(rawPhone).replace(/\D/g, '').replace(/^0/, '62');
+    const targetPhone = cleanPhone.startsWith('62') ? cleanPhone : `62${cleanPhone}`;
+    const driverName = driver?.name || booking?.driver_name || 'Mitra Driver';
+    const orderCode = booking?.order_code || booking?.booking_code || '#ORD';
+    const sName = booking?.service_name || (booking?.service_type === 'mobil' ? 'Mobil' : booking?.service_type === 'paket' ? 'Paket' : 'Motor');
+    const fareStr = `Rp ${Number(booking?.fare_amount || 15000).toLocaleString('id-ID')}`;
+    const payMethod = (booking?.payment_method || 'cash').toUpperCase();
+
+    const pkgLines = booking?.package_info
+      ? `\n📦 *Detail Paket:* ${booking.package_info.itemName || booking.package_info.category || 'Paket'} (${booking.package_info.size || 'S'})${booking.package_info.weight ? ` • ${booking.package_info.weight} kg` : ''}\n👤 *Penerima Paket:* ${booking.package_info.recipientName || '-'} (${booking.package_info.recipientPhone || '-'})${booking.package_info.floorUnit ? ` • Unit: ${booking.package_info.floorUnit}` : ''}${booking.package_info.notes ? `\n📝 *Catatan:* ${booking.package_info.notes}` : ''}`
+      : '';
+
+    const text = `Halo Kak *${driverName}* 🌸\nAnda mendapat *Penugasan Pesanan OTWJek* dari Admin:\n\n📋 *Kode Pesanan:* ${orderCode}\n🛵 *Layanan:* ${sName}\n👤 *Pelanggan:* ${booking?.customer_name || 'Pelanggan OTWJek'} (${booking?.customer_phone || '-'})\n📍 *Lokasi Jemput / Ambil:* ${booking?.pickup_name || '-'}${booking?.pickup_address && booking.pickup_address !== booking.pickup_name ? ` (${booking.pickup_address})` : ''}\n🏁 *Lokasi Tujuan / Antar:* ${booking?.dropoff_name || '-'}${booking?.dropoff_address && booking.dropoff_address !== booking.dropoff_name ? ` (${booking.dropoff_address})` : ''}\n📏 *Estimasi Jarak:* ${booking?.distance_km || 3.2} km\n💰 *Total Tarif:* ${fareStr} (${payMethod})${pkgLines}\n\nSilakan segera menuju titik penjemputan dan cek menu *Activity* di akun Driver Anda. Terima kasih! 🙏`;
+
+    return `https://wa.me/${targetPhone}?text=${encodeURIComponent(text)}`;
+  };
+
+  const handleAssignDriverToOrder = (booking, driver, sendWa = false) => {
+    if (!booking || !driver) return;
+    const reviewerName = admin?.name || 'Admin OTWJEK';
+    const updated = dbService.bookings.assignDriver(booking.id, driver, reviewerName);
+    loadBookings();
+    loadDrivers();
+    setAssignModalOrder(null);
+    setAssignDriverSearch('');
+    setToastMessage(`Driver ${driver.name} berhasil ditugaskan untuk pesanan ${booking.order_code || booking.booking_code}!`);
+    setTimeout(() => setToastMessage(null), 4000);
+
+    if (sendWa && updated) {
+      const waUrl = buildDriverTaskWhatsAppUrl(updated, driver);
+      window.open(waUrl, '_blank');
+    }
+  };
+
+  // =========================================================================
   // HANDLERS DRIVER
   // =========================================================================
   const handleApprove = (driver) => {
@@ -868,6 +1092,40 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
             <span className="sidebar-badge-count">{customerCounts.total}</span>
           </button>
 
+          <button
+            type="button"
+            className={`sidebar-nav-item ${mainSection === 'orders' ? 'active' : ''}`}
+            onClick={() => {
+              setMainSection('orders');
+              setSidebarOpen(false);
+            }}
+          >
+            <div className="sidebar-nav-left">
+              <Package size={18} />
+              <span className="nav-item-label">Penugasan Pesanan</span>
+            </div>
+            {orderCounts.unassigned > 0 ? (
+              <span className="sidebar-badge-alert">{orderCounts.unassigned}</span>
+            ) : (
+              <span className="sidebar-badge-count">{orderCounts.total}</span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            className={`sidebar-nav-item ${mainSection === 'all_orders' ? 'active' : ''}`}
+            onClick={() => {
+              setMainSection('all_orders');
+              setSidebarOpen(false);
+            }}
+          >
+            <div className="sidebar-nav-left">
+              <Receipt size={18} />
+              <span className="nav-item-label">Pesanan Pelanggan</span>
+            </div>
+            <span className="sidebar-badge-count">{bookings.length}</span>
+          </button>
+
           <div className="sidebar-section-title">LAYANAN & LAINNYA</div>
 
           {onGoToCustomerApp && (
@@ -971,7 +1229,11 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                   ? 'Dashboard Overview'
                   : mainSection === 'drivers'
                   ? 'Verifikasi Mitra Driver'
-                  : 'Data Pelanggan'}
+                  : mainSection === 'customers'
+                  ? 'Data Pelanggan'
+                  : mainSection === 'orders'
+                  ? 'Kelola & Penugasan Pesanan'
+                  : 'Pesanan Pelanggan (Riwayat & Detail)'}
               </h2>
             </div>
             <div className="page-header-breadcrumb">
@@ -982,7 +1244,11 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                   ? 'Overview'
                   : mainSection === 'drivers'
                   ? 'Verifikasi Driver'
-                  : 'Customer Data'}
+                  : mainSection === 'customers'
+                  ? 'Data Pelanggan'
+                  : mainSection === 'orders'
+                  ? 'Penugasan Pesanan'
+                  : 'Pesanan Pelanggan'}
               </span>
             </div>
           </div>
@@ -1050,13 +1316,22 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                   </div>
                 </div>
 
-                <div className="metric-card">
-                  <span className="metric-label">Total Perjalanan</span>
+                <div
+                  className="metric-card"
+                  onClick={() => {
+                    setMainSection('orders');
+                    setOrderTab('all');
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <span className="metric-label">Total Pesanan & Tugaskan</span>
                   <div className="metric-bottom-row">
-                    <span className="metric-num">{bookings.length}</span>
+                    <span className="metric-num">{orderCounts.total}</span>
                     <div className="metric-trend-wrap">
-                      <span className="metric-trend-badge success">+7%</span>
-                      <span className="metric-trend-text">Vs last month</span>
+                      <span className={`metric-trend-badge ${orderCounts.unassigned > 0 ? 'warning' : 'success'}`}>
+                        {orderCounts.unassigned > 0 ? `${orderCounts.unassigned} Belum` : 'Tertugaskan'}
+                      </span>
+                      <span className="metric-trend-text">Klik kelola</span>
                     </div>
                   </div>
                 </div>
@@ -2630,6 +2905,352 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
         )}
 
         {/* ================================================================= */}
+        {/* VIEW 4: SEMUA PESANAN & RIWAYAT PELANGGAN (DETAIL, SELESAI, BATAL) */}
+        {/* ================================================================= */}
+        {mainSection === 'all_orders' && (
+          <>
+            {/* KPI Summary Cards All Orders */}
+            <section className="dash-metrics-grid">
+              <div
+                className={`metric-card ${allOrdersStatusTab === 'all' ? 'active' : ''}`}
+                onClick={() => setAllOrdersStatusTab('all')}
+              >
+                <span className="metric-label">Total Semua Pesanan</span>
+                <div className="metric-bottom-row">
+                  <span className="metric-num">{allOrdersMetrics.total}</span>
+                  <div className="metric-trend-wrap">
+                    <span className="metric-trend-badge success">Arsip Seluruh Pesanan</span>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className={`metric-card ${allOrdersStatusTab === 'completed' ? 'active' : ''}`}
+                onClick={() => setAllOrdersStatusTab('completed')}
+              >
+                <span className="metric-label">Pesanan Selesai</span>
+                <div className="metric-bottom-row">
+                  <span className="metric-num">{allOrdersMetrics.completed}</span>
+                  <div className="metric-trend-wrap">
+                    <span className="metric-trend-badge success">Berhasil Diantar</span>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className={`metric-card ${allOrdersStatusTab === 'in_progress' ? 'active' : ''}`}
+                onClick={() => setAllOrdersStatusTab('in_progress')}
+              >
+                <span className="metric-label">Sedang Berjalan / Aktif</span>
+                <div className="metric-bottom-row">
+                  <span className="metric-num">{allOrdersMetrics.inProgress}</span>
+                  <div className="metric-trend-wrap">
+                    <span className="metric-trend-badge primary">Dalam Proses</span>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className={`metric-card ${allOrdersStatusTab === 'cancelled' ? 'active' : ''}`}
+                onClick={() => setAllOrdersStatusTab('cancelled')}
+              >
+                <span className="metric-label">Pesanan Dibatalkan</span>
+                <div className="metric-bottom-row">
+                  <span className="metric-num">{allOrdersMetrics.cancelled}</span>
+                  <div className="metric-trend-wrap">
+                    <span className={`metric-trend-badge ${allOrdersMetrics.cancelled > 0 ? 'warning' : 'success'}`}>
+                      {allOrdersMetrics.cancelled > 0 ? 'Dibatalkan' : 'Nihil Batal'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Filter and Search Bar All Orders */}
+            <section className="dash-filter-row" style={{ flexWrap: 'wrap', gap: 12 }}>
+              <div className="dash-tabs">
+                <button
+                  className={`dash-tab-btn ${allOrdersStatusTab === 'all' ? 'active' : ''}`}
+                  onClick={() => setAllOrdersStatusTab('all')}
+                >
+                  Semua ({allOrdersMetrics.total})
+                </button>
+                <button
+                  className={`dash-tab-btn ${allOrdersStatusTab === 'completed' ? 'active' : ''}`}
+                  onClick={() => setAllOrdersStatusTab('completed')}
+                >
+                  Selesai ({allOrdersMetrics.completed})
+                </button>
+                <button
+                  className={`dash-tab-btn ${allOrdersStatusTab === 'in_progress' ? 'active' : ''}`}
+                  onClick={() => setAllOrdersStatusTab('in_progress')}
+                >
+                  Berjalan ({allOrdersMetrics.inProgress})
+                </button>
+                <button
+                  className={`dash-tab-btn ${allOrdersStatusTab === 'cancelled' ? 'active' : ''}`}
+                  onClick={() => setAllOrdersStatusTab('cancelled')}
+                >
+                  Dibatalkan ({allOrdersMetrics.cancelled})
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flex: 1, justifyContent: 'flex-end' }}>
+                <div className="assign-select-wrap">
+                  <select
+                    className="assign-select-filter"
+                    value={allOrdersServiceFilter}
+                    onChange={(e) => setAllOrdersServiceFilter(e.target.value)}
+                  >
+                    <option value="all">Semua Layanan</option>
+                    <option value="motor">Motor (SheRide)</option>
+                    <option value="mobil">Mobil (SheCar)</option>
+                    <option value="paket">Paket (SheSend)</option>
+                  </select>
+                  <ChevronDown size={14} className="assign-select-icon" />
+                </div>
+
+                <div className="dash-search-box" style={{ minWidth: 260 }}>
+                  <Search size={16} className="search-icon" />
+                  <input
+                    type="text"
+                    placeholder="Cari kode, nama pelanggan, driver, alamat..."
+                    value={allOrdersSearchQuery}
+                    onChange={(e) => setAllOrdersSearchQuery(e.target.value)}
+                  />
+                  {allOrdersSearchQuery && (
+                    <button
+                      type="button"
+                      className="btn-clear-search"
+                      onClick={() => setAllOrdersSearchQuery('')}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            {/* All Orders Table Section */}
+            <section className="dash-customer-list-section">
+              <div className="overview-split-card tailadmin-table-card">
+                <div className="tailadmin-table-responsive">
+                  <table className="tailadmin-project-table">
+                    <thead>
+                      <tr className="tailadmin-th-row">
+                        <th className="tailadmin-th text-left">Kode & Waktu</th>
+                        <th className="tailadmin-th text-left">Pelanggan</th>
+                        <th className="tailadmin-th text-left">Rute & Layanan</th>
+                        <th className="tailadmin-th text-left">Mitra Driver</th>
+                        <th className="tailadmin-th text-left">Tarif & Bayar</th>
+                        <th className="tailadmin-th text-center">Status</th>
+                        <th className="tailadmin-th text-right">Rincian</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredAllOrders.length === 0 ? (
+                        <tr>
+                          <td colSpan="7" className="table-empty-td">
+                            <div className="table-empty-content">
+                              <Receipt size={28} className="empty-icon" />
+                              <span>
+                                {allOrdersSearchQuery
+                                  ? `Tidak ditemukan pesanan yang cocok dengan "${allOrdersSearchQuery}".`
+                                  : 'Belum ada data pesanan pada filter ini.'}
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        paginatedAllOrdersView.map((ord) => {
+                          const sType = String(ord.service_type || '').toLowerCase();
+                          const isCar = sType === 'mobil' || sType === 'car';
+                          const isSend = sType === 'paket' || sType === 'send' || sType === 'package' || sType === 'food';
+                          const sLabel = isCar ? 'Mobil' : isSend ? 'Paket' : 'Motor';
+                          const orderCode = ord.order_code || ord.booking_code || '#ORD';
+                          const fareFormatted = `Rp ${Number(ord.fare_amount || 15000).toLocaleString('id-ID')}`;
+                          const createdDateStr = ord.created_at
+                            ? new Date(ord.created_at).toLocaleString('id-ID', {
+                                day: 'numeric',
+                                month: 'short',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })
+                            : 'Baru saja';
+
+                          const isCompleted = ord.booking_status === 'completed';
+                          const isCancelled = ord.booking_status === 'cancelled';
+                          const isAssigned = ord.assignment_status === 'assigned';
+
+                          return (
+                            <tr key={ord.id} className="tailadmin-tr">
+                              <td className="tailadmin-td">
+                                <div className="table-cell-meta">
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <span style={{ fontWeight: 800, color: '#0F172A', fontSize: 13.5 }}>
+                                      {orderCode}
+                                    </span>
+                                    <span
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 4,
+                                        fontSize: 11,
+                                        fontWeight: 700,
+                                        padding: '1px 7px',
+                                        borderRadius: 6,
+                                        backgroundColor: isCar ? '#ECFDF5' : isSend ? '#FFF7ED' : '#FDF2F8',
+                                        color: isCar ? '#059669' : isSend ? '#EA580C' : '#DB2777'
+                                      }}
+                                    >
+                                      {isCar ? <Car size={11} /> : isSend ? <Package size={11} /> : <Bike size={11} />}
+                                      {sLabel}
+                                    </span>
+                                  </div>
+                                  <span className="table-secondary-text">{createdDateStr}</span>
+                                </div>
+                              </td>
+
+                              <td className="tailadmin-td">
+                                <div className="table-cell-meta">
+                                  <span className="table-primary-text">{ord.customer_name || 'Pelanggan OTWJek'}</span>
+                                  <span className="table-secondary-text">{ord.customer_phone || '-'}</span>
+                                </div>
+                              </td>
+
+                              <td className="tailadmin-td" style={{ maxWidth: 260 }}>
+                                <div className="table-cell-meta">
+                                  <span
+                                    className="table-primary-text"
+                                    style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                                    title={`Jemput: ${ord.pickup_name || '-'} (${ord.pickup_address || ''})`}
+                                  >
+                                    <MapPin size={12} color="#10B981" strokeWidth={2.5} style={{ flexShrink: 0, marginRight: 4 }} />
+                                    {ord.pickup_name || 'Titik Jemput'}
+                                  </span>
+                                  <span
+                                    className="table-secondary-text"
+                                    style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                                    title={`Tujuan: ${ord.dropoff_name || '-'} (${ord.dropoff_address || ''})`}
+                                  >
+                                    <MapPin size={12} color="#EF4444" strokeWidth={2.5} style={{ flexShrink: 0, marginRight: 4 }} />
+                                    {ord.dropoff_name || 'Titik Tujuan'} ({ord.distance_km || 3.2} km)
+                                  </span>
+                                </div>
+                              </td>
+
+                              <td className="tailadmin-td">
+                                {isAssigned ? (
+                                  <div className="table-cell-meta">
+                                    <span className="table-primary-text" style={{ fontWeight: 600 }}>
+                                      {ord.driver_name || ord.driver?.name || 'Mitra Driver'}
+                                    </span>
+                                    <span className="table-secondary-text">
+                                      {ord.driver_plate || ord.driver?.plateNumber || 'DD - MKS'}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span style={{ fontSize: 12, color: '#94A3B8', fontStyle: 'italic' }}>
+                                    Belum Ada Driver
+                                  </span>
+                                )}
+                              </td>
+
+                              <td className="tailadmin-td">
+                                <div className="table-cell-meta">
+                                  <span className="table-primary-text" style={{ fontWeight: 700 }}>
+                                    {fareFormatted}
+                                  </span>
+                                  <span className="table-secondary-text">
+                                    {(ord.payment_method || 'CASH').toUpperCase()}
+                                  </span>
+                                </div>
+                              </td>
+
+                              <td className="tailadmin-td text-center">
+                                {isCompleted ? (
+                                  <span className="table-status-pill active" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                    <Check size={11} strokeWidth={2.5} /> Selesai
+                                  </span>
+                                ) : isCancelled ? (
+                                  <span className="table-status-pill inactive" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, backgroundColor: '#FEF2F2', color: '#DC2626' }}>
+                                    <X size={11} strokeWidth={2.5} /> Dibatalkan
+                                  </span>
+                                ) : isAssigned ? (
+                                  <span className="table-status-pill active" style={{ backgroundColor: '#EFF6FF', color: '#2563EB', borderColor: '#BFDBFE' }}>
+                                    Berjalan
+                                  </span>
+                                ) : (
+                                  <span className="table-status-pill pending">
+                                    Menunggu
+                                  </span>
+                                )}
+                              </td>
+
+                              <td className="tailadmin-td action-td text-right">
+                                <button
+                                  type="button"
+                                  className="btn-table-icon-action"
+                                  onClick={() => setOrderDetailModalData(ord)}
+                                  title="Lihat Rincian Lengkap Pesanan"
+                                >
+                                  <Eye size={15} />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* TailAdmin Table Footer Pagination All Orders View */}
+                <div className="tailadmin-table-footer">
+                  <div className="table-pagination-info">
+                    Menampilkan{' '}
+                    <strong>
+                      {filteredAllOrders.length === 0
+                        ? 0
+                        : (currentAllOrdersPage - 1) * TABLE_PAGE_SIZE + 1}
+                      {' - '}
+                      {Math.min(currentAllOrdersPage * TABLE_PAGE_SIZE, filteredAllOrders.length)}
+                    </strong>{' '}
+                    dari <strong>{filteredAllOrders.length}</strong> pesanan
+                  </div>
+
+                  <div className="table-pagination-controls">
+                    <button
+                      type="button"
+                      className="btn-pagination-nav"
+                      disabled={currentAllOrdersPage <= 1}
+                      onClick={() => setAllOrdersViewPage((p) => Math.max(1, p - 1))}
+                    >
+                      <ChevronLeft size={15} />
+                      <span>Sebelumnya</span>
+                    </button>
+
+                    <div className="table-pagination-pages">
+                      {renderPaginationPages(currentAllOrdersPage, totalAllOrdersPages, setAllOrdersViewPage)}
+                    </div>
+
+                    <button
+                      type="button"
+                      className="btn-pagination-nav"
+                      disabled={currentAllOrdersPage >= totalAllOrdersPages}
+                      onClick={() => setAllOrdersViewPage((p) => Math.min(totalAllOrdersPages, p + 1))}
+                    >
+                      <span>Berikutnya</span>
+                      <ChevronRight size={15} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </>
+        )}
+
+        {/* ================================================================= */}
         {/* VIEW 2: DATA PELANGGAN (CUSTOMER)                                */}
         {/* ================================================================= */}
         {mainSection === 'customers' && (
@@ -3132,6 +3753,375 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                       disabled={currentCustomersViewPage >= totalCustomersViewPages}
                       onClick={() => setCustomersViewPage((p) => Math.min(totalCustomersViewPages, p + 1))}
                       title="Halaman berikutnya"
+                    >
+                      <span>Berikutnya</span>
+                      <ChevronRight size={15} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </>
+        )}
+
+        {/* ================================================================= */}
+        {/* VIEW 3: PENUGASAN PESANAN PELANGGAN KE DRIVER (ORDER DISPATCH)    */}
+        {/* ================================================================= */}
+        {mainSection === 'orders' && (
+          <>
+            {/* KPI Summary Cards Orders */}
+            <section className="dash-metrics-grid">
+              <div
+                className={`metric-card ${orderTab === 'all' ? 'active' : ''}`}
+                onClick={() => setOrderTab('all')}
+              >
+                <span className="metric-label">Total Pesanan Pelanggan</span>
+                <div className="metric-bottom-row">
+                  <span className="metric-num">{orderCounts.total}</span>
+                  <div className="metric-trend-wrap">
+                    <span className="metric-trend-badge success">Motor, Mobil & Paket</span>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className={`metric-card ${orderTab === 'unassigned' ? 'active' : ''}`}
+                onClick={() => setOrderTab('unassigned')}
+              >
+                <span className="metric-label">Menunggu Penugasan Driver</span>
+                <div className="metric-bottom-row">
+                  <span className="metric-num">{orderCounts.unassigned}</span>
+                  <div className="metric-trend-wrap">
+                    <span className={`metric-trend-badge ${orderCounts.unassigned > 0 ? 'warning' : 'success'}`}>
+                      {orderCounts.unassigned > 0 ? 'Perlu Ditugaskan' : 'Semua Tertugaskan'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className={`metric-card ${orderTab === 'assigned' ? 'active' : ''}`}
+                onClick={() => setOrderTab('assigned')}
+              >
+                <span className="metric-label">Sudah Ditugaskan ke Driver</span>
+                <div className="metric-bottom-row">
+                  <span className="metric-num">{orderCounts.assigned}</span>
+                  <div className="metric-trend-wrap">
+                    <span className="metric-trend-badge success">Aktif Berjalan</span>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className="metric-card"
+                onClick={() => {
+                  setMainSection('drivers');
+                  setDriverTab('approved');
+                }}
+                style={{ cursor: 'pointer' }}
+              >
+                <span className="metric-label">Mitra Driver Siap Tugas</span>
+                <div className="metric-bottom-row">
+                  <span className="metric-num">{driverCounts.approved}</span>
+                  <div className="metric-trend-wrap">
+                    <span className="metric-trend-badge success">Disetujui Admin</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Filter and Search Bar Orders */}
+            <section className="dash-filter-row" style={{ flexWrap: 'wrap', gap: 12 }}>
+              <div className="dash-tabs">
+                <button
+                  className={`dash-tab-btn ${orderTab === 'all' ? 'active' : ''}`}
+                  onClick={() => setOrderTab('all')}
+                >
+                  Semua Pesanan ({orderCounts.total})
+                </button>
+                <button
+                  className={`dash-tab-btn ${orderTab === 'unassigned' ? 'active' : ''}`}
+                  onClick={() => setOrderTab('unassigned')}
+                >
+                  Belum Ditugaskan ({orderCounts.unassigned})
+                </button>
+                <button
+                  className={`dash-tab-btn ${orderTab === 'assigned' ? 'active' : ''}`}
+                  onClick={() => setOrderTab('assigned')}
+                >
+                  Sudah Ditugaskan ({orderCounts.assigned})
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flex: 1, justifyContent: 'flex-end' }}>
+                <div className="assign-select-wrap">
+                  <select
+                    className="assign-select-filter"
+                    value={orderServiceFilter}
+                    onChange={(e) => setOrderServiceFilter(e.target.value)}
+                  >
+                    <option value="all">Semua Layanan</option>
+                    <option value="motor">Motor (SheRide)</option>
+                    <option value="mobil">Mobil (SheCar)</option>
+                    <option value="paket">Paket (SheSend)</option>
+                  </select>
+                  <ChevronDown size={14} className="assign-select-icon" />
+                </div>
+
+                <div className="dash-search-box" style={{ minWidth: 260 }}>
+                  <Search size={16} className="search-icon" />
+                  <input
+                    type="text"
+                    placeholder="Cari kode pesanan, pelanggan, alamat, atau driver..."
+                    value={orderSearchQuery}
+                    onChange={(e) => setOrderSearchQuery(e.target.value)}
+                  />
+                  {orderSearchQuery && (
+                    <button
+                      type="button"
+                      className="btn-clear-search"
+                      onClick={() => setOrderSearchQuery('')}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            {/* Orders Table Section */}
+            <section className="dash-customer-list-section">
+              <div className="overview-split-card tailadmin-table-card">
+                <div className="tailadmin-table-responsive">
+                  <table className="tailadmin-project-table">
+                    <thead>
+                      <tr className="tailadmin-th-row">
+                        <th className="tailadmin-th text-left">Kode & Layanan</th>
+                        <th className="tailadmin-th text-left">Pelanggan</th>
+                        <th className="tailadmin-th text-left">Rute Jemput & Tujuan</th>
+                        <th className="tailadmin-th text-left">Mitra Driver Ditugaskan</th>
+                        <th className="tailadmin-th text-right">Aksi Penugasan</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredOrders.length === 0 ? (
+                        <tr>
+                          <td colSpan="5" className="table-empty-td">
+                            <div className="table-empty-content">
+                              <Package size={28} className="empty-icon" />
+                              <span>
+                                {orderSearchQuery
+                                  ? `Tidak ditemukan pesanan yang cocok dengan "${orderSearchQuery}".`
+                                  : 'Belum ada pesanan pelanggan yang masuk.'}
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        paginatedOrdersView.map((ord) => {
+                          const sType = String(ord.service_type || '').toLowerCase();
+                          const isCar = sType === 'mobil' || sType === 'car';
+                          const isSend = sType === 'paket' || sType === 'send' || sType === 'package' || sType === 'food';
+                          const sLabel = isCar ? 'Mobil' : isSend ? 'Paket' : 'Motor';
+                          const isAssigned = ord.assignment_status === 'assigned';
+                          const orderCode = ord.order_code || ord.booking_code || '#ORD';
+                          const fareFormatted = `Rp ${Number(ord.fare_amount || 15000).toLocaleString('id-ID')}`;
+                          const createdDateStr = ord.created_at
+                            ? new Date(ord.created_at).toLocaleString('id-ID', {
+                                day: 'numeric',
+                                month: 'short',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })
+                            : 'Baru saja';
+
+                          return (
+                            <tr key={ord.id} className="tailadmin-tr">
+                              <td className="tailadmin-td">
+                                <div className="table-cell-meta">
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <span style={{ fontWeight: 800, color: '#EE4335', fontSize: 13.5 }}>
+                                      {orderCode}
+                                    </span>
+                                    <span
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 4,
+                                        fontSize: 11.5,
+                                        fontWeight: 700,
+                                        padding: '2px 8px',
+                                        borderRadius: 8,
+                                        backgroundColor: isCar ? '#ECFDF5' : isSend ? '#FFF7ED' : '#FDF2F8',
+                                        color: isCar ? '#059669' : isSend ? '#EA580C' : '#DB2777'
+                                      }}
+                                    >
+                                      {isCar ? <Car size={12} /> : isSend ? <Package size={12} /> : <Bike size={12} />}
+                                      {sLabel}
+                                    </span>
+                                  </div>
+                                  <span className="table-secondary-text">
+                                    {createdDateStr} • {fareFormatted} ({(ord.payment_method || 'cash').toUpperCase()})
+                                  </span>
+                                </div>
+                              </td>
+
+                              <td className="tailadmin-td">
+                                <div className="table-cell-meta">
+                                  <span className="table-primary-text">
+                                    {ord.customer_name || 'Pelanggan OTWJek'}
+                                  </span>
+                                  <span className="table-secondary-text">
+                                    {ord.customer_phone || '-'}
+                                    {isSend && ord.package_info?.recipientName
+                                      ? ` → Penerima: ${ord.package_info.recipientName}`
+                                      : ''}
+                                  </span>
+                                </div>
+                              </td>
+
+                              <td className="tailadmin-td" style={{ maxWidth: 280 }}>
+                                <div className="table-cell-meta">
+                                  <span
+                                    className="table-primary-text"
+                                    style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                                    title={`Jemput: ${ord.pickup_name || '-'} (${ord.pickup_address || ''})`}
+                                  >
+                                    <MapPin size={13} color="#10B981" strokeWidth={2.5} style={{ flexShrink: 0, marginRight: 5 }} />
+                                    {ord.pickup_name || 'Titik Jemput'}
+                                  </span>
+                                  <span
+                                    className="table-secondary-text"
+                                    style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                                    title={`Tujuan: ${ord.dropoff_name || '-'} (${ord.dropoff_address || ''})`}
+                                  >
+                                    <MapPin size={13} color="#EF4444" strokeWidth={2.5} style={{ flexShrink: 0, marginRight: 5 }} />
+                                    {ord.dropoff_name || 'Titik Tujuan'} ({ord.distance_km || 3.2} km)
+                                  </span>
+                                </div>
+                              </td>
+
+                              <td className="tailadmin-td">
+                                {isAssigned ? (
+                                  <div className="table-cell-meta">
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                      <span className="table-primary-text" style={{ color: '#059669', fontWeight: 700 }}>
+                                        {ord.driver_name || ord.driver?.name || 'Mitra Driver'}
+                                      </span>
+                                      <span className="table-status-pill active" style={{ fontSize: 10.5, padding: '1px 7px' }}>
+                                        Ditugaskan
+                                      </span>
+                                    </div>
+                                    <span className="table-secondary-text">
+                                      {ord.driver_plate || ord.driver?.plateNumber || 'DD - MKS'} • {ord.driver_vehicle || ord.driver?.vehicleModel || 'Mitra Resmi'}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="table-cell-meta">
+                                    <span className="table-status-pill pending">
+                                      Belum Ditugaskan
+                                    </span>
+                                    <span className="table-secondary-text" style={{ marginTop: 3 }}>
+                                      Pilih driver aktif untuk mengambil order
+                                    </span>
+                                  </div>
+                                )}
+                              </td>
+
+                              <td className="tailadmin-td action-td text-right">
+                                <div className="table-action-group" style={{ justifyContent: 'flex-end', gap: 6 }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setAssignModalOrder(ord);
+                                      setAssignDriverSearch('');
+                                      setAssignVehicleFilter('recommended');
+                                    }}
+                                    style={{
+                                      backgroundColor: isAssigned ? '#F1F5F9' : '#EE4335',
+                                      color: isAssigned ? '#334155' : '#FFFFFF',
+                                      border: isAssigned ? '1px solid #CBD5E1' : 'none',
+                                      borderRadius: 8,
+                                      padding: '6px 12px',
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 5
+                                    }}
+                                  >
+                                    <UserCheck size={14} />
+                                    <span>{isAssigned ? 'Ganti Driver' : 'Tugaskan Driver'}</span>
+                                  </button>
+
+                                  {isAssigned && (ord.driver_phone || ord.driver?.phone) && (
+                                    <a
+                                      href={buildDriverTaskWhatsAppUrl(ord, ord.driver)}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      title="Kirim rincian tugas pesanan ke WhatsApp Driver"
+                                      style={{
+                                        backgroundColor: '#10B981',
+                                        color: '#FFFFFF',
+                                        borderRadius: 8,
+                                        padding: '6px 10px',
+                                        fontSize: 12,
+                                        fontWeight: 700,
+                                        textDecoration: 'none',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 4
+                                      }}
+                                    >
+                                      <span>WA Driver</span>
+                                      <ExternalLink size={12} />
+                                    </a>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* TailAdmin Table Footer Pagination Orders View */}
+                <div className="tailadmin-table-footer">
+                  <div className="table-pagination-info">
+                    Menampilkan{' '}
+                    <strong>
+                      {filteredOrders.length === 0
+                        ? 0
+                        : (currentOrdersViewPage - 1) * TABLE_PAGE_SIZE + 1}
+                      {' - '}
+                      {Math.min(currentOrdersViewPage * TABLE_PAGE_SIZE, filteredOrders.length)}
+                    </strong>{' '}
+                    dari <strong>{filteredOrders.length}</strong> pesanan
+                  </div>
+
+                  <div className="table-pagination-controls">
+                    <button
+                      type="button"
+                      className="btn-pagination-nav"
+                      disabled={currentOrdersViewPage <= 1}
+                      onClick={() => setOrdersViewPage((p) => Math.max(1, p - 1))}
+                    >
+                      <ChevronLeft size={15} />
+                      <span>Sebelumnya</span>
+                    </button>
+
+                    <div className="table-pagination-pages">
+                      {renderPaginationPages(currentOrdersViewPage, totalOrdersViewPages, setOrdersViewPage)}
+                    </div>
+
+                    <button
+                      type="button"
+                      className="btn-pagination-nav"
+                      disabled={currentOrdersViewPage >= totalOrdersViewPages}
+                      onClick={() => setOrdersViewPage((p) => Math.min(totalOrdersViewPages, p + 1))}
                     >
                       <span>Berikutnya</span>
                       <ChevronRight size={15} />
@@ -4005,6 +4995,731 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
           </div>
         </div>
       )}
+
+      {/* ================================================================= */}
+      {/* MODAL 8: PILIH & TUGASKAN MITRA DRIVER PADA PESANAN PELANGGAN     */}
+      {/* ================================================================= */}
+      {assignModalOrder && (
+        <div className="admin-modal-backdrop" onClick={() => setAssignModalOrder(null)}>
+          <div
+            className="admin-modal-dialog assign-dialog-clean"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Clean Header without oversized alert box */}
+            <div className="assign-dialog-header">
+              <div className="assign-header-left">
+                <div className="assign-header-title-row">
+                  <h3 className="assign-header-title">Tugaskan Mitra Driver</h3>
+                </div>
+                <p className="assign-header-sub">
+                  Pelanggan: <strong>{assignModalOrder.customer_name || 'Pelanggan OTWJek'}</strong> • Layanan: <strong>{assignModalOrder.service_name || (assignModalOrder.service_type === 'mobil' ? 'OTWMobil' : assignModalOrder.service_type === 'paket' ? 'OTWPaket' : 'OTWMotor')}</strong>
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn-close-dialog"
+                onClick={() => setAssignModalOrder(null)}
+                title="Tutup"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="assign-body-clean">
+              {/* Order Route & Info Card */}
+              <div className="assign-order-card">
+                <div className="assign-order-card-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span className={`assign-service-tag ${(assignModalOrder.service_type || 'motor').toLowerCase()}`}>
+                      {assignModalOrder.service_type === 'mobil' ? (
+                        <Car size={13} strokeWidth={2.2} />
+                      ) : assignModalOrder.service_type === 'paket' ? (
+                        <Package size={13} strokeWidth={2.2} />
+                      ) : (
+                        <Bike size={13} strokeWidth={2.2} />
+                      )}
+                      <span>{assignModalOrder.service_name || (assignModalOrder.service_type === 'mobil' ? 'OTWMobil' : assignModalOrder.service_type === 'paket' ? 'OTWPaket' : 'OTWMotor')}</span>
+                    </span>
+                    <span className="assign-order-distance">
+                      {assignModalOrder.distance_km || 3.2} km
+                    </span>
+                  </div>
+                  <div className="assign-price-wrap">
+                    <span className="assign-price-val">
+                      Rp {Number(assignModalOrder.fare_amount || 15000).toLocaleString('id-ID')}
+                    </span>
+                    <span className="assign-pay-badge">
+                      {(assignModalOrder.payment_method || 'CASH').toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Route Stations Timeline */}
+                <div className="assign-route-timeline">
+                  <div className="assign-station-row">
+                    <span className="assign-station-dot pickup" />
+                    <div className="assign-station-info">
+                      <div className="assign-station-name">{assignModalOrder.pickup_name}</div>
+                      <div className="assign-station-address">{assignModalOrder.pickup_address || '-'}</div>
+                    </div>
+                  </div>
+                  <div className="assign-station-row">
+                    <span className="assign-station-dot dropoff" />
+                    <div className="assign-station-info">
+                      <div className="assign-station-name">{assignModalOrder.dropoff_name}</div>
+                      <div className="assign-station-address">{assignModalOrder.dropoff_address || '-'}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Package extra details if any */}
+                {assignModalOrder.package_info && (
+                  <div className="assign-package-meta">
+                    <span className="assign-package-badge">
+                      <Package size={12} strokeWidth={2.2} />
+                      <span>{assignModalOrder.package_info.itemName || assignModalOrder.package_info.category || 'Barang'} ({assignModalOrder.package_info.size || 'M'})</span>
+                    </span>
+                    <span>• Penerima: <strong>{assignModalOrder.package_info.recipientName || '-'}</strong> ({assignModalOrder.package_info.recipientPhone || '-'})</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Filter & Search Bar */}
+              <div className="assign-filter-row">
+                <div className="assign-search-wrap">
+                  <Search size={15} className="assign-search-icon" />
+                  <input
+                    type="text"
+                    className="assign-search-input"
+                    placeholder="Cari nama driver, plat, atau wilayah..."
+                    value={assignDriverSearch}
+                    onChange={(e) => setAssignDriverSearch(e.target.value)}
+                  />
+                  {assignDriverSearch && (
+                    <button
+                      type="button"
+                      className="assign-clear-btn"
+                      onClick={() => setAssignDriverSearch('')}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+                <div className="assign-select-wrap">
+                  <select
+                    className="assign-select-filter"
+                    value={assignVehicleFilter}
+                    onChange={(e) => setAssignVehicleFilter(e.target.value)}
+                  >
+                    <option value="recommended">Sesuai Armada</option>
+                    <option value="all">Semua Driver Aktif</option>
+                  </select>
+                  <ChevronDown size={14} className="assign-select-icon" />
+                </div>
+              </div>
+
+              {/* Approved Drivers List */}
+              {(() => {
+                const approvedList = drivers.filter((d) => (d.verification_status || 'approved') === 'approved');
+                const orderNeedsCar =
+                  assignModalOrder.service_type === 'mobil' ||
+                  assignModalOrder.service_type === 'car' ||
+                  String(assignModalOrder.package_info?.vehicleType || '').toLowerCase().includes('mobil');
+
+                let candidateDrivers = approvedList.filter((d) => {
+                  if (assignVehicleFilter === 'recommended') {
+                    const dIsCar = (d.vehicleType || '').toLowerCase() === 'mobil';
+                    return orderNeedsCar ? dIsCar : !dIsCar;
+                  }
+                  return true;
+                });
+
+                if (candidateDrivers.length === 0 && approvedList.length > 0 && assignVehicleFilter === 'recommended') {
+                  candidateDrivers = approvedList;
+                }
+
+                if (assignDriverSearch.trim()) {
+                  const q = assignDriverSearch.toLowerCase().trim();
+                  candidateDrivers = candidateDrivers.filter(
+                    (d) =>
+                      d.name?.toLowerCase().includes(q) ||
+                      d.plateNumber?.toLowerCase().includes(q) ||
+                      d.phone?.toLowerCase().includes(q) ||
+                      d.operationalArea?.toLowerCase().includes(q)
+                  );
+                }
+
+                if (approvedList.length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', padding: '24px 16px', color: '#64748B', fontSize: 13 }}>
+                      <p style={{ margin: '0 0 10px' }}>
+                        Belum ada akun Mitra Driver yang berstatus <strong>Disetujui (Approved)</strong>.
+                      </p>
+                      <button
+                        type="button"
+                        className="btn-dialog-confirm-approve"
+                        onClick={() => {
+                          setAssignModalOrder(null);
+                          setMainSection('drivers');
+                        }}
+                      >
+                        Buka Menu Verifikasi Driver
+                      </button>
+                    </div>
+                  );
+                }
+
+                if (candidateDrivers.length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', padding: '24px 12px', color: '#64748B', fontSize: 13, backgroundColor: '#F8FAFC', borderRadius: 10 }}>
+                      Tidak ada driver aktif yang cocok dengan pencarian "{assignDriverSearch}".
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="assign-drivers-list">
+                    {candidateDrivers.map((drv) => {
+                      const isCurrentlyAssigned =
+                        assignModalOrder.assignment_status === 'assigned' &&
+                        assignModalOrder.driver_id === drv.id;
+
+                      const isCar = (drv.vehicleType || '').toLowerCase() === 'mobil';
+
+                      return (
+                        <div
+                          key={drv.id}
+                          className={`assign-driver-card ${isCurrentlyAssigned ? 'is-assigned' : ''}`}
+                        >
+                          <div className="assign-driver-left">
+                            <img
+                              src={drv.avatar || driverPlaceholder}
+                              alt={drv.name}
+                              className="assign-driver-avatar"
+                              onError={(e) => {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.src = driverPlaceholder;
+                              }}
+                            />
+                            <div className="assign-driver-info">
+                              <div className="assign-driver-name-row">
+                                <span className="assign-driver-name">{drv.name}</span>
+                                <span className={`assign-veh-badge ${isCar ? 'mobil' : 'motor'}`}>
+                                  {isCar ? 'Mobil' : 'Motor'}
+                                </span>
+                                {isCurrentlyAssigned && (
+                                  <span className="assign-status-assigned-pill">
+                                    <Check size={11} strokeWidth={2.8} /> Ditugaskan
+                                  </span>
+                                )}
+                              </div>
+                              <div className="assign-driver-meta-row">
+                                <span className="assign-plate-text">{drv.plateNumber || 'DD - MKS'}</span>
+                                <span className="assign-meta-divider">•</span>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                  <Phone size={11} strokeWidth={2} />
+                                  {drv.phone || '-'}
+                                </span>
+                              </div>
+                              {drv.operationalArea && (
+                                <div className="assign-driver-area-row" title={drv.operationalArea}>
+                                  <MapPin size={11} strokeWidth={2} style={{ flexShrink: 0 }} />
+                                  <span>{drv.operationalArea}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="assign-driver-actions">
+                            {isCurrentlyAssigned ? (
+                              <>
+                                <button
+                                  type="button"
+                                  className="btn-assign-icon-secondary"
+                                  onClick={() => handleAssignDriverToOrder(assignModalOrder, drv, false)}
+                                  title="Tugaskan Ulang driver ini"
+                                  aria-label="Tugaskan Ulang"
+                                >
+                                  <RotateCw size={15} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-assign-icon-wa"
+                                  onClick={() => handleAssignDriverToOrder(assignModalOrder, drv, true)}
+                                  title="Hubungi Driver & Kirim Info Pesanan via WhatsApp"
+                                  aria-label="Hubungi Driver via WhatsApp"
+                                >
+                                  <MessageCircle size={16} />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  className="btn-assign-icon-primary"
+                                  onClick={() => handleAssignDriverToOrder(assignModalOrder, drv, false)}
+                                  title="Tugaskan pesanan ke driver ini"
+                                  aria-label="Tugaskan Driver"
+                                >
+                                  <UserCheck size={16} strokeWidth={2.2} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-assign-icon-wa outline"
+                                  onClick={() => handleAssignDriverToOrder(assignModalOrder, drv, true)}
+                                  title="Tugaskan & Kirim Langsung via WhatsApp"
+                                  aria-label="Tugaskan dan kirim WhatsApp"
+                                >
+                                  <MessageCircle size={15} />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="dialog-footer" style={{ padding: '12px 24px', backgroundColor: '#F8FAFC', borderTop: '1px solid #F1F5F9' }}>
+              <button
+                type="button"
+                className="btn-dialog-cancel"
+                onClick={() => setAssignModalOrder(null)}
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* MODAL 9: DETAIL LENGKAP PESANAN PELANGGAN (SESUAI REFERENSI RECEIPT) */}
+      {/* ================================================================= */}
+      {orderDetailModalData && (() => {
+        const ord = orderDetailModalData;
+        const isPackage = String(ord.service_type || '').toLowerCase() === 'paket' || Boolean(ord.package_info);
+        const isCar = String(ord.service_type || '').toLowerCase() === 'mobil';
+        const serviceDisplayName = isCar ? 'Mobil' : isPackage ? 'Paket' : 'Motor';
+        
+        const fare = Number(ord.fare_amount || 17000);
+        const platformFee = 2000;
+        const tripFare = Math.max(0, fare - platformFee);
+
+        const orderDateObj = ord.created_at ? new Date(ord.created_at) : new Date();
+        const durationMin = Number(ord.duration_minutes || (ord.distance_km ? Math.round(ord.distance_km * 2) : 15));
+        const dropoffDateObj = new Date(orderDateObj.getTime() + durationMin * 60000);
+
+        const formatClock = (d) =>
+          d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':');
+        
+        const pickupClock = ord.timeline?.pickedUp || ord.timeline?.received || formatClock(orderDateObj);
+        const dropoffClock = ord.timeline?.completed || formatClock(dropoffDateObj);
+
+        const orderCode = ord.order_code || ord.booking_code || '#NP3S';
+        const orderNum = ord.order_number || ('3301447' + Date.now().toString().slice(-12));
+
+        const isCash = (ord.payment_method || 'cash').toLowerCase() === 'cash';
+
+        const driverDisplay = ord.driver_name || ord.driver?.name
+          ? `${ord.driver_name || ord.driver?.name}${ord.driver_plate || ord.driver?.plateNumber ? ` • ${ord.driver_plate || ord.driver?.plateNumber}` : ''}`
+          : 'Menunggu Penugasan Admin';
+
+        const handleCopyNumber = () => {
+          navigator.clipboard.writeText(orderNum);
+          setAdminCopiedOrderNum(true);
+          setTimeout(() => setAdminCopiedOrderNum(false), 2000);
+        };
+
+        return (
+          <div className="admin-modal-backdrop" onClick={() => setOrderDetailModalData(null)}>
+            <div
+              className="admin-modal-dialog"
+              style={{
+                maxWidth: 480,
+                width: '95%',
+                borderRadius: 16,
+                overflow: 'hidden',
+                backgroundColor: '#FFFFFF',
+                boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)',
+                display: 'flex',
+                flexDirection: 'column',
+                maxHeight: '90vh'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header Modal */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '16px 20px',
+                  borderBottom: '1px solid #F1F5F9',
+                  backgroundColor: '#FFFFFF'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0F172A' }}>
+                    Rincian Pesanan
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  className="btn-close-dialog"
+                  onClick={() => setOrderDetailModalData(null)}
+                  title="Tutup"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Body Modal: Exact Customer Receipt Flow matching reference */}
+              <div style={{ overflowY: 'auto', flex: 1, backgroundColor: '#FFFFFF' }}>
+                <div className="customer-detail-flow">
+                  {/* 1. Rute Perjalanan */}
+                  <section className="customer-card-section">
+                    <div className="customer-section-header">
+                      <span className="customer-section-title">
+                        {isPackage ? 'Rute Pengambilan & Pengantaran Paket' : 'Rute Perjalanan'}
+                      </span>
+                      <span className="customer-route-summary">
+                        {ord.distance_km || 3.9} km (~{durationMin} mnt)
+                      </span>
+                    </div>
+
+                    <div className="customer-route-box">
+                      {/* Titik Jemput */}
+                      <div className="customer-route-item pickup-step">
+                        <div className="customer-pin-column">
+                          <div className="customer-pin-icon pickup">
+                            <MapPin size={15} strokeWidth={2.4} />
+                          </div>
+                          <div className="track-vertical-line" aria-hidden="true" />
+                        </div>
+                        <div className="customer-point-details pickup-details">
+                          {isPackage && (
+                            <span className="package-step-badge pickup">Lokasi Pengambilan (Pengirim)</span>
+                          )}
+                          <div className="point-title-row">
+                            <span className="point-title">{ord.pickup_name || 'Titik Jemput'}</span>
+                            <span className="point-time-tag">{pickupClock}</span>
+                          </div>
+                          <p className="point-address">{ord.pickup_address || '-'}</p>
+                          {isPackage && ord.package_info?.senderName && (
+                            <p className="point-contact-sub">
+                              Pengirim: <strong>{ord.package_info.senderName}</strong>
+                              {ord.package_info.senderPhone ? ` (${ord.package_info.senderPhone})` : ''}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Titik Dropoff */}
+                      <div className="customer-route-item dropoff-step">
+                        <div className="customer-pin-column">
+                          <div className="customer-pin-icon dropoff">
+                            <MapPin size={15} strokeWidth={2.4} />
+                          </div>
+                        </div>
+                        <div className="customer-point-details">
+                          {isPackage && (
+                            <span className="package-step-badge dropoff">Lokasi Pengantaran (Penerima)</span>
+                          )}
+                          <div className="point-title-row">
+                            <span className="point-title">{ord.dropoff_name || 'Titik Tujuan'}</span>
+                            <span className="point-time-tag completed">{dropoffClock}</span>
+                          </div>
+                          <p className="point-address">{ord.dropoff_address || '-'}</p>
+                          {isPackage && ord.package_info?.recipientName && (
+                            <p className="point-contact-sub">
+                              Penerima: <strong>{ord.package_info.recipientName}</strong>
+                              {ord.package_info.recipientPhone ? ` (${ord.package_info.recipientPhone})` : ''}
+                              {ord.package_info.floorUnit ? ` • Unit: ${ord.package_info.floorUnit}` : ''}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* 2. Detail Paket & Pengiriman jika Paket */}
+                  {isPackage && ord.package_info && (
+                    <>
+                      <div className="order-section-divider" />
+                      <section className="customer-card-section">
+                        <div className="customer-section-header">
+                          <div className="title-with-icon">
+                            <Package size={17} className="title-icon" />
+                            <span className="customer-section-title">Detail Paket & Pengiriman</span>
+                          </div>
+                          <span className="customer-package-type-badge">
+                            {ord.package_info.category || 'Paket'}
+                          </span>
+                        </div>
+
+                        <div className="package-detail-card-list">
+                          {ord.package_info.senderName && (
+                            <div className="package-detail-row">
+                              <span className="package-detail-label">Pengirim</span>
+                              <span className="package-detail-value">
+                                <strong>{ord.package_info.senderName}</strong>
+                                {ord.package_info.senderPhone && (
+                                  <span className="package-detail-sub"> ({ord.package_info.senderPhone})</span>
+                                )}
+                              </span>
+                            </div>
+                          )}
+
+                          {ord.package_info.recipientName && (
+                            <div className="package-detail-row">
+                              <span className="package-detail-label">Penerima</span>
+                              <span className="package-detail-value">
+                                <strong>{ord.package_info.recipientName}</strong>
+                                {ord.package_info.recipientPhone && (
+                                  <span className="package-detail-sub"> ({ord.package_info.recipientPhone})</span>
+                                )}
+                              </span>
+                            </div>
+                          )}
+
+                          {(ord.package_info.itemName || ord.package_info.category) && (
+                            <div className="package-detail-row">
+                              <span className="package-detail-label">Jenis Barang</span>
+                              <span className="package-detail-value">
+                                {ord.package_info.itemName || ord.package_info.category}
+                              </span>
+                            </div>
+                          )}
+
+                          <div className="package-detail-row">
+                            <span className="package-detail-label">Ukuran & Berat</span>
+                            <span className="package-detail-value">
+                              {ord.package_info.size || 'M'}
+                              {ord.package_info.weight ? ` • ${ord.package_info.weight} kg` : ''}
+                            </span>
+                          </div>
+
+                          {ord.package_info.notes && (
+                            <div className="package-detail-note-bar">
+                              <span className="package-note-bar-label">Catatan</span>
+                              <span className="package-note-bar-val">{ord.package_info.notes}</span>
+                            </div>
+                          )}
+                        </div>
+                      </section>
+                    </>
+                  )}
+
+                  {/* Section Divider Strip */}
+                  <div className="order-section-divider" />
+
+                  {/* 3. Rincian Pembayaran */}
+                  <section className="customer-card-section">
+                    <div className="customer-section-header">
+                      <div className="title-with-icon">
+                        <Receipt size={17} className="title-icon" />
+                        <span className="customer-section-title">Rincian Pembayaran</span>
+                      </div>
+                      <span className="customer-payment-badge success">
+                        <Check size={12} strokeWidth={2.5} /> Lunas
+                      </span>
+                    </div>
+
+                    <div className="customer-pricing-list">
+                      <div className="customer-price-row">
+                        <span className="price-item-label">
+                          {isPackage ? 'Ongkos Kirim Paket' : 'Tarif Perjalanan'}
+                        </span>
+                        <span className="price-item-value">
+                          Rp {tripFare.toLocaleString('id-ID')}
+                        </span>
+                      </div>
+
+                      <div className="customer-price-row">
+                        <span className="price-item-label">Biaya Layanan & Aplikasi</span>
+                        <span className="price-item-value">Rp {platformFee.toLocaleString('id-ID')}</span>
+                      </div>
+
+                      <div className="customer-pricing-divider" />
+
+                      <div className="customer-price-row total">
+                        <span className="price-item-label bold">Total Pembayaran</span>
+                        <span className="price-item-value total-bold">
+                          Rp {fare.toLocaleString('id-ID')}
+                        </span>
+                      </div>
+
+                      <div className="customer-payment-method-bar">
+                        <div className="method-left">
+                          {isCash ? (
+                            <Banknote size={16} color="#059669" />
+                          ) : (
+                            <QrCode size={16} color="#2563EB" />
+                          )}
+                          <span className="method-name">
+                            {isCash ? 'Tunai (Cash)' : 'QRIS / OTWPay'}
+                          </span>
+                        </div>
+                        <span className="method-status-tag">Lunas</span>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Section Divider Strip */}
+                  <div className="order-section-divider" />
+
+                  {/* 4. Informasi Pesanan */}
+                  <section className="customer-card-section">
+                    <div className="customer-section-header">
+                      <span className="customer-section-title">Informasi Pesanan</span>
+                    </div>
+
+                    <div className="customer-info-list">
+                      <div className="customer-info-row">
+                        <span className="info-row-label">Layanan</span>
+                        <span className="order-number-val" style={{ fontWeight: 600, color: '#111827' }}>
+                          {serviceDisplayName}
+                        </span>
+                      </div>
+
+                      <div className="customer-info-row">
+                        <span className="info-row-label">Mitra Driver</span>
+                        <span
+                          className="order-number-val"
+                          style={{
+                            fontWeight: 600,
+                            color: ord.assignment_status === 'assigned' ? '#059669' : '#D97706',
+                            textAlign: 'right'
+                          }}
+                        >
+                          {driverDisplay}
+                        </span>
+                      </div>
+
+                      <div className="customer-info-row">
+                        <span className="info-row-label">Kode Pesanan</span>
+                        <span className="order-number-val" style={{ fontWeight: 700, color: '#EE4335' }}>
+                          {orderCode}
+                        </span>
+                      </div>
+
+                      <div className="customer-info-row">
+                        <span className="info-row-label">No. Pesanan</span>
+                        <div className="info-row-right">
+                          <span className="order-number-val">{orderNum}</span>
+                          <button
+                            type="button"
+                            className="btn-copy-order-number"
+                            onClick={handleCopyNumber}
+                            aria-label="Salin nomor pesanan"
+                          >
+                            {adminCopiedOrderNum ? (
+                              <span className="copied-label">
+                                <CheckCheck size={14} /> Tersalin
+                              </span>
+                            ) : (
+                              <span>Salin</span>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="customer-info-row">
+                        <span className="info-row-label">Waktu Pemesanan</span>
+                        <span className="info-row-val">
+                          {orderDateObj.toLocaleDateString('id-ID', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                          })}, {pickupClock}
+                        </span>
+                      </div>
+
+                      <div className="customer-info-row">
+                        <span className="info-row-label">Waktu Tiba</span>
+                        <span className="info-row-val">
+                          {dropoffDateObj.toLocaleDateString('id-ID', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                          })}, {dropoffClock}
+                        </span>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              </div>
+
+              {/* Modal Footer Controls */}
+              <div
+                style={{
+                  padding: '14px 20px',
+                  backgroundColor: '#F8FAFC',
+                  borderTop: '1px solid #E2E8F0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 8,
+                  flexWrap: 'wrap'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {ord.booking_status !== 'completed' && (
+                    <button
+                      type="button"
+                      style={{
+                        height: 34,
+                        padding: '0 12px',
+                        borderRadius: 8,
+                        border: 'none',
+                        backgroundColor: '#10B981',
+                        color: '#FFFFFF',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => handleUpdateOrderStatus(ord.id, 'completed', 'Diselesaikan oleh Admin')}
+                    >
+                      Tandai Selesai
+                    </button>
+                  )}
+                  {ord.booking_status !== 'cancelled' && (
+                    <button
+                      type="button"
+                      style={{
+                        height: 34,
+                        padding: '0 12px',
+                        borderRadius: 8,
+                        border: '1px solid #FECACA',
+                        backgroundColor: '#FFFFFF',
+                        color: '#DC2626',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => handleUpdateOrderStatus(ord.id, 'cancelled', 'Dibatalkan oleh Admin')}
+                    >
+                      Batalkan Pesanan
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  className="btn-dialog-cancel"
+                  onClick={() => setOrderDetailModalData(null)}
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Floating Toast Notification */}
       {toastMessage && (

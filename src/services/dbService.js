@@ -903,16 +903,49 @@ export const dbService = {
             phone: '085255655084'
           };
 
-      const assignedDriver = rideData.driver || {
-        id: rideData.driverId || defaultDriver.id,
-        name: rideData.driverName || defaultDriver.name,
-        rating: rideData.driverRating || defaultDriver.rating,
-        tripsCount: rideData.driverTrips || defaultDriver.tripsCount,
-        vehicleType: rideData.vehicleType || defaultDriver.vehicleType,
-        vehicleModel: rideData.vehicleModel || defaultDriver.vehicleModel,
-        plateNumber: rideData.plateNumber || defaultDriver.plateNumber,
-        phone: rideData.driverPhone || defaultDriver.phone
-      };
+      const existingIdx = rideData.id ? bookings.findIndex((b) => b.id === rideData.id) : -1;
+      const existingBooking = existingIdx !== -1 ? bookings[existingIdx] : null;
+
+      const hasExplicitDriver = Boolean(
+        rideData.driver?.id ||
+        rideData.driverId ||
+        existingBooking?.assignment_status === 'assigned'
+      );
+
+      const sourceDriver = rideData.driver || (existingBooking?.assignment_status === 'assigned' ? existingBooking.driver : null);
+
+      const assignedDriver = sourceDriver
+        ? {
+            id: sourceDriver.id || rideData.driverId || defaultDriver.id,
+            user_id: sourceDriver.user_id || existingBooking?.driver_user_id || null,
+            name: sourceDriver.name || rideData.driverName || defaultDriver.name,
+            rating: sourceDriver.rating || rideData.driverRating || defaultDriver.rating,
+            tripsCount: sourceDriver.tripsCount
+              ? typeof sourceDriver.tripsCount === 'number'
+                ? `${sourceDriver.tripsCount}+ perjalanan`
+                : sourceDriver.tripsCount
+              : defaultDriver.tripsCount,
+            vehicleType: sourceDriver.vehicleType || rideData.vehicleType || defaultDriver.vehicleType,
+            vehicleModel:
+              sourceDriver.vehicleModel ||
+              `${sourceDriver.vehicleBrand || ''} ${sourceDriver.vehicleColor ? `(${sourceDriver.vehicleColor})` : ''}`.trim() ||
+              defaultDriver.vehicleModel,
+            plateNumber: sourceDriver.plateNumber || rideData.plateNumber || defaultDriver.plateNumber,
+            phone: sourceDriver.phone || rideData.driverPhone || defaultDriver.phone,
+            avatar: sourceDriver.avatar || null
+          }
+        : {
+            id: rideData.driverId || defaultDriver.id,
+            user_id: null,
+            name: rideData.driverName || defaultDriver.name,
+            rating: rideData.driverRating || defaultDriver.rating,
+            tripsCount: rideData.driverTrips || defaultDriver.tripsCount,
+            vehicleType: rideData.vehicleType || defaultDriver.vehicleType,
+            vehicleModel: rideData.vehicleModel || defaultDriver.vehicleModel,
+            plateNumber: rideData.plateNumber || defaultDriver.plateNumber,
+            phone: rideData.driverPhone || defaultDriver.phone,
+            avatar: null
+          };
 
       const resolvedPickupName = rideData.pickup?.name || rideData.pickupName || 'Titik Penjemputan';
       const resolvedPickupAddress = rideData.pickup?.address || rideData.pickupAddress || resolvedPickupName;
@@ -920,20 +953,24 @@ export const dbService = {
       const resolvedDropoffAddress = rideData.dropoff?.address || rideData.dropoffAddress || (sType === 'mobil' ? 'Mandai, Maros, Makassar' : sType === 'paket' ? 'Jl. AP Pettarani Blok C2, Makassar' : 'Jl. Pengayoman, Panakkukang, Makassar');
 
       const newBooking = {
-        id: generateUUID(),
-        booking_code: `RIDE-${codeSuffix}`,
-        order_code: orderCode,
-        order_number: randomOrderNum,
+        id: existingBooking?.id || rideData.id || generateUUID(),
+        booking_code: existingBooking?.booking_code || `RIDE-${codeSuffix}`,
+        order_code: existingBooking?.order_code || orderCode,
+        order_number: existingBooking?.order_number || randomOrderNum,
         customer_id: resolvedCustomerId,
         customer_phone: resolvedCustomerPhone,
         customer_name: resolvedCustomerName,
         driver_id: assignedDriver.id,
+        driver_user_id: assignedDriver.user_id || existingBooking?.driver_user_id || null,
         driver_name: assignedDriver.name,
         driver_phone: assignedDriver.phone,
         driver_vehicle: assignedDriver.vehicleModel,
         driver_plate: assignedDriver.plateNumber,
         driver_rating: assignedDriver.rating,
         driver: assignedDriver,
+        assignment_status: hasExplicitDriver ? 'assigned' : 'unassigned',
+        assigned_by: existingBooking?.assigned_by || (hasExplicitDriver ? 'Pilihan Pelanggan' : null),
+        assigned_at: existingBooking?.assigned_at || (hasExplicitDriver ? now.toISOString() : null),
         service_type: sType,
         service_name: sName,
         pickup_name: resolvedPickupName,
@@ -949,24 +986,133 @@ export const dbService = {
         cash_collected: isCash ? -fare : 0,
         adjustment: -fare,
         discount: rideData.discount || 0,
-        package_info: rideData.packageInfo || null,
+        customer_notes: rideData.customerNotes || existingBooking?.customer_notes || '',
+        package_info: rideData.packageInfo || existingBooking?.package_info || null,
         incentives: [
           { name: 'Bonus Harian - Makassar', points: 100 },
           { name: 'MISI SIGAP', points: 100 }
         ],
-        timeline: {
+        timeline: existingBooking?.timeline || {
           received: formatTime(receivedTime),
           arrived: formatTime(arrivalTime),
           pickedUp: formatTime(pickupTime),
           completed: formatTime(completionTime)
         },
-        booking_status: rideData.bookingStatus || 'completed',
-        created_at: now.toISOString()
+        booking_status: rideData.bookingStatus || existingBooking?.booking_status || 'completed',
+        is_read: rideData.isRead !== undefined ? Boolean(rideData.isRead) : (existingBooking?.is_read ?? false),
+        is_read_driver: rideData.isReadDriver !== undefined ? Boolean(rideData.isReadDriver) : (existingBooking?.is_read_driver ?? false),
+        created_at: existingBooking?.created_at || now.toISOString()
       };
 
-      bookings.unshift(newBooking);
+      if (existingIdx !== -1) {
+        bookings[existingIdx] = newBooking;
+      } else {
+        bookings.unshift(newBooking);
+      }
       setStoredArray(STORAGE_KEYS.BOOKINGS, bookings);
       return newBooking;
+    },
+
+    /**
+     * Admin Menugaskan Akun Driver pada Pesanan Pelanggan (Order Dispatch)
+     */
+    assignDriver(bookingId, driver, reviewerName = 'Admin OTWJek') {
+      if (!bookingId || !driver) return null;
+      const bookings = getStoredArray(STORAGE_KEYS.BOOKINGS, []);
+      const idx = bookings.findIndex((b) => b && b.id === bookingId);
+      if (idx === -1) return null;
+
+      const existing = bookings[idx];
+      const prevDriverId = existing.driver_id;
+
+      const vehicleModelStr =
+        driver.vehicleModel ||
+        `${driver.vehicleBrand || ''} ${driver.vehicleColor ? `(${driver.vehicleColor})` : ''}`.trim() ||
+        (driver.vehicleType === 'mobil' ? 'Mobil Mitra Resmi' : 'Motor Mitra Resmi');
+
+      const assignedDriverObj = {
+        id: driver.id,
+        user_id: driver.user_id || null,
+        name: driver.name || 'Mitra Driver OTWJek',
+        rating: Number(driver.rating || 5.0),
+        tripsCount: driver.tripsCount
+          ? typeof driver.tripsCount === 'number'
+            ? `${driver.tripsCount + 1}+ perjalanan`
+            : driver.tripsCount
+          : 'Mitra Resmi 🌸',
+        vehicleType: driver.vehicleType || existing.service_type || 'motor',
+        vehicleModel: vehicleModelStr,
+        plateNumber: driver.plateNumber || 'DD - MKS',
+        phone: driver.phone || '085255655084',
+        avatar: driver.avatar || null
+      };
+
+      const updatedBooking = {
+        ...existing,
+        driver_id: assignedDriverObj.id,
+        driver_user_id: assignedDriverObj.user_id,
+        driver_name: assignedDriverObj.name,
+        driver_phone: assignedDriverObj.phone,
+        driver_vehicle: assignedDriverObj.vehicleModel,
+        driver_plate: assignedDriverObj.plateNumber,
+        driver_rating: assignedDriverObj.rating,
+        driver: assignedDriverObj,
+        assignment_status: 'assigned',
+        assigned_by: reviewerName,
+        assigned_at: new Date().toISOString(),
+        is_read_driver: false,
+        is_read: false,
+        updated_at: new Date().toISOString()
+      };
+
+      bookings[idx] = updatedBooking;
+      setStoredArray(STORAGE_KEYS.BOOKINGS, bookings);
+
+      // Tambahkan jumlah perjalanan (tripsCount) pada profil driver jika baru ditugaskan
+      if (prevDriverId !== driver.id) {
+        const drivers = getStoredArray(STORAGE_KEYS.DRIVERS, []);
+        const dIdx = drivers.findIndex((d) => d && d.id === driver.id);
+        if (dIdx !== -1) {
+          const currentTrips = Number(drivers[dIdx].tripsCount) || 0;
+          drivers[dIdx] = {
+            ...drivers[dIdx],
+            tripsCount: currentTrips + 1,
+            updated_at: new Date().toISOString()
+          };
+          setStoredArray(STORAGE_KEYS.DRIVERS, drivers);
+        }
+      }
+
+      return updatedBooking;
+    },
+
+    updateBookingStatus(bookingId, status, note = '') {
+      if (!bookingId || !status) return null;
+      const bookings = getStoredArray(STORAGE_KEYS.BOOKINGS, []);
+      const idx = bookings.findIndex((b) => b && b.id === bookingId);
+      if (idx === -1) return null;
+
+      const updated = {
+        ...bookings[idx],
+        booking_status: status,
+        status_note: note || bookings[idx].status_note || null,
+        updated_at: new Date().toISOString()
+      };
+
+      bookings[idx] = updated;
+      setStoredArray(STORAGE_KEYS.BOOKINGS, bookings);
+      return updated;
+    },
+
+    getAllAdmin() {
+      const rawBookings = getStoredArray(STORAGE_KEYS.BOOKINGS, []);
+      return rawBookings.filter((b) => {
+        if (!b) return false;
+        if (typeof b.id === 'string' && (b.id.startsWith('book-seed-') || b.id.startsWith('ord-ref-'))) {
+          return false;
+        }
+        return true;
+      });
     },
 
     getAll(accountUser = null) {
@@ -982,22 +1128,87 @@ export const dbService = {
         return true;
       });
 
-      // Jika ada akun yang login, sinkronkan hanya pesanan milik akun tersebut
+      // Jika ada akun yang login, sinkronkan pesanan milik akun tersebut (baik sebagai Driver maupun Pelanggan)
       if (activeUser) {
         const uId = activeUser.id;
         const uPhone = activeUser.phone ? normalizePhone(activeUser.phone) : null;
         const uName = (activeUser.fullName || activeUser.full_name || activeUser.name || '').trim().toLowerCase();
 
+        // Jika akun yang sedang aktif adalah Mitra Driver, tampilkan pesanan yang ditugaskan ke driver tersebut
+        if (activeUser.role === 'driver') {
+          const allDrivers = getStoredArray(STORAGE_KEYS.DRIVERS, []);
+          const matchedDriver = allDrivers.find(
+            (d) =>
+              d &&
+              ((uId && (d.user_id === uId || d.id === uId || d.id === activeUser.driver?.id)) ||
+                (uPhone && d.phone && normalizePhone(d.phone) === uPhone))
+          );
+          const dId = matchedDriver?.id || activeUser.driver?.id || null;
+          const dPhone = matchedDriver?.phone ? normalizePhone(matchedDriver.phone) : uPhone;
+          const dName = (matchedDriver?.name || uName || '').trim().toLowerCase();
+
+          return realBookings.filter((b) => {
+            if (dId && b.driver_id === dId) return true;
+            if (uId && (b.driver_user_id === uId || b.driver_id === uId)) return true;
+            if (dPhone && b.driver_phone && normalizePhone(b.driver_phone) === dPhone && b.assignment_status === 'assigned') return true;
+            if (dName && b.driver_name && b.driver_name.trim().toLowerCase() === dName && b.assignment_status === 'assigned') return true;
+            return false;
+          });
+        }
+
         return realBookings.filter((b) => {
           if (uId && b.customer_id && b.customer_id === uId) return true;
           if (uPhone && b.customer_phone && normalizePhone(b.customer_phone) === uPhone) return true;
           if (uName && b.customer_name && b.customer_name.trim().toLowerCase() === uName && uName !== 'pelanggan otwjek') return true;
+          if (b.package_info) {
+            const sPhone = b.package_info.senderPhone ? normalizePhone(b.package_info.senderPhone) : null;
+            const rPhone = b.package_info.recipientPhone ? normalizePhone(b.package_info.recipientPhone) : null;
+            const sName = (b.package_info.senderName || '').trim().toLowerCase();
+            if (uPhone && (sPhone === uPhone || rPhone === uPhone)) return true;
+            if (uName && sName === uName) return true;
+          }
+          if (!b.customer_id) return true;
           return false;
         });
       }
 
-      // Jika belum ada akun login (sesi tamu), tampilkan hanya pesanan yang dibuat pada sesi tamu saat ini
-      return realBookings.filter((b) => !b.customer_id && !b.customer_phone);
+      // Jika belum ada akun login (sesi tamu), tampilkan pesanan pada sesi perangkat ini
+      return realBookings.filter((b) => !b.customer_id);
+    },
+
+    getUnreadCount(accountUser = null) {
+      const activeUser = accountUser || dbService.session.getCurrentUser();
+      const isDriver = activeUser?.role === 'driver';
+      const userBookings = this.getAll(activeUser);
+      return userBookings.filter((b) => (isDriver ? !b.is_read_driver : !b.is_read)).length;
+    },
+
+    markAllAsRead(accountUser = null) {
+      const activeUser = accountUser || dbService.session.getCurrentUser();
+      const isDriver = activeUser?.role === 'driver';
+      const rawBookings = getStoredArray(STORAGE_KEYS.BOOKINGS, []);
+      const userBookings = this.getAll(activeUser);
+      if (!userBookings.length) return;
+
+      const userBookingIds = new Set(userBookings.map((b) => b.id));
+      let hasChanges = false;
+
+      const updatedBookings = rawBookings.map((b) => {
+        if (!b || !userBookingIds.has(b.id)) return b;
+        if (isDriver && !b.is_read_driver) {
+          hasChanges = true;
+          return { ...b, is_read_driver: true };
+        }
+        if (!isDriver && !b.is_read) {
+          hasChanges = true;
+          return { ...b, is_read: true };
+        }
+        return b;
+      });
+
+      if (hasChanges) {
+        setStoredArray(STORAGE_KEYS.BOOKINGS, updatedBookings);
+      }
     },
 
     getSeedBookings() {

@@ -1,14 +1,50 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   HomeNavIcon,
   ActivityNavIcon,
   ProfileNavIcon
 } from './BottomNavIcons.jsx';
+import dbService from '../services/dbService.js';
 
-export default function BottomNavBar({ activeTab, onChangeTab }) {
+export default function BottomNavBar({ activeTab, onChangeTab, currentUser }) {
+  const [activityCount, setActivityCount] = useState(0);
+
+  useEffect(() => {
+    const updateActivityBadge = () => {
+      try {
+        const activeUser = currentUser || dbService.session.getCurrentUser();
+        if (activeTab === 'activity') {
+          dbService.bookings.markAllAsRead(activeUser);
+          setActivityCount(0);
+          return;
+        }
+        const unreadCount = dbService.bookings.getUnreadCount(activeUser);
+        setActivityCount(unreadCount);
+      } catch {
+        setActivityCount(0);
+      }
+    };
+
+    updateActivityBadge();
+    const unsubscribe = dbService.subscribe(() => {
+      updateActivityBadge();
+    });
+
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, [currentUser, activeTab]);
+
+  const badgeLabel =
+    activeTab !== 'activity' && activityCount > 0
+      ? activityCount > 99
+        ? '99+'
+        : String(activityCount)
+      : null;
+
   const navItems = [
     { id: 'home', label: 'Home', icon: HomeNavIcon },
-    { id: 'activity', label: 'Activity', icon: ActivityNavIcon, badge: '1' },
+    { id: 'activity', label: 'Activity', icon: ActivityNavIcon, badge: badgeLabel },
     { id: 'account', label: 'Profile', icon: ProfileNavIcon }
   ];
 
@@ -21,7 +57,14 @@ export default function BottomNavBar({ activeTab, onChangeTab }) {
           <button
             key={item.id}
             className={`ref-nav-item ${isActive ? 'active' : ''}`}
-            onClick={() => onChangeTab(item.id)}
+            onClick={() => {
+              if (item.id === 'activity') {
+                const activeUser = currentUser || dbService.session.getCurrentUser();
+                dbService.bookings.markAllAsRead(activeUser);
+                setActivityCount(0);
+              }
+              onChangeTab(item.id);
+            }}
             id={`ref-nav-${item.id}`}
             aria-label={item.label}
           >

@@ -12,7 +12,6 @@ import {
   RotateCcw,
   Clock,
   Check,
-  Edit3,
   X,
   CheckCheck,
   Bike,
@@ -35,10 +34,7 @@ export default function ActivityOrderDetailView({
   onReorder
 }) {
   const [copied, setCopied] = useState(false);
-  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
-  const [feedbackRating, setFeedbackRating] = useState(5);
-  const [feedbackText, setFeedbackText] = useState('');
-  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+
   const [toastMsg, setToastMsg] = useState(null);
 
   // Customer in-card rating state
@@ -176,29 +172,7 @@ export default function ActivityOrderDetailView({
     }
   };
 
-  const handleSubmitFeedback = (e) => {
-    e.preventDefault();
-    try {
-      const existing = JSON.parse(localStorage.getItem('otwjek_db_order_feedbacks') || '[]');
-      existing.unshift({
-        orderCode,
-        orderNumber,
-        role: isDriverView ? 'driver' : 'customer',
-        rating: feedbackRating,
-        text: feedbackText,
-        submittedAt: new Date().toISOString()
-      });
-      localStorage.setItem('otwjek_db_order_feedbacks', JSON.stringify(existing));
-    } catch {
-      // ignore
-    }
-    setFeedbackSubmitted(true);
-    setTimeout(() => {
-      setFeedbackSubmitted(false);
-      setIsFeedbackOpen(false);
-      showToast('Terima kasih atas saran & masukan Anda!');
-    }, 1200);
-  };
+
 
   const handleReorderClick = () => {
     showToast(`Membuat pesanan ulang ${serviceDisplayName}...`);
@@ -287,16 +261,21 @@ export default function ActivityOrderDetailView({
                 </div>
               </div>
 
-              {/* Route Section Driver (Alamat disembunyikan sesuai privasi mitra driver) */}
+              {/* Route Section Driver */}
               <div className="order-detail-route">
                 {/* Origin Step */}
                 <div className="order-route-point">
                   <div className="route-circle-icon store-icon">
                     <Store size={14} color="#E04F16" strokeWidth={2.2} />
                   </div>
-                  <span className="route-point-label" title={order.merchantName || 'Alamat Pengirim disembunyikan'}>
-                    {order.merchantName || 'Alamat Pengirim disembunyikan'}
-                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                    <span className="route-point-label" title={pickupLoc.name}>
+                      {pickupLoc.name}
+                    </span>
+                    {pickupLoc.address && pickupLoc.address !== pickupLoc.name && (
+                      <span style={{ fontSize: 12, color: '#6B7280', marginTop: 1 }}>{pickupLoc.address}</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Connecting Vertical Line */}
@@ -307,10 +286,61 @@ export default function ActivityOrderDetailView({
                   <div className="route-circle-icon user-icon">
                     <User size={14} color="#10B981" strokeWidth={2.4} />
                   </div>
-                  <span className="route-point-label" title={order.customerAddress || 'Alamat Pelanggan disembunyikan'}>
-                    {order.customerAddress || 'Alamat Pelanggan disembunyikan'}
+                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                    <span className="route-point-label" title={dropoffLoc.name}>
+                      {dropoffLoc.name}
+                    </span>
+                    {dropoffLoc.address && dropoffLoc.address !== dropoffLoc.name && (
+                      <span style={{ fontSize: 12, color: '#6B7280', marginTop: 1 }}>{dropoffLoc.address}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Informasi Pelanggan yang Ditugaskan Admin */}
+              <div
+                style={{
+                  marginTop: 14,
+                  padding: '10px 12px',
+                  backgroundColor: '#F9FAFB',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: 10,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 10
+                }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ fontSize: 11.5, color: '#6B7280', fontWeight: 500 }}>
+                    Pelanggan ({serviceDisplayName})
+                  </span>
+                  <span style={{ fontSize: 13.5, fontWeight: 700, color: '#111827' }}>
+                    {order.customerName || 'Pelanggan OTWJek'}
+                    {order.customerPhone ? ` • ${order.customerPhone}` : ''}
                   </span>
                 </div>
+                {order.customerPhone && (
+                  <a
+                    href={`https://wa.me/${String(order.customerPhone).replace(/\D/g, '').replace(/^0/, '62')}?text=${encodeURIComponent(
+                      `Halo Kak ${order.customerName || ''}, saya ${driverInfo.name} (Mitra Driver OTWJek) yang ditugaskan Admin untuk pesanan ${serviceDisplayName} ${orderCode}.`
+                    )}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      backgroundColor: '#10B981',
+                      color: '#FFFFFF',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      padding: '6px 12px',
+                      borderRadius: 8,
+                      textDecoration: 'none',
+                      flexShrink: 0
+                    }}
+                  >
+                    Chat WA
+                  </a>
+                )}
               </div>
             </section>
 
@@ -481,7 +511,7 @@ export default function ActivityOrderDetailView({
             <section className="customer-card-section">
               <div className="customer-section-header">
                 <span className="customer-section-title">
-                  {isPackage ? 'Rute Pengiriman Paket' : 'Rute Perjalanan'}
+                  {isPackage ? 'Rute Pengambilan & Pengantaran Paket' : 'Rute Perjalanan'}
                 </span>
                 <span className="customer-route-summary">
                   {order.distanceKm ? `${order.distanceKm} km` : '3.2 km'} (~{order.durationMinutes || 18} mnt)
@@ -490,65 +520,155 @@ export default function ActivityOrderDetailView({
 
               <div className="customer-route-box">
                 {/* Titik Jemput / Asal */}
-                <div className="customer-route-item">
-                  <div className="customer-pin-icon pickup">
-                    <MapPin size={15} strokeWidth={2.4} />
+                <div className="customer-route-item pickup-step">
+                  <div className="customer-pin-column">
+                    <div className="customer-pin-icon pickup">
+                      <MapPin size={15} strokeWidth={2.4} />
+                    </div>
+                    <div className="track-vertical-line" aria-hidden="true" />
                   </div>
-                  <div className="customer-point-details">
+                  <div className="customer-point-details pickup-details">
+                    {isPackage && (
+                      <span className="package-step-badge pickup">Lokasi Pengambilan (Pengirim)</span>
+                    )}
                     <div className="point-title-row">
                       <span className="point-title">{pickupLoc.name}</span>
                       <span className="point-time-tag">{timeline.pickedUp || '13:47'}</span>
                     </div>
                     <p className="point-address">{pickupLoc.address}</p>
+                    {isPackage && order.packageInfo?.senderName && (
+                      <p className="point-contact-sub">
+                        Pengirim: <strong>{order.packageInfo.senderName}</strong>
+                        {order.packageInfo.senderPhone ? ` (${order.packageInfo.senderPhone})` : ''}
+                      </p>
+                    )}
                   </div>
-                </div>
-
-                {/* Route Connecting Track */}
-                <div className="customer-route-track" aria-hidden="true">
-                  <div className="track-vertical-line" />
                 </div>
 
                 {/* Titik Tujuan / Antar */}
-                <div className="customer-route-item">
-                  <div className="customer-pin-icon dropoff">
-                    <MapPin size={15} strokeWidth={2.4} />
+                <div className="customer-route-item dropoff-step">
+                  <div className="customer-pin-column">
+                    <div className="customer-pin-icon dropoff">
+                      <MapPin size={15} strokeWidth={2.4} />
+                    </div>
                   </div>
                   <div className="customer-point-details">
+                    {isPackage && (
+                      <span className="package-step-badge dropoff">Lokasi Pengantaran (Penerima)</span>
+                    )}
                     <div className="point-title-row">
                       <span className="point-title">{dropoffLoc.name}</span>
                       <span className="point-time-tag completed">{timeline.completed || '14:00'}</span>
                     </div>
                     <p className="point-address">{dropoffLoc.address}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Box Spesial Paket jika Layanan Paket */}
-              {isPackage && order.packageInfo && (
-                <div className="customer-package-note-box">
-                  <div className="package-note-title">
-                    <Package size={14} color="#7C3AED" />
-                    <span>Detail Paket & Penerima</span>
-                  </div>
-                  <div className="package-note-content">
-                    <div className="package-kv-row">
-                      <span className="kv-label">Penerima:</span>
-                      <span className="kv-val">{order.packageInfo.recipientName} ({order.packageInfo.recipientPhone})</span>
-                    </div>
-                    <div className="package-kv-row">
-                      <span className="kv-label">Ukuran:</span>
-                      <span className="kv-val">{order.packageInfo.size || 'S (Dokumen / Kecil)'}</span>
-                    </div>
-                    {order.packageInfo.notes && (
-                      <div className="package-kv-row">
-                        <span className="kv-label">Catatan:</span>
-                        <span className="kv-val">{order.packageInfo.notes}</span>
-                      </div>
+                    {isPackage && order.packageInfo?.recipientName && (
+                      <p className="point-contact-sub">
+                        Penerima: <strong>{order.packageInfo.recipientName}</strong>
+                        {order.packageInfo.recipientPhone ? ` (${order.packageInfo.recipientPhone})` : ''}
+                        {order.packageInfo.floorUnit ? ` • Unit: ${order.packageInfo.floorUnit}` : ''}
+                      </p>
                     )}
                   </div>
                 </div>
-              )}
+              </div>
             </section>
+
+            {/* 2. Card Baru: Detail Paket & Pengiriman (Khusus Layanan Paket) */}
+            {isPackage && order.packageInfo && (
+              <>
+                <div className="order-section-divider" />
+
+                <section className="customer-card-section">
+                  <div className="customer-section-header">
+                    <div className="title-with-icon">
+                      <Package size={17} className="title-icon" />
+                      <span className="customer-section-title">Detail Paket & Pengiriman</span>
+                    </div>
+                    <span className="customer-package-type-badge">
+                      {order.packageInfo.category || 'Paket'}
+                    </span>
+                  </div>
+
+                  <div className="package-detail-card-list">
+                    {order.packageInfo.senderName && (
+                      <div className="package-detail-row">
+                        <span className="package-detail-label">Pengirim</span>
+                        <span className="package-detail-value">
+                          <strong>{order.packageInfo.senderName}</strong>
+                          {order.packageInfo.senderPhone && (
+                            <span className="package-detail-sub"> ({order.packageInfo.senderPhone})</span>
+                          )}
+                        </span>
+                      </div>
+                    )}
+
+                    {order.packageInfo.recipientName && (
+                      <div className="package-detail-row">
+                        <span className="package-detail-label">Penerima</span>
+                        <span className="package-detail-value">
+                          <strong>{order.packageInfo.recipientName}</strong>
+                          {order.packageInfo.recipientPhone && (
+                            <span className="package-detail-sub"> ({order.packageInfo.recipientPhone})</span>
+                          )}
+                        </span>
+                      </div>
+                    )}
+
+                    {order.packageInfo.floorUnit && (
+                      <div className="package-detail-row">
+                        <span className="package-detail-label">Unit / Patokan</span>
+                        <span className="package-detail-value">{order.packageInfo.floorUnit}</span>
+                      </div>
+                    )}
+
+                    <div className="customer-pricing-divider" />
+
+                    {(order.packageInfo.itemName || order.packageInfo.category) && (
+                      <div className="package-detail-row">
+                        <span className="package-detail-label">Jenis Barang</span>
+                        <span className="package-detail-value">
+                          {order.packageInfo.itemName || order.packageInfo.category}
+                          {order.packageInfo.category &&
+                          order.packageInfo.itemName &&
+                          order.packageInfo.itemName !== order.packageInfo.category
+                            ? ` (${order.packageInfo.category})`
+                            : ''}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="package-detail-row">
+                      <span className="package-detail-label">Ukuran & Berat</span>
+                      <span className="package-detail-value">
+                        {order.packageInfo.size || 'S (Dokumen / Kecil)'}
+                        {order.packageInfo.weight ? ` • ${order.packageInfo.weight} kg` : ''}
+                      </span>
+                    </div>
+
+                    {order.packageInfo.deliverySpeed && (
+                      <div className="package-detail-row">
+                        <span className="package-detail-label">Layanan Pengiriman</span>
+                        <span className="package-detail-value">{order.packageInfo.deliverySpeed}</span>
+                      </div>
+                    )}
+
+                    {order.packageInfo.vehicleType && (
+                      <div className="package-detail-row">
+                        <span className="package-detail-label">Armada Kurir</span>
+                        <span className="package-detail-value">{order.packageInfo.vehicleType}</span>
+                      </div>
+                    )}
+
+                    {order.packageInfo.notes && (
+                      <div className="package-detail-note-bar">
+                        <span className="package-note-bar-label">Catatan</span>
+                        <span className="package-note-bar-val">{order.packageInfo.notes}</span>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              </>
+            )}
 
             {/* Section Divider Strip */}
             <div className="order-section-divider" />
@@ -620,6 +740,22 @@ export default function ActivityOrderDetailView({
                   <span className="info-row-label">Layanan</span>
                   <span className="order-number-val" style={{ fontWeight: 600, color: '#111827' }}>
                     {serviceDisplayName}
+                  </span>
+                </div>
+
+                <div className="customer-info-row">
+                  <span className="info-row-label">Mitra Driver</span>
+                  <span
+                    className="order-number-val"
+                    style={{
+                      fontWeight: 600,
+                      color: order.assignmentStatus === 'assigned' ? '#059669' : '#D97706',
+                      textAlign: 'right'
+                    }}
+                  >
+                    {order.assignmentStatus === 'assigned'
+                      ? `${driverInfo.name}${driverInfo.plateNumber ? ` • ${driverInfo.plateNumber}` : ''}`
+                      : 'Menunggu Penugasan Admin'}
                   </span>
                 </div>
 
@@ -711,116 +847,35 @@ export default function ActivityOrderDetailView({
               )}
             </section>
 
-            {/* Customer Fixed Action Bottom Bar */}
             <div className="customer-action-footer-spacer" />
-            <div className="customer-action-footer">
-              <button
-                type="button"
-                className="btn-customer-cs-help"
-                onClick={handleContactCS}
-              >
-                <Headphones size={17} />
-                <span>Bantuan</span>
-              </button>
-
-              <button
-                type="button"
-                className="btn-customer-reorder"
-                onClick={handleReorderClick}
-              >
-                <RefreshCw size={17} />
-                <span>Pesan Lagi</span>
-              </button>
-            </div>
           </div>
         )}
       </main>
 
-      {/* Floating Pill: Saran & Masukan (Hanya tampil pada mode Driver) */}
-      {isDriverView && (
-        <button
-          type="button"
-          className="floating-feedback-pill"
-          onClick={() => setIsFeedbackOpen(true)}
-          aria-label="Buka form Saran & Masukan"
-        >
-          <Edit3 size={15} strokeWidth={2.4} />
-          <span>Saran & Masukan</span>
-        </button>
-      )}
-
-      {/* Feedback Modal Popover untuk Driver */}
-      {isFeedbackOpen && (
-        <div className="feedback-modal-backdrop" onClick={() => setIsFeedbackOpen(false)}>
-          <div
-            className="feedback-modal-card"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
+      {/* Customer Action Bottom Bar (constrained inside order-detail-viewport) */}
+      {!isDriverView && (
+        <div className="customer-action-footer">
+          <button
+            type="button"
+            className="btn-customer-cs-help"
+            onClick={handleContactCS}
           >
-            <div className="feedback-modal-header">
-              <h3 className="feedback-modal-title">Saran & Masukan Mitra</h3>
-              <button
-                type="button"
-                className="btn-feedback-close"
-                onClick={() => setIsFeedbackOpen(false)}
-              >
-                <X size={18} />
-              </button>
-            </div>
+            <Headphones size={17} />
+            <span>Bantuan</span>
+          </button>
 
-            {feedbackSubmitted ? (
-              <div className="feedback-success-state">
-                <div className="feedback-success-icon">
-                  <Check size={28} />
-                </div>
-                <h4>Terima Kasih!</h4>
-                <p>Masukan Anda sangat berharga untuk meningkatkan mutu layanan OTWJek.</p>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmitFeedback} className="feedback-form">
-                <p className="feedback-prompt-text">
-                  Bagaimana operasional pesanan <strong>{orderCode}</strong>?
-                </p>
-
-                <div className="feedback-stars-row">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      className={`star-btn ${star <= feedbackRating ? 'filled' : ''}`}
-                      onClick={() => setFeedbackRating(star)}
-                    >
-                      ★
-                    </button>
-                  ))}
-                </div>
-
-                <textarea
-                  className="feedback-textarea"
-                  rows={3}
-                  placeholder="Tulis kritik, kendala aplikasi, atau catatan rute..."
-                  value={feedbackText}
-                  onChange={(e) => setFeedbackText(e.target.value)}
-                />
-
-                <div className="feedback-actions-row">
-                  <button
-                    type="button"
-                    className="btn-feedback-cancel"
-                    onClick={() => setIsFeedbackOpen(false)}
-                  >
-                    Batal
-                  </button>
-                  <button type="submit" className="btn-feedback-submit">
-                    Kirim Masukan
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
+          <button
+            type="button"
+            className="btn-customer-reorder"
+            onClick={handleReorderClick}
+          >
+            <RefreshCw size={17} />
+            <span>Pesan Lagi</span>
+          </button>
         </div>
       )}
+
+
 
       {/* Toast Notification */}
       {toastMsg && (

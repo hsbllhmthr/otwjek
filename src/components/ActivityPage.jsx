@@ -87,24 +87,29 @@ function formatBookingToOrder(b) {
   const platformFee = 2000;
   const tripFare = Math.max(0, fare - platformFee);
 
-  const realPickupName = b.pickup_name || (sType === 'paket' ? 'Kantor Cabang Rappocini' : 'Warung Megarasa - Rappocini');
-  const realPickupAddress = b.pickup_address || 'Jl. Rappocini Raya No. 112, Makassar';
+  const realPickupName =
+    b.pickup_name ||
+    b.package_info?.pickupName ||
+    (sType === 'paket' ? 'Titik Pengambilan Paket' : 'Warung Megarasa - Rappocini');
+  const realPickupAddress =
+    b.pickup_address ||
+    b.package_info?.pickupAddress ||
+    realPickupName;
 
   const realDropoffName =
     b.dropoff_name && b.dropoff_name !== 'Alamat Pelanggan disembunyikan'
       ? b.dropoff_name
+      : b.package_info?.dropoffName
+      ? b.package_info.dropoffName
       : isCar
       ? 'Bandara Sultan Hasanuddin'
       : isSend
-      ? 'Ruko Pettarani Indah No. 14'
+      ? 'Titik Pengantaran Paket'
       : 'Mall Panakkukang (MP)';
   const realDropoffAddress =
     b.dropoff_address ||
-    (isCar
-      ? 'Mandai, Maros, Makassar'
-      : isSend
-      ? 'Jl. AP Pettarani Blok C2, Makassar'
-      : 'Jl. Pengayoman, Panakkukang, Makassar');
+    b.package_info?.dropoffAddress ||
+    realDropoffName;
 
   return {
     id: b.id || b.booking_code || code,
@@ -121,8 +126,8 @@ function formatBookingToOrder(b) {
     totalEarnings: formatRupiah(totalEarnings),
     cashCollected: cashVal < 0 ? `-${formatRupiah(Math.abs(cashVal))}` : formatRupiah(cashVal),
     adjustment: adjVal < 0 ? `-${formatRupiah(Math.abs(adjVal))}` : formatRupiah(adjVal),
-    merchantName: b.pickup_name || b.pickup_address || 'Alamat Pengirim disembunyikan',
-    customerAddress: b.dropoff_name || b.dropoff_address || 'Alamat Pelanggan disembunyikan',
+    merchantName: realPickupName,
+    customerAddress: realDropoffName,
     pickupLocation: {
       name: realPickupName,
       address: realPickupAddress
@@ -132,6 +137,11 @@ function formatBookingToOrder(b) {
       address: realDropoffAddress
     },
     driver: driverObj,
+    assignmentStatus: b.assignment_status || 'unassigned',
+    assignedBy: b.assigned_by || null,
+    customerName: b.customer_name || 'Pelanggan OTWJek',
+    customerPhone: b.customer_phone || '',
+    customerNotes: b.customer_notes || '',
     distanceKm: b.distance_km || 3.2,
     durationMinutes: b.duration_minutes || 18,
     status: b.booking_status === 'cancelled' ? 'cancelled' : 'completed',
@@ -180,6 +190,7 @@ export default function ActivityPage({ onBack, currentUser }) {
   // Ambil data pesanan dinamis langsung dari dbService khusus untuk akun yang aktif
   const loadBookings = () => {
     try {
+      dbService.bookings.markAllAsRead(activeUser);
       const items = dbService.bookings.getAll(activeUser);
       setRawBookings(Array.isArray(items) ? items : []);
     } catch {
@@ -276,9 +287,10 @@ export default function ActivityPage({ onBack, currentUser }) {
   };
 
   if (selectedOrder) {
+    const liveSelectedOrder = allOrders.find((o) => o.id === selectedOrder.id) || selectedOrder;
     return (
       <ActivityOrderDetailView
-        order={selectedOrder}
+        order={liveSelectedOrder}
         onBack={() => setSelectedOrder(null)}
         currentUser={activeUser}
         isDriver={activeUser?.role === 'driver'}
@@ -404,7 +416,7 @@ export default function ActivityPage({ onBack, currentUser }) {
                       )}
                     </div>
                     <span className="activity-route-text" title={order.merchantName}>
-                      {order.merchantName}
+                      {order.serviceType === 'paket' ? `Pengambilan: ${order.merchantName}` : order.merchantName}
                     </span>
                   </div>
 
@@ -417,7 +429,7 @@ export default function ActivityPage({ onBack, currentUser }) {
                       <User size={13} strokeWidth={2.4} />
                     </div>
                     <span className="activity-route-text subtle" title={order.customerAddress}>
-                      {order.customerAddress}
+                      {order.serviceType === 'paket' ? `Pengantaran: ${order.customerAddress}` : order.customerAddress}
                     </span>
                   </div>
 
