@@ -164,71 +164,115 @@
   border-color: #CBD5E1;
 }
 
-/* 2. Verification Status Alert Banner */
+/* 2. Verification Status Alert Banner (Reference Notification Style) */
 .driver-verify-card {
+  position: relative;
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px 16px;
-  border-radius: 14px;
-  border: 1px solid transparent;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 3px solid #FFFFFF;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.driver-verify-card:active {
+  transform: scale(0.99);
 }
 
 .driver-verify-card.pending {
-  background: #FFFBEB;
-  border-color: #FDE68A;
-  color: #92400E;
+  background: #FDF5EA;
 }
 
 .driver-verify-card.rejected {
   background: #FEF2F2;
-  border-color: #FECACA;
-  color: #991B1B;
 }
 
-.driver-verify-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.driver-verify-title-wrap {
+.driver-verify-icon-outer {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: #FFFFFF;
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.driver-verify-icon-inner {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
   font-size: 13.5px;
+  font-weight: 800;
+  font-family: inherit;
+  line-height: 1;
+}
+
+.driver-verify-card.pending .driver-verify-icon-inner {
+  background: #FFB020;
+}
+
+.driver-verify-card.rejected .driver-verify-icon-inner {
+  background: #EF4444;
+}
+
+.driver-verify-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.driver-verify-title {
+  margin: 0;
+  padding-right: 22px;
+  font-size: 14px;
   font-weight: 700;
+  color: #1E293B;
+  line-height: 1.25;
+  letter-spacing: -0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .driver-verify-desc {
   margin: 0;
-  font-size: 12.5px;
-  line-height: 1.5;
-  opacity: 0.92;
-}
-
-.btn-driver-verify-action {
-  align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 12px;
-  border-radius: 8px;
+  padding-right: 4px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 400;
+  color: #64748B;
+  line-height: 1.4;
+}
+
+.driver-verify-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: transparent;
   border: none;
+  color: #94A3B8;
+  padding: 4px;
+  border-radius: 6px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease, background-color 0.15s ease;
 }
 
-.driver-verify-card.pending .btn-driver-verify-action {
-  background: #D97706;
-  color: #FFFFFF;
-}
-
-.driver-verify-card.rejected .btn-driver-verify-action {
-  background: #DC2626;
-  color: #FFFFFF;
+.driver-verify-close:hover {
+  color: #475569;
+  background: rgba(15, 23, 42, 0.04);
 }
 
 /* 3. Online / Offline Status Switch Card */

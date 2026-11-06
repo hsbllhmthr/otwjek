@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import './DriverHomePage.css';
 import {
-  Clock,
-  AlertTriangle,
   Wallet,
-  ChevronRight,
-  Inbox
+  Inbox,
+  X
 } from 'lucide-react';
 import dbService, { normalizePhone } from '../services/dbService.js';
 import { formatRupiah } from '../utils/fareCalculator.js';
@@ -168,6 +166,7 @@ export default function DriverHomePage({ currentUser, onNavigate }) {
   const [earningsPeriod, setEarningsPeriod] = useState('today'); // 'today' | 'all'
   const [orderFilter, setOrderFilter] = useState('all'); // 'all' | 'ride' | 'paket'
   const [selectedOrderDetail, setSelectedOrderDetail] = useState(null);
+  const [dismissedVerifyBanner, setDismissedVerifyBanner] = useState(false);
 
   const loadDriverData = useCallback(() => {
     const activeUser = currentUser || dbService.session.getCurrentUser();
@@ -297,47 +296,64 @@ export default function DriverHomePage({ currentUser, onNavigate }) {
     <div className="driver-home-viewport">
       <div className="driver-home-scroll">
         {/* Verification Status Banner (if Pending or Rejected) */}
-        {verificationStatus === 'pending' && (
-          <div className="driver-verify-card pending">
-            <div className="driver-verify-top">
-              <div className="driver-verify-title-wrap">
-                <Clock size={17} />
-                <span>Dokumen Sedang Diverifikasi Admin</span>
-              </div>
+        {!dismissedVerifyBanner && verificationStatus === 'pending' && (
+          <div
+            className="driver-verify-card pending"
+            onClick={() => onNavigate && onNavigate('account')}
+            role="button"
+            tabIndex={0}
+          >
+            <div className="driver-verify-icon-outer">
+              <div className="driver-verify-icon-inner">i</div>
             </div>
-            <p className="driver-verify-desc">
-              Berkas KTP, SIM, dan STNK Anda sedang ditinjau oleh tim Admin OTWJek. Pastikan seluruh data kendaraan sudah lengkap.
-            </p>
+            <div className="driver-verify-body">
+              <h3 className="driver-verify-title">Menunggu Verifikasi Admin</h3>
+              <p className="driver-verify-desc">
+                Berkas KTP, SIM, dan STNK Anda sedang ditinjau oleh tim Admin OTWJek.
+              </p>
+            </div>
             <button
               type="button"
-              className="btn-driver-verify-action"
-              onClick={() => onNavigate && onNavigate('account')}
+              className="driver-verify-close"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDismissedVerifyBanner(true);
+              }}
+              aria-label="Tutup notifikasi"
+              title="Tutup"
             >
-              <span>Cek Kelengkapan Berkas</span>
-              <ChevronRight size={14} />
+              <X size={16} strokeWidth={1.8} />
             </button>
           </div>
         )}
 
-        {verificationStatus === 'rejected' && (
-          <div className="driver-verify-card rejected">
-            <div className="driver-verify-top">
-              <div className="driver-verify-title-wrap">
-                <AlertTriangle size={17} />
-                <span>Verifikasi Berkas Perlu Diperbaiki</span>
-              </div>
+        {!dismissedVerifyBanner && verificationStatus === 'rejected' && (
+          <div
+            className="driver-verify-card rejected"
+            onClick={() => onNavigate && onNavigate('account')}
+            role="button"
+            tabIndex={0}
+          >
+            <div className="driver-verify-icon-outer">
+              <div className="driver-verify-icon-inner">!</div>
             </div>
-            <p className="driver-verify-desc">
-              <strong>Catatan Admin:</strong>{' '}
-              {driverProfile?.rejection_reason || 'Foto dokumen kurang jelas atau belum sesuai.'}
-            </p>
+            <div className="driver-verify-body">
+              <h3 className="driver-verify-title">Verifikasi Perlu Diperbaiki</h3>
+              <p className="driver-verify-desc">
+                {driverProfile?.rejection_reason || 'Foto dokumen kurang jelas. Ketuk untuk unggah ulang.'}
+              </p>
+            </div>
             <button
               type="button"
-              className="btn-driver-verify-action"
-              onClick={() => onNavigate && onNavigate('account')}
+              className="driver-verify-close"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDismissedVerifyBanner(true);
+              }}
+              aria-label="Tutup notifikasi"
+              title="Tutup"
             >
-              <span>Perbaiki & Unggah Ulang</span>
-              <ChevronRight size={14} />
+              <X size={16} strokeWidth={1.8} />
             </button>
           </div>
         )}
