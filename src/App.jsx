@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import MapEngine from './components/MapEngine.jsx';
 import DriverCatalogModal from './components/DriverCatalogModal.jsx';
 import HomePage from './components/HomePage.jsx';
+import DriverHomePage from './components/DriverHomePage.jsx';
 import WhereToPage from './components/WhereToPage.jsx';
 import SendPackagePage from './components/SendPackagePage.jsx';
 import DeliveryDetailsPage from './components/DeliveryDetailsPage.jsx';
@@ -24,7 +25,6 @@ import LoginPage from './components/LoginPage.jsx';
 import PersonalInfoPage from './components/PersonalInfoPage.jsx';
 import AdminLoginPage from './components/AdminLoginPage.jsx';
 import AdminVerificationDashboard from './components/AdminVerificationDashboard.jsx';
-import PwaInstallPrompt from './components/PwaInstallPrompt.jsx';
 import dbService from './services/dbService.js';
 
 import {
@@ -55,11 +55,32 @@ export default function App() {
     return p === '/admin' || p.startsWith('/admin/') || h === '#/admin' || h.startsWith('#/admin/');
   };
 
+  // Deteksi apakah pengguna mengakses rute URL khusus mitra driver (/driver)
+  const checkIsDriverPath = () => {
+    if (typeof window === 'undefined') return false;
+    const p = window.location.pathname.toLowerCase();
+    const h = window.location.hash.toLowerCase();
+    return p === '/driver' || p.startsWith('/driver/') || h === '#/driver' || h.startsWith('#/driver/');
+  };
+
   const [isAdminRoute, setIsAdminRoute] = useState(checkIsAdminPath);
+  const [isDriverRoute, setIsDriverRoute] = useState(checkIsDriverPath);
 
   useEffect(() => {
     const handleUrlChange = () => {
-      setIsAdminRoute(checkIsAdminPath());
+      const adminPath = checkIsAdminPath();
+      const driverPath = checkIsDriverPath();
+      setIsAdminRoute(adminPath);
+      setIsDriverRoute(driverPath);
+      if (driverPath) {
+        setRegistrationRole('driver');
+        const sessionUser = dbService.session.getCurrentUser();
+        if (!sessionUser || sessionUser.role !== 'driver') {
+          setCurrentView('welcome');
+        }
+      } else if (!adminPath) {
+        setRegistrationRole('user');
+      }
     };
     window.addEventListener('popstate', handleUrlChange);
     window.addEventListener('hashchange', handleUrlChange);
@@ -72,12 +93,19 @@ export default function App() {
   const navigateToCustomerApp = (targetView = 'home') => {
     window.history.pushState({}, '', '/');
     setIsAdminRoute(false);
+    setIsDriverRoute(false);
+    setRegistrationRole('user');
     setCurrentView(targetView);
   };
 
   const [currentView, setCurrentView] = useState(() => {
-    // Cek apakah ada sesi aktif
-    const hasSession = !!dbService.session.getCurrentUser();
+    const isDriverUrl = checkIsDriverPath();
+    const sessionUser = dbService.session.getCurrentUser();
+    const hasSession = !!sessionUser;
+    // Jika mengakses rute /driver tetapi belum login sebagai mitra driver, tampilkan layar selamat datang
+    if (isDriverUrl && (!sessionUser || sessionUser.role !== 'driver')) {
+      return 'welcome';
+    }
     // Ambil view terakhir dari sessionStorage
     const savedView = sessionStorage.getItem('otwjek_current_view');
     // Jika view tersimpan valid dan bukan transient, kembalikan view itu
@@ -130,7 +158,7 @@ export default function App() {
   const [activeRideBooking, setActiveRideBooking] = useState(null);
   const [activePackageBooking, setActivePackageBooking] = useState(null);
   const [registeredUserData, setRegisteredUserData] = useState(null);
-  const [registrationRole, setRegistrationRole] = useState('user'); // 'user' | 'driver'
+  const [registrationRole, setRegistrationRole] = useState(() => (checkIsDriverPath() ? 'driver' : 'user')); // 'user' | 'driver'
   const [currentUser, setCurrentUser] = useState(() => dbService.session.getCurrentUser());
   const [loggedAdmin, setLoggedAdmin] = useState(() => dbService.admin.getCurrentAdmin());
 
@@ -818,19 +846,20 @@ export default function App() {
   }
 
   if (currentView === 'welcome') {
+    const isDriverPortal = isDriverRoute || registrationRole === 'driver';
     return (
       <div className="app-viewport-wrapper">
         <div className="bolt-app-shell">
           <WelcomeScreen
+            isDriver={isDriverPortal}
             onContinue={() => setCurrentView('home')}
             onSignUp={() => {
-              setRegistrationRole('user');
+              setRegistrationRole(isDriverPortal ? 'driver' : 'user');
               setCurrentView('signup');
             }}
-            onSignIn={() => setCurrentView('login')}
-            onRegisterDriver={() => {
-              setRegistrationRole('driver');
-              setCurrentView('signup');
+            onSignIn={() => {
+              setRegistrationRole(isDriverPortal ? 'driver' : 'user');
+              setCurrentView('login');
             }}
           />
         </div>
@@ -839,17 +868,19 @@ export default function App() {
   }
 
   if (currentView === 'login') {
+    const isDriverPortal = isDriverRoute || registrationRole === 'driver';
     return (
       <div className="app-viewport-wrapper">
         <div className="bolt-app-shell">
           <LoginPage
+            isDriver={isDriverPortal}
             onBack={() => setCurrentView('welcome')}
             onSuccess={(user) => {
               if (user) setCurrentUser(user);
               setCurrentView('home');
             }}
             onGoToSignUp={() => {
-              setRegistrationRole('user');
+              setRegistrationRole(isDriverPortal ? 'driver' : 'user');
               setCurrentView('signup');
             }}
           />
@@ -859,14 +890,16 @@ export default function App() {
   }
 
   if (currentView === 'signup') {
+    const isDriverPortal = isDriverRoute || registrationRole === 'driver';
     return (
       <div className="app-viewport-wrapper">
         <div className="bolt-app-shell">
           <SignUpPage
-            isDriver={registrationRole === 'driver'}
+            isDriver={isDriverPortal}
             onBack={() => setCurrentView('welcome')}
             onSuccess={(data) => {
-              const fullUserData = { ...data, role: registrationRole };
+              const targetRole = isDriverPortal ? 'driver' : 'user';
+              const fullUserData = { ...data, role: targetRole };
               // Simpan langsung akun dasar ke dbService agar tidak hilang
               let existing = dbService.users.findByPhone(data.phone);
               let savedUser;
@@ -888,16 +921,17 @@ export default function App() {
   }
 
   if (currentView === 'personal-info') {
+    const isDriverPortal = isDriverRoute || registrationRole === 'driver';
     return (
       <div className="app-viewport-wrapper">
         <div className="bolt-app-shell">
           <PersonalInfoPage
             initialData={registeredUserData || currentUser}
-            isDriver={registrationRole === 'driver'}
+            isDriver={isDriverPortal}
             onBack={() => setCurrentView('signup')}
             onSuccess={(profileData) => {
               const merged = { ...(registeredUserData || currentUser || {}), ...profileData };
-              if (registrationRole === 'driver') {
+              if (isDriverPortal) {
                 const res = dbService.drivers.registerDriver(
                   merged,
                   profileData.vehicleData || {},
@@ -925,18 +959,26 @@ export default function App() {
   }
 
   if (currentView === 'home') {
+    const isDriverSide = isDriverRoute || currentUser?.role === 'driver';
     return (
       <div className="app-viewport-wrapper">
         <div className="bolt-app-shell">
-          <HomePage
-            onSelectService={handleSelectService}
-            currentLocation={pickup?.name || 'Jakarta, Indonesia'}
-          />
-          <PwaInstallPrompt />
+          {isDriverSide ? (
+            <DriverHomePage
+              currentUser={currentUser}
+              onNavigate={(targetTab) => setCurrentView(targetTab)}
+            />
+          ) : (
+            <HomePage
+              onSelectService={handleSelectService}
+              currentLocation={pickup?.name || 'Jakarta, Indonesia'}
+            />
+          )}
           <BottomNavBar
             activeTab="home"
             onChangeTab={(tab) => setCurrentView(tab)}
             currentUser={currentUser}
+            isDriver={isDriverSide}
           />
         </div>
       </div>
@@ -1141,14 +1183,20 @@ export default function App() {
 
 
   if (currentView === 'activity') {
+    const isDriverSide = isDriverRoute || currentUser?.role === 'driver';
     return (
       <div className="app-viewport-wrapper">
         <div className="bolt-app-shell">
-          <ActivityView onBack={() => setCurrentView('home')} currentUser={currentUser} />
+          <ActivityView
+            onBack={() => setCurrentView('home')}
+            currentUser={currentUser}
+            isDriver={isDriverSide}
+          />
           <BottomNavBar
             activeTab="activity"
             onChangeTab={(tab) => setCurrentView(tab)}
             currentUser={currentUser}
+            isDriver={isDriverSide}
           />
         </div>
       </div>
@@ -1156,6 +1204,7 @@ export default function App() {
   }
 
   if (currentView === 'message') {
+    const isDriverSide = isDriverRoute || currentUser?.role === 'driver';
     return (
       <div className="app-viewport-wrapper">
         <div className="bolt-app-shell">
@@ -1164,6 +1213,7 @@ export default function App() {
             activeTab="message"
             onChangeTab={(tab) => setCurrentView(tab)}
             currentUser={currentUser}
+            isDriver={isDriverSide}
           />
         </div>
       </div>
@@ -1171,6 +1221,7 @@ export default function App() {
   }
 
   if (currentView === 'payment') {
+    const isDriverSide = isDriverRoute || currentUser?.role === 'driver';
     return (
       <div className="app-viewport-wrapper">
         <div className="bolt-app-shell">
@@ -1179,6 +1230,7 @@ export default function App() {
             activeTab="payment"
             onChangeTab={(tab) => setCurrentView(tab)}
             currentUser={currentUser}
+            isDriver={isDriverSide}
           />
         </div>
       </div>
@@ -1186,6 +1238,7 @@ export default function App() {
   }
 
   if (currentView === 'account') {
+    const isDriverSide = isDriverRoute || currentUser?.role === 'driver';
     return (
       <div className="app-viewport-wrapper">
         <div className="bolt-app-shell">
@@ -1193,8 +1246,18 @@ export default function App() {
             user={currentUser}
             onBack={() => setCurrentView('home')}
             onLogout={() => {
+              const wasDriver = isDriverRoute || currentUser?.role === 'driver';
               dbService.session.logout();
               setCurrentUser(null);
+              if (wasDriver) {
+                if (!checkIsDriverPath()) {
+                  window.history.pushState({}, '', '/driver');
+                }
+                setIsDriverRoute(true);
+                setRegistrationRole('driver');
+              } else {
+                setRegistrationRole('user');
+              }
               setCurrentView('welcome');
             }}
           />
@@ -1202,6 +1265,7 @@ export default function App() {
             activeTab="account"
             onChangeTab={(tab) => setCurrentView(tab)}
             currentUser={currentUser}
+            isDriver={isDriverSide}
           />
         </div>
       </div>

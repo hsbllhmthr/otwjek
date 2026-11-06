@@ -22,8 +22,8 @@ function MinimalEmptyState({ onBack, icon: IconComponent, title, subtitle }) {
   );
 }
 
-export function ActivityView({ onBack, currentUser }) {
-  return <ActivityPage onBack={onBack} currentUser={currentUser} />;
+export function ActivityView({ onBack, currentUser, isDriver }) {
+  return <ActivityPage onBack={onBack} currentUser={currentUser} isDriver={isDriver} />;
 }
 
 export function PaymentView({ onBack }) {
@@ -51,4 +51,3 @@ export function MessageView({ onBack }) {
 export function AccountView({ onBack, onLogout, user }) {
   return <ProfilePage onBack={onBack} onLogout={onLogout} user={user} />;
 }
-

@@ -3,7 +3,7 @@ import './WelcomeScreen.css';
 import { X as CloseIcon } from 'lucide-react';
 import otwjekLogo from '../assets/otwjek_logo.png';
 
-export default function WelcomeScreen({ onContinue, onSignUp, onSignIn, onRegisterDriver }) {
+export default function WelcomeScreen({ isDriver = false, onContinue, onSignUp, onSignIn }) {
   const [activeModal, setActiveModal] = useState(null); // 'terms' | 'privacy' | null
 
   return (
@@ -24,8 +24,14 @@ export default function WelcomeScreen({ onContinue, onSignUp, onSignIn, onRegist
 
           {/* Heading & Subtitle in Indonesian */}
           <div className="welcome-text-group">
-            <h1 className="welcome-title">Selamat Datang!</h1>
-            <p className="welcome-subtitle">Masuk atau buat akun untuk melanjutkan perjalanan</p>
+            <h1 className="welcome-title">
+              {isDriver ? 'Selamat Datang, Mitra!' : 'Selamat Datang!'}
+            </h1>
+            <p className="welcome-subtitle">
+              {isDriver
+                ? 'Masuk atau daftar akun mitra untuk mulai menerima pesanan'
+                : 'Masuk atau buat akun untuk melanjutkan perjalanan'}
+            </p>
           </div>
 
           {/* Centered Action Buttons (Daftar & Masuk) */}
@@ -36,7 +42,7 @@ export default function WelcomeScreen({ onContinue, onSignUp, onSignIn, onRegist
               className="btn-welcome-signup"
               onClick={onSignUp || onContinue}
             >
-              Daftar
+              {isDriver ? 'Daftar Mitra' : 'Daftar'}
             </button>
 
             {/* Masuk (Sign in) button */}
@@ -46,17 +52,6 @@ export default function WelcomeScreen({ onContinue, onSignUp, onSignIn, onRegist
               onClick={onSignIn || onContinue}
             >
               Masuk
-            </button>
-          </div>
-
-          {/* Driver Registration Entry */}
-          <div className="welcome-skip-wrapper">
-            <button
-              type="button"
-              className="btn-welcome-skip"
-              onClick={onRegisterDriver || onSignUp || onContinue}
-            >
-              Daftar sebagai mitra driver
             </button>
           </div>
         </div>
@@ -76,7 +71,7 @@ export default function WelcomeScreen({ onContinue, onSignUp, onSignIn, onRegist
             className="btn-legal-link"
             onClick={() => setActiveModal('terms')}
           >
-            Syarat & Ketentuan
+            {isDriver ? 'Ketentuan Kemitraan' : 'Syarat & Ketentuan'}
           </button>
         </div>
       </div>
@@ -90,7 +85,11 @@ export default function WelcomeScreen({ onContinue, onSignUp, onSignIn, onRegist
           >
             <div className="welcome-modal-header">
               <h3 className="modal-heading">
-                {activeModal === 'terms' ? 'Syarat & Ketentuan' : 'Kebijakan Privasi'}
+                {activeModal === 'terms'
+                  ? isDriver
+                    ? 'Syarat & Ketentuan Mitra'
+                    : 'Syarat & Ketentuan'
+                  : 'Kebijakan Privasi'}
               </h3>
               <button
                 type="button"
@@ -102,14 +101,37 @@ export default function WelcomeScreen({ onContinue, onSignUp, onSignIn, onRegist
             </div>
             <div className="modal-legal-content">
               {activeModal === 'terms' ? (
+                isDriver ? (
+                  <>
+                    <p>
+                      Selamat datang di portal kemitraan pengemudi OTWJek. Dengan bergabung sebagai mitra, Anda menyetujui ketentuan berikut:
+                    </p>
+                    <ul>
+                      <li>Khusus pengemudi perempuan dengan dokumen KTP, SIM, dan STNK aktif yang terverifikasi.</li>
+                      <li>Berkomitmen menjaga keselamatan, kesopanan, dan kenyamanan penumpang selama perjalanan.</li>
+                      <li>Penugasan order dan koordinasi pengantaran terhubung langsung dengan WhatsApp Admin Dispatch resmi.</li>
+                    </ul>
+                  </>
+                ) : (
+                  <>
+                    <p>
+                      Selamat datang di platform transportasi online kami. Dengan menggunakan layanan ini, Anda menyetujui ketentuan berikut:
+                    </p>
+                    <ul>
+                      <li>Layanan perjalanan aman, transparan, dan terpercaya khusus perempuan.</li>
+                      <li>Tarif transparan disesuaikan dengan jarak dan waktu rute perjalanan.</li>
+                      <li>Pemesanan terintegrasi langsung dengan WhatsApp dispatcher dan mitra driver resmi.</li>
+                    </ul>
+                  </>
+                )
+              ) : isDriver ? (
                 <>
                   <p>
-                    Selamat datang di platform transportasi online kami. Dengan menggunakan layanan ini, Anda menyetujui ketentuan berikut:
+                    Privasi dan keamanan data mitra pengemudi adalah prioritas utama kami:
                   </p>
                   <ul>
-                    <li>Layanan perjalanan aman, transparan, dan terpercaya khusus perempuan.</li>
-                    <li>Tarif transparan disesuaikan dengan jarak dan waktu rute perjalanan.</li>
-                    <li>Pemesanan terintegrasi langsung dengan WhatsApp dispatcher dan mitra driver resmi.</li>
+                    <li>Dokumen identitas (KTP, SIM, STNK) hanya digunakan untuk verifikasi resmi oleh tim Admin OTWJek.</li>
+                    <li>Data kontak dan kendaraan Anda dijaga kerahasiaannya untuk keperluan penugasan pesanan.</li>
                   </ul>
                 </>
               ) : (

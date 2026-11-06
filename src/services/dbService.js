@@ -984,7 +984,7 @@ export const dbService = {
         total_earnings: deliveryFee,
         payment_method: isCash ? 'cash' : 'qris',
         cash_collected: isCash ? -fare : 0,
-        adjustment: -fare,
+        adjustment: isCash ? -fare : 0,
         discount: rideData.discount || 0,
         customer_notes: rideData.customerNotes || existingBooking?.customer_notes || '',
         package_info: rideData.packageInfo || existingBooking?.package_info || null,
@@ -1058,8 +1058,13 @@ export const dbService = {
         driver_rating: assignedDriverObj.rating,
         driver: assignedDriverObj,
         assignment_status: 'assigned',
+        driver_step: existing.booking_status === 'cancelled' ? 'cancelled' : 'assigned',
         assigned_by: reviewerName,
         assigned_at: new Date().toISOString(),
+        timeline: {
+          ...(existing.timeline || {}),
+          received: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':')
+        },
         is_read_driver: false,
         is_read: false,
         updated_at: new Date().toISOString()
@@ -1096,6 +1101,62 @@ export const dbService = {
         ...bookings[idx],
         booking_status: status,
         status_note: note || bookings[idx].status_note || null,
+        updated_at: new Date().toISOString()
+      };
+
+      bookings[idx] = updated;
+      setStoredArray(STORAGE_KEYS.BOOKINGS, bookings);
+      return updated;
+    },
+
+    advanceDriverStep(bookingId, nextStep) {
+      if (!bookingId || !nextStep) return null;
+      const bookings = getStoredArray(STORAGE_KEYS.BOOKINGS, []);
+      const idx = bookings.findIndex((b) => b && b.id === bookingId);
+      if (idx === -1) return null;
+
+      const existing = bookings[idx];
+      const nowTime = new Date()
+        .toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+        .replace('.', ':');
+      const prevTimeline = existing.timeline || { received: nowTime };
+      let nextTimeline = { ...prevTimeline };
+
+      if (nextStep === 'assigned') {
+        nextTimeline = {
+          received: prevTimeline.received || nowTime,
+          arrived: '--:--',
+          pickedUp: '--:--',
+          completed: '--:--'
+        };
+      } else if (nextStep === 'arrived') {
+        nextTimeline = {
+          ...prevTimeline,
+          arrived: nowTime,
+          pickedUp: '--:--',
+          completed: '--:--'
+        };
+      } else if (nextStep === 'picked_up') {
+        nextTimeline = {
+          ...prevTimeline,
+          arrived: prevTimeline.arrived && prevTimeline.arrived !== '--:--' ? prevTimeline.arrived : nowTime,
+          pickedUp: nowTime,
+          completed: '--:--'
+        };
+      } else if (nextStep === 'completed') {
+        nextTimeline = {
+          ...prevTimeline,
+          arrived: prevTimeline.arrived && prevTimeline.arrived !== '--:--' ? prevTimeline.arrived : nowTime,
+          pickedUp: prevTimeline.pickedUp && prevTimeline.pickedUp !== '--:--' ? prevTimeline.pickedUp : nowTime,
+          completed: nowTime
+        };
+      }
+
+      const updated = {
+        ...existing,
+        driver_step: nextStep,
+        booking_status: nextStep === 'cancelled' ? 'cancelled' : 'completed',
+        timeline: nextTimeline,
         updated_at: new Date().toISOString()
       };
 

@@ -249,15 +249,23 @@ export default function ProfilePage({ user: propUser, onBack, onLogout }) {
             : (simCNumber.trim() || simANumber.trim()),
         };
 
+        if (displayAvatar) {
+          vehicleUpdates.avatar = displayAvatar;
+        }
+        const activeDocs = {};
+        ['ktp', 'sim', 'stnk'].forEach((k) => {
+          if (docFiles[k]) activeDocs[k] = docFiles[k];
+        });
+
         if (driverProfile?.id) {
-          dbService.drivers.updateDriver(driverProfile.id, vehicleUpdates);
+          dbService.drivers.updateDriver(driverProfile.id, vehicleUpdates, activeDocs);
         } else {
           const allDrivers = dbService.drivers.getAll();
           const existingDriver = allDrivers.find(
             (d) => d.user_id === currentUser?.id || d.name?.toLowerCase() === name.toLowerCase()
           );
           if (existingDriver) {
-            dbService.drivers.updateDriver(existingDriver.id, vehicleUpdates);
+            dbService.drivers.updateDriver(existingDriver.id, vehicleUpdates, activeDocs);
           } else {
             dbService.drivers.registerDriver(
               { ...currentUser, ...userUpdates },
@@ -376,19 +384,23 @@ export default function ProfilePage({ user: propUser, onBack, onLogout }) {
       const dataUrl = await compressImageFile(file, 400, 400, 0.8);
       setLocalAvatar(dataUrl);
       
-      const allUsers = dbService.users.getAll();
-      const idx = allUsers.findIndex(
-        (u) =>
-          u.id === currentUser.id ||
-          (u.full_name || u.fullName) === (currentUser.full_name || currentUser.fullName)
-      );
-      if (idx !== -1) {
-        allUsers[idx] = { ...allUsers[idx], avatar_url: dataUrl };
-        localStorage.setItem('otwjek_db_users', JSON.stringify(allUsers));
+      if (currentUser?.id) {
+        dbService.users.update(currentUser.id, { avatar_url: dataUrl, avatarUrl: dataUrl });
+      }
+      if (isDriver && driverProfile?.id) {
+        dbService.drivers.updateDriver(driverProfile.id, { avatar: dataUrl });
       }
       const sessionUser = dbService.session.getCurrentUser();
       if (sessionUser) {
-        dbService.session.setCurrentUser({ ...sessionUser, avatar_url: dataUrl });
+        const updatedDriverObj = sessionUser.driver
+          ? { ...sessionUser.driver, avatar: dataUrl }
+          : sessionUser.driver;
+        dbService.session.setCurrentUser({
+          ...sessionUser,
+          avatar_url: dataUrl,
+          avatarUrl: dataUrl,
+          driver: updatedDriverObj
+        });
       }
     } catch (err) {
       console.error(err);
@@ -435,7 +447,7 @@ export default function ProfilePage({ user: propUser, onBack, onLogout }) {
         >
           <ArrowLeft size={24} strokeWidth={2.2} />
         </button>
-        <h1 className="profile-flat-title">Personal Info</h1>
+        <h1 className="profile-flat-title">{isDriver ? 'Profil Mitra Driver' : 'Profil Saya'}</h1>
         <div className="profile-flat-spacer" />
       </div>
 
@@ -541,7 +553,7 @@ export default function ProfilePage({ user: propUser, onBack, onLogout }) {
 
           {/* 1. Full Name */}
           <div className="profile-flat-field">
-            <label className="profile-flat-label">Full Name</label>
+            <label className="profile-flat-label">Nama Lengkap</label>
             <div className={`profile-flat-pill-box ${isEditing ? 'is-editing' : 'is-locked'}`}>
               <input
                 ref={nameInputRef}
@@ -557,7 +569,7 @@ export default function ProfilePage({ user: propUser, onBack, onLogout }) {
 
           {/* 2. Email */}
           <div className="profile-flat-field">
-            <label className="profile-flat-label">Email</label>
+            <label className="profile-flat-label">Alamat Email</label>
             <div className={`profile-flat-pill-box ${isEditing ? 'is-editing' : 'is-locked'}`}>
               <div className="profile-flat-lead-icon">
                 <Mail size={18} strokeWidth={2} />
@@ -575,7 +587,7 @@ export default function ProfilePage({ user: propUser, onBack, onLogout }) {
 
           {/* 3. Phone Number */}
           <div className="profile-flat-field">
-            <label className="profile-flat-label">Phone Number</label>
+            <label className="profile-flat-label">Nomor Telepon / WhatsApp</label>
             <div className={`profile-flat-pill-box ${isEditing ? 'is-editing' : 'is-locked'}`}>
               <div className="profile-flat-phone-prefix">
                 <span className="profile-flag-emoji">🇮🇩</span>
@@ -594,7 +606,7 @@ export default function ProfilePage({ user: propUser, onBack, onLogout }) {
 
           {/* 4. Gender */}
           <div className="profile-flat-field">
-            <label className="profile-flat-label">Gender</label>
+            <label className="profile-flat-label">Jenis Kelamin</label>
             <div className="profile-flat-pill-box is-readonly is-locked">
               <input
                 type="text"
@@ -611,14 +623,14 @@ export default function ProfilePage({ user: propUser, onBack, onLogout }) {
 
           {/* 5. Date of Birth */}
           <div className="profile-flat-field">
-            <label className="profile-flat-label">Date of Birth</label>
+            <label className="profile-flat-label">Tanggal Lahir</label>
             <div className={`profile-flat-pill-box ${isEditing ? 'is-editing' : 'is-locked'}`}>
               <input
                 type="text"
                 className="profile-flat-input"
                 value={birthDate}
                 onChange={(e) => setBirthDate(e.target.value)}
-                placeholder="MM-DD-YYYY atau YYYY-MM-DD"
+                placeholder="Contoh: 27-12-1995"
                 disabled={!isEditing}
               />
               <div className="profile-flat-trail-icon">

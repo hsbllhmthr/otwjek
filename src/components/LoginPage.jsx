@@ -3,7 +3,7 @@ import './LoginPage.css';
 import { ArrowLeft, Check, Loader2 } from 'lucide-react';
 import dbService, { normalizePhone } from '../services/dbService.js';
 
-export default function LoginPage({ onBack, onSuccess, onGoToSignUp }) {
+export default function LoginPage({ isDriver = false, onBack, onSuccess, onGoToSignUp }) {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -31,35 +31,67 @@ export default function LoginPage({ onBack, onSuccess, onGoToSignUp }) {
 
     setTimeout(() => {
       setIsLoading(false);
-      const existingUser = dbService.users.findByPhone(phoneNumber);
-      if (!existingUser) {
-        setErrorMessage(
-          'Nomor telepon ini belum terdaftar. Silakan klik "Daftar" di bawah untuk membuat akun baru.'
-        );
-        return;
+      const allDrivers = dbService.drivers.getAll();
+      let existingUser = dbService.users.findByPhone(phoneNumber);
+      const driverProfile =
+        (existingUser && dbService.drivers.getDriverByUserId(existingUser.id)) ||
+        allDrivers.find((d) => normalizePhone(d.phone) === normalizePhone(phoneNumber));
+
+      if (isDriver) {
+        if (!existingUser && !driverProfile) {
+          setErrorMessage(
+            'Nomor telepon mitra driver ini belum terdaftar. Silakan klik "Daftar" di bawah untuk mendaftar sebagai mitra driver.'
+          );
+          return;
+        }
+        if (existingUser && existingUser.role !== 'driver' && !driverProfile) {
+          setErrorMessage(
+            'Nomor telepon ini terdaftar sebagai akun pelanggan, bukan mitra driver. Silakan klik "Daftar" di bawah untuk mendaftar sebagai mitra driver.'
+          );
+          return;
+        }
+        if (!existingUser && driverProfile) {
+          existingUser = dbService.users.create({
+            id: driverProfile.user_id,
+            fullName: driverProfile.name,
+            full_name: driverProfile.name,
+            phone: driverProfile.phone,
+            role: 'driver'
+          });
+        } else if (existingUser && existingUser.role !== 'driver') {
+          existingUser = dbService.users.update(existingUser.id, { role: 'driver' }) || existingUser;
+          existingUser.role = 'driver';
+        }
+      } else {
+        if (!existingUser) {
+          setErrorMessage(
+            'Nomor telepon ini belum terdaftar. Silakan klik "Daftar" di bawah untuk membuat akun baru.'
+          );
+          return;
+        }
       }
 
       // Pastikan data profil driver ditautkan ke sesi jika terdaftar sebagai mitra driver
-      if (existingUser.role === 'driver') {
-        const allDrivers = dbService.drivers.getAll();
-        const driverProfile =
+      if (existingUser.role === 'driver' || driverProfile) {
+        const activeDriverProfile =
+          driverProfile ||
           dbService.drivers.getDriverByUserId(existingUser.id) ||
           allDrivers.find((d) => normalizePhone(d.phone) === normalizePhone(existingUser.phone));
-        if (driverProfile) {
-          existingUser.driver = driverProfile;
+        if (activeDriverProfile) {
+          existingUser.driver = activeDriverProfile;
           existingUser.vehicleData = {
-            vehicleType: driverProfile.vehicleType,
-            vehicleBrand: driverProfile.vehicleBrand,
-            vehicleModel: driverProfile.vehicleModel,
-            vehicleColor: driverProfile.vehicleColor,
-            plateNumber: driverProfile.plateNumber,
-            operationalArea: driverProfile.operationalArea,
-            nik: driverProfile.nik,
-            simNumber: driverProfile.simNumber,
-            simExpiry: driverProfile.simExpiry,
-            stnkExpiry: driverProfile.stnkExpiry,
-            emergencyContactName: driverProfile.emergencyContactName,
-            emergencyContactPhone: driverProfile.emergencyContactPhone
+            vehicleType: activeDriverProfile.vehicleType,
+            vehicleBrand: activeDriverProfile.vehicleBrand,
+            vehicleModel: activeDriverProfile.vehicleModel,
+            vehicleColor: activeDriverProfile.vehicleColor,
+            plateNumber: activeDriverProfile.plateNumber,
+            operationalArea: activeDriverProfile.operationalArea,
+            nik: activeDriverProfile.nik,
+            simNumber: activeDriverProfile.simNumber,
+            simExpiry: activeDriverProfile.simExpiry,
+            stnkExpiry: activeDriverProfile.stnkExpiry,
+            emergencyContactName: activeDriverProfile.emergencyContactName,
+            emergencyContactPhone: activeDriverProfile.emergencyContactPhone
           };
         }
       }
@@ -89,10 +121,12 @@ export default function LoginPage({ onBack, onSuccess, onGoToSignUp }) {
         {/* Header Text */}
         <div className="login-header-group">
           <h1 className="login-headline">
-            Selamat Datang Kembali!
+            {isDriver ? 'Masuk Mitra Driver' : 'Selamat Datang Kembali!'}
           </h1>
           <p className="login-subheadline">
-            Silakan masukkan nomor telepon Anda untuk masuk ke akun OTWJek.
+            {isDriver
+              ? 'Silakan masukkan nomor telepon Anda untuk masuk ke akun Mitra Driver OTWJek.'
+              : 'Silakan masukkan nomor telepon Anda untuk masuk ke akun OTWJek.'}
           </p>
         </div>
 
@@ -169,7 +203,9 @@ export default function LoginPage({ onBack, onSuccess, onGoToSignUp }) {
         {/* Helper switcher to Sign up if user doesn't have an account */}
         {onGoToSignUp && (
           <div className="login-footer-switcher">
-            <span className="login-switcher-text">Belum punya akun?</span>
+            <span className="login-switcher-text">
+              {isDriver ? 'Belum punya akun mitra?' : 'Belum punya akun?'}
+            </span>
             <button
               type="button"
               className="btn-link-signup"

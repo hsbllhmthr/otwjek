@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import './ActivityPage.css';
 import {
   ArrowLeft,
@@ -8,10 +8,11 @@ import {
   Car,
   User,
   Check,
-  ShoppingBag
+  ShoppingBag,
+  Inbox
 } from 'lucide-react';
 import { formatRupiah } from '../utils/fareCalculator.js';
-import dbService from '../services/dbService.js';
+import dbService, { normalizePhone } from '../services/dbService.js';
 import ActivityOrderDetailView from './ActivityOrderDetailView.jsx';
 
 // Helper konversi data booking dari dbService ke format tampilan kartu riwayat pesanan
@@ -40,13 +41,17 @@ function formatBookingToOrder(b) {
   const deliveryFee = Number(b.delivery_fee || Math.round((fare * 0.85) / 100) * 100);
   const totalEarnings = Number(b.total_earnings || deliveryFee);
 
-  const cashVal =
-    b.cash_collected !== undefined
-      ? Number(b.cash_collected)
-      : b.payment_method === 'cash'
-      ? -fare
-      : 0;
-  const adjVal = b.adjustment !== undefined ? Number(b.adjustment) : -fare;
+  const isQris = String(b.payment_method || 'cash').toLowerCase() === 'qris';
+  const cashVal = isQris
+    ? 0
+    : b.cash_collected !== undefined
+    ? Number(b.cash_collected)
+    : -fare;
+  const adjVal = isQris
+    ? 0
+    : b.adjustment !== undefined
+    ? Number(b.adjustment)
+    : -fare;
 
   const code =
     b.order_code ||
@@ -123,6 +128,7 @@ function formatBookingToOrder(b) {
     price: fare,
     formattedPrice: formatRupiah(fare),
     deliveryFee: formatRupiah(deliveryFee),
+    totalEarningsAmount: totalEarnings,
     totalEarnings: formatRupiah(totalEarnings),
     cashCollected: cashVal < 0 ? `-${formatRupiah(Math.abs(cashVal))}` : formatRupiah(cashVal),
     adjustment: adjVal < 0 ? `-${formatRupiah(Math.abs(adjVal))}` : formatRupiah(adjVal),
@@ -130,11 +136,15 @@ function formatBookingToOrder(b) {
     customerAddress: realDropoffName,
     pickupLocation: {
       name: realPickupName,
-      address: realPickupAddress
+      address: realPickupAddress,
+      lat: b.pickup_lat || null,
+      lng: b.pickup_lng || null
     },
     dropoffLocation: {
       name: realDropoffName,
-      address: realDropoffAddress
+      address: realDropoffAddress,
+      lat: b.dropoff_lat || null,
+      lng: b.dropoff_lng || null
     },
     driver: driverObj,
     assignmentStatus: b.assignment_status || 'unassigned',
@@ -145,6 +155,7 @@ function formatBookingToOrder(b) {
     distanceKm: b.distance_km || 3.2,
     durationMinutes: b.duration_minutes || 18,
     status: b.booking_status === 'cancelled' ? 'cancelled' : 'completed',
+    driverStep: b.driver_step || (b.booking_status === 'cancelled' ? 'cancelled' : 'completed'),
     cancelReason: b.cancel_reason || 'Dibatalkan oleh Pelanggan',
     timeline: b.timeline || {
       received: '13:31',
@@ -177,7 +188,7 @@ function formatBookingToOrder(b) {
   };
 }
 
-export default function ActivityPage({ onBack, currentUser }) {
+export default function ActivityPage({ onBack, currentUser, isDriver }) {
   const [activeTab, setActiveTab] = useState('selesai'); // 'selesai' | 'dibatalkan'
   const [selectedDate, setSelectedDate] = useState('all');
   const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
@@ -186,17 +197,45 @@ export default function ActivityPage({ onBack, currentUser }) {
   const dropdownRef = useRef(null);
 
   const activeUser = currentUser || dbService.session.getCurrentUser();
+  const isDriverView = Boolean(isDriver || activeUser?.role === 'driver');
 
   // Ambil data pesanan dinamis langsung dari dbService khusus untuk akun yang aktif
-  const loadBookings = () => {
+  const loadBookings = useCallback(() => {
     try {
-      dbService.bookings.markAllAsRead(activeUser);
-      const items = dbService.bookings.getAll(activeUser);
+      if (!activeUser) {
+        setRawBookings([]);
+        return;
+      }
+
+      let queryAccount = activeUser;
+
+      if (isDriverView) {
+        const allDrivers = dbService.drivers.getAll();
+        const matchedDriver =
+          dbService.drivers.getDriverByUserId(activeUser.id) ||
+          allDrivers.find(
+            (d) =>
+              d &&
+              ((activeUser.driver?.id && d.id === activeUser.driver.id) ||
+                (activeUser.phone && d.phone && normalizePhone(d.phone) === normalizePhone(activeUser.phone)))
+          ) ||
+          activeUser.driver ||
+          null;
+
+        queryAccount = {
+          ...activeUser,
+          role: 'driver',
+          driver: matchedDriver || activeUser.driver
+        };
+      }
+
+      dbService.bookings.markAllAsRead(queryAccount);
+      const items = dbService.bookings.getAll(queryAccount);
       setRawBookings(Array.isArray(items) ? items : []);
     } catch {
-      // fallback
+      setRawBookings([]);
     }
-  };
+  }, [activeUser, isDriverView]);
 
   useEffect(() => {
     loadBookings();
@@ -214,7 +253,7 @@ export default function ActivityPage({ onBack, currentUser }) {
       window.removeEventListener('otwjek_db_change', handleDbChange);
       window.removeEventListener('storage', loadBookings);
     };
-  }, [activeUser]);
+  }, [loadBookings]);
 
   // Tutup dropdown tanggal jika klik di luar
   useEffect(() => {
@@ -293,7 +332,7 @@ export default function ActivityPage({ onBack, currentUser }) {
         order={liveSelectedOrder}
         onBack={() => setSelectedOrder(null)}
         currentUser={activeUser}
-        isDriver={activeUser?.role === 'driver'}
+        isDriver={isDriverView}
         onReorder={() => {
           setSelectedOrder(null);
           if (onBack) onBack();
@@ -313,7 +352,9 @@ export default function ActivityPage({ onBack, currentUser }) {
         >
           <ArrowLeft size={22} strokeWidth={2.2} />
         </button>
-        <h1 className="activity-topbar-title">Riwayat Pesanan</h1>
+        <h1 className="activity-topbar-title">
+          {isDriverView ? 'Riwayat Tugas Driver' : 'Riwayat Pesanan'}
+        </h1>
       </header>
 
       {/* 2. Tabs Bar (Selesai | Dibatalkan) */}
@@ -340,7 +381,7 @@ export default function ActivityPage({ onBack, currentUser }) {
 
       {/* 3. Scrollable List Area */}
       <main className="activity-content-scroll">
-        {/* Date Filter Header Selector */}
+        {/* Date Filter Header Selector + Driver Net Earnings Summary */}
         <div className="activity-date-filter-row" ref={dropdownRef}>
           <button
             className="btn-activity-date-selector"
@@ -378,70 +419,184 @@ export default function ActivityPage({ onBack, currentUser }) {
         {/* Orders List */}
         {displayedOrders.length > 0 ? (
           <>
-            {displayedOrders.map((order) => (
-              <article
-                key={order.id}
-                className="activity-order-card"
-                onClick={() => setSelectedOrder(order)}
-                role="button"
-                tabIndex={0}
-                aria-label={`Rincian pesanan ${order.orderCode || order.serviceName} ${order.formattedPrice}`}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    setSelectedOrder(order);
-                  }
-                }}
-              >
-                {/* Header Row: Time, Service Name (Motor / Mobil / Paket), and Price */}
-                <div className="activity-card-header-row">
-                  <div className="activity-card-left-meta">
-                    <span className="activity-card-time">{order.time}</span>
-                    {renderServiceBadge(order)}
-                  </div>
-                  <span className="activity-card-price">{order.formattedPrice}</span>
-                </div>
-
-                {/* Route Details: Merchant / Pickup point and Customer Address */}
-                <div className="activity-card-route">
-                  {/* Origin / Restaurant / Pickup */}
-                  <div className="activity-route-step">
-                    <div className="activity-circle-icon pickup">
-                      {(order.serviceType === 'paket' || order.serviceType === 'send' || order.serviceName === 'Paket') ? (
-                        <Package size={13} strokeWidth={2.2} />
-                      ) : (order.serviceType === 'mobil' || order.serviceType === 'car' || order.serviceName === 'Mobil') ? (
-                        <Car size={13} strokeWidth={2.2} />
-                      ) : (
-                        <Bike size={13} strokeWidth={2.2} />
-                      )}
+            {displayedOrders.map((order) =>
+              isDriverView ? (
+                /* KARTU RIWAYAT KHUSUS DRIVER (2-Stop Stepper Style seragam dengan Beranda Driver) */
+                <article
+                  key={order.id}
+                  className="driver-order-card stepper-card-style"
+                  onClick={() => setSelectedOrder(order)}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Rincian tugas ${order.orderCode} ${order.totalEarnings}`}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedOrder(order);
+                    }
+                  }}
+                >
+                  {/* Stop 1: Pickup / Titik Jemput */}
+                  <div className="stepper-stop-row">
+                    <div className="stepper-rail-col">
+                      <div
+                        className={`stepper-check-ring ${
+                          order.status === 'cancelled' ? 'muted-gray' : 'active-blue'
+                        }`}
+                      >
+                        <div className="stepper-check-inner">
+                          <svg width="9" height="9" viewBox="0 0 12 12" fill="none">
+                            <path
+                              d="M2.5 6.2L4.8 8.5L9.5 3.5"
+                              stroke="#FFFFFF"
+                              strokeWidth="2.2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                      <div
+                        className={`stepper-dashed-line ${
+                          order.status === 'completed' ? 'completed' : ''
+                        }`}
+                      />
                     </div>
-                    <span className="activity-route-text" title={order.merchantName}>
-                      {order.serviceType === 'paket' ? `Pengambilan: ${order.merchantName}` : order.merchantName}
-                    </span>
+
+                    <div className="stepper-stop-content first-stop">
+                      <div className="stepper-stop-header">
+                        <span className="stepper-stop-kicker">TITIK JEMPUT · STOP 1</span>
+                        <span
+                          className={`stepper-status-pill ${
+                            order.status === 'cancelled'
+                              ? 'cancelled'
+                              : order.driverStep === 'assigned' || order.driverStep === 'arrived'
+                              ? 'in-progress'
+                              : 'completed'
+                          }`}
+                        >
+                          {order.status === 'cancelled'
+                            ? 'DIBATALKAN'
+                            : order.driverStep === 'assigned'
+                            ? 'MENUJU JEMPUT'
+                            : order.driverStep === 'arrived'
+                            ? 'TIBA DI JEMPUT'
+                            : 'SELESAI'}
+                        </span>
+                      </div>
+                      <h3 className="stepper-stop-title">{order.pickupLocation.name}</h3>
+                      <p className="stepper-stop-address">{order.pickupLocation.address}</p>
+                      <p className="stepper-stop-meta">
+                        {order.date} · Waktu {order.timeline?.received || order.time} – {order.timeline?.pickedUp || order.time} · Tiba {order.timeline?.arrived || order.time}
+                      </p>
+                    </div>
                   </div>
 
-                  {/* Vertical Connecting Line */}
-                  <div className="activity-route-connector" aria-hidden="true" />
-
-                  {/* Destination / Customer Address */}
-                  <div className="activity-route-step">
-                    <div className="activity-circle-icon dropoff">
-                      <User size={13} strokeWidth={2.4} />
+                  {/* Stop 2: Dropoff / Titik Tujuan */}
+                  <div className="stepper-stop-row">
+                    <div className="stepper-rail-col">
+                      <div
+                        className={`stepper-check-ring ${
+                          order.status === 'completed' && order.driverStep === 'completed'
+                            ? 'active-blue'
+                            : 'muted-gray'
+                        }`}
+                      >
+                        <div className="stepper-check-inner">
+                          <svg width="9" height="9" viewBox="0 0 12 12" fill="none">
+                            <path
+                              d="M2.5 6.2L4.8 8.5L9.5 3.5"
+                              stroke="#FFFFFF"
+                              strokeWidth="2.2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </div>
+                      </div>
                     </div>
-                    <span className="activity-route-text subtle" title={order.customerAddress}>
-                      {order.serviceType === 'paket' ? `Pengantaran: ${order.customerAddress}` : order.customerAddress}
-                    </span>
+
+                    <div className="stepper-stop-content">
+                      <div className="stepper-stop-header">
+                        <span className="stepper-stop-kicker">TITIK TUJUAN · STOP 2</span>
+                        {order.status !== 'cancelled' && order.driverStep === 'picked_up' && (
+                          <span className="stepper-status-pill in-progress">DIANTAR</span>
+                        )}
+                      </div>
+                      <h3 className="stepper-stop-title">{order.dropoffLocation.name}</h3>
+                      <p className="stepper-stop-address">{order.dropoffLocation.address}</p>
+                      <p className="stepper-stop-meta">
+                        Estimasi {order.timeline?.pickedUp || order.time} – {order.timeline?.completed || order.time} · {order.serviceName} {order.orderCode} ({order.totalEarnings})
+                      </p>
+                    </div>
+                  </div>
+                </article>
+              ) : (
+                /* KARTU RIWAYAT PELANGGAN (CUSTOMER) */
+                <article
+                  key={order.id}
+                  className="activity-order-card"
+                  onClick={() => setSelectedOrder(order)}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Rincian pesanan ${order.orderCode || order.serviceName} ${order.formattedPrice}`}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedOrder(order);
+                    }
+                  }}
+                >
+                  {/* Header Row: Time, Service Name (Motor / Mobil / Paket), and Price */}
+                  <div className="activity-card-header-row">
+                    <div className="activity-card-left-meta">
+                      <span className="activity-card-time">{order.time}</span>
+                      {renderServiceBadge(order)}
+                    </div>
+                    <span className="activity-card-price">{order.formattedPrice}</span>
                   </div>
 
-                  {/* Cancelled badge if on cancelled tab */}
-                  {order.status === 'cancelled' && order.cancelReason && (
-                    <div className="activity-cancelled-badge">
-                      {order.cancelReason}
+                  {/* Route Details: Merchant / Pickup point and Customer Address */}
+                  <div className="activity-card-route">
+                    {/* Origin / Restaurant / Pickup */}
+                    <div className="activity-route-step">
+                      <div className="activity-circle-icon pickup">
+                        {(order.serviceType === 'paket' || order.serviceType === 'send' || order.serviceName === 'Paket') ? (
+                          <Package size={13} strokeWidth={2.2} />
+                        ) : (order.serviceType === 'mobil' || order.serviceType === 'car' || order.serviceName === 'Mobil') ? (
+                          <Car size={13} strokeWidth={2.2} />
+                        ) : (
+                          <Bike size={13} strokeWidth={2.2} />
+                        )}
+                      </div>
+                      <span className="activity-route-text" title={order.merchantName}>
+                        {order.serviceType === 'paket' ? `Pengambilan: ${order.merchantName}` : order.merchantName}
+                      </span>
                     </div>
-                  )}
-                </div>
-              </article>
-            ))}
+
+                    {/* Vertical Connecting Line */}
+                    <div className="activity-route-connector" aria-hidden="true" />
+
+                    {/* Destination / Customer Address */}
+                    <div className="activity-route-step">
+                      <div className="activity-circle-icon dropoff">
+                        <User size={13} strokeWidth={2.4} />
+                      </div>
+                      <span className="activity-route-text subtle" title={order.customerAddress}>
+                        {order.serviceType === 'paket' ? `Pengantaran: ${order.customerAddress}` : order.customerAddress}
+                      </span>
+                    </div>
+
+                    {/* Cancelled badge if on cancelled tab */}
+                    {order.status === 'cancelled' && order.cancelReason && (
+                      <div className="activity-cancelled-badge">
+                        {order.cancelReason}
+                      </div>
+                    )}
+                  </div>
+                </article>
+              )
+            )}
 
             {/* End of list divider ("Akhir dari daftar") matching reference */}
             <div className="activity-end-of-list" aria-hidden="true">
@@ -453,14 +608,20 @@ export default function ActivityPage({ onBack, currentUser }) {
         ) : (
           <div className="activity-empty-box">
             <div className="activity-empty-icon-wrap">
-              <ShoppingBag size={28} />
+              {isDriverView ? <Inbox size={28} /> : <ShoppingBag size={28} />}
             </div>
             <h3 className="activity-empty-title">
-              {allOrders.length === 0 ? 'Belum Ada Pesanan' : 'Tidak Ada Pesanan'}
+              {allOrders.length === 0
+                ? isDriverView
+                  ? 'Belum Ada Riwayat Tugas'
+                  : 'Belum Ada Pesanan'
+                : 'Tidak Ada Pesanan'}
             </h3>
             <p className="activity-empty-desc">
               {allOrders.length === 0
-                ? 'Riwayat pesanan Motor, Mobil, atau Paket Anda akan muncul di sini setelah Anda melakukan pemesanan.'
+                ? isDriverView
+                  ? 'Pesanan yang ditugaskan oleh Admin Dispatch kepada Anda akan otomatis tercatat di halaman riwayat ini.'
+                  : 'Riwayat pesanan Motor, Mobil, atau Paket Anda akan muncul di sini setelah Anda melakukan pemesanan.'
                 : activeTab === 'selesai'
                 ? `Belum ada pesanan selesai pada tanggal ${selectedDate === 'all' ? '' : selectedDate}.`
                 : 'Belum ada pesanan yang dibatalkan.'}

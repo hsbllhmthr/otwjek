@@ -1,0 +1,794 @@
+/* ==========================================================================
+   DriverHomePage.css — Dashboard Beranda Khusus Mitra Driver OTWJek
+   ========================================================================== */
+
+.driver-home-viewport {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background-color: #F8FAFC;
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #0F172A;
+  overflow: hidden;
+  position: relative;
+}
+
+.driver-home-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px 16px 104px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Toast Notification */
+.driver-toast-banner {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1200;
+  background: #0F172A;
+  color: #FFFFFF;
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
+  max-width: 90%;
+  animation: driverToastFadeIn 0.2s ease-out;
+}
+
+@keyframes driverToastFadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* 1. Top Header Bar */
+.driver-top-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #FFFFFF;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid #E2E8F0;
+}
+
+.driver-identity-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.driver-avatar-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #FDF2F8;
+  border: 2px solid #FBCFE8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  color: #FF337F;
+}
+
+.driver-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.driver-identity-texts {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.driver-greeting-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.driver-badges-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.driver-role-pill {
+  font-size: 11px;
+  font-weight: 700;
+  color: #BE185D;
+  background: #FDF2F8;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid #FBCFE8;
+}
+
+.driver-rating-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #B45309;
+  background: #FEF3C7;
+  padding: 2px 7px;
+  border-radius: 6px;
+}
+
+.btn-driver-support {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid #E2E8F0;
+  background: #F8FAFC;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-driver-support:hover {
+  background: #F1F5F9;
+  border-color: #CBD5E1;
+}
+
+/* 2. Verification Status Alert Banner */
+.driver-verify-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+}
+
+.driver-verify-card.pending {
+  background: #FFFBEB;
+  border-color: #FDE68A;
+  color: #92400E;
+}
+
+.driver-verify-card.rejected {
+  background: #FEF2F2;
+  border-color: #FECACA;
+  color: #991B1B;
+}
+
+.driver-verify-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.driver-verify-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.driver-verify-desc {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  opacity: 0.92;
+}
+
+.btn-driver-verify-action {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+}
+
+.driver-verify-card.pending .btn-driver-verify-action {
+  background: #D97706;
+  color: #FFFFFF;
+}
+
+.driver-verify-card.rejected .btn-driver-verify-action {
+  background: #DC2626;
+  color: #FFFFFF;
+}
+
+/* 3. Online / Offline Status Switch Card */
+.driver-status-card {
+  background: #FFFFFF;
+  border-radius: 16px;
+  padding: 16px;
+  border: 1.5px solid #E2E8F0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.driver-status-card.is-online {
+  border-color: #10B981;
+  background: linear-gradient(180deg, #ECFDF5 0%, #FFFFFF 65%);
+}
+
+.driver-status-main-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.driver-status-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.driver-status-indicator-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #94A3B8;
+}
+
+.status-dot.online {
+  background: #10B981;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
+}
+
+.driver-status-heading {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0F172A;
+}
+
+.driver-status-subtext {
+  font-size: 12.5px;
+  color: #64748B;
+  margin: 0;
+}
+
+/* Toggle Switch Button */
+.btn-online-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.12s ease, background-color 0.2s ease;
+  flex-shrink: 0;
+}
+
+.btn-online-toggle:active {
+  transform: scale(0.97);
+}
+
+.btn-online-toggle.offline-mode {
+  background: #0F172A;
+  color: #FFFFFF;
+}
+
+.btn-online-toggle.online-mode {
+  background: #10B981;
+  color: #FFFFFF;
+}
+
+.driver-status-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #F1F5F9;
+  flex-wrap: wrap;
+}
+
+.driver-area-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.btn-report-ready-wa {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #FDF2F8;
+  color: #FF337F;
+  border: 1px solid #FBCFE8;
+  padding: 6px 11px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* 4. Earnings & Performance Summary Card */
+.driver-earnings-card {
+  background: #FFFFFF;
+  border-radius: 16px;
+  padding: 16px;
+  border: 1px solid #E2E8F0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.earnings-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.earnings-card-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #475569;
+}
+
+.earnings-period-tabs {
+  display: inline-flex;
+  background: #F1F5F9;
+  padding: 3px;
+  border-radius: 8px;
+}
+
+.period-tab-btn {
+  border: none;
+  background: transparent;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #64748B;
+  cursor: pointer;
+}
+
+.period-tab-btn.active {
+  background: #FFFFFF;
+  color: #0F172A;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.earnings-main-amount {
+  font-size: 26px;
+  font-weight: 800;
+  color: #0F172A;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.earnings-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #F1F5F9;
+}
+
+.earnings-metric-box {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.metric-box-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748B;
+}
+
+.metric-box-value {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+/* 5. Active Vehicle Info Strip */
+.driver-vehicle-card {
+  background: #FFFFFF;
+  border-radius: 14px;
+  padding: 13px 16px;
+  border: 1px solid #E2E8F0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.vehicle-card-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.vehicle-icon-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #FDF2F8;
+  color: #FF337F;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.vehicle-card-texts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.vehicle-model-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0F172A;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vehicle-plate-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #64748B;
+}
+
+.plate-badge {
+  background: #0F172A;
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1.5px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.03em;
+}
+
+.btn-vehicle-edit {
+  border: 1px solid #E2E8F0;
+  background: #F8FAFC;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 11px;
+  border-radius: 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* 6. Assigned Orders Section */
+.driver-orders-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.driver-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.driver-section-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.driver-section-title {
+  font-size: 15.5px;
+  font-weight: 800;
+  color: #0F172A;
+  margin: 0;
+}
+
+.orders-count-badge {
+  background: #FF337F;
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.btn-see-all-orders {
+  background: transparent;
+  border: none;
+  color: #FF337F;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Order Filter Pills */
+.driver-order-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.order-filter-pill {
+  border: 1px solid #E2E8F0;
+  background: #FFFFFF;
+  color: #475569;
+  padding: 6px 13px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.order-filter-pill.active {
+  background: #0F172A;
+  color: #FFFFFF;
+  border-color: #0F172A;
+}
+
+/* Order Card (2-Stop Stepper Style) */
+.driver-order-card.stepper-card-style {
+  background: #FFFFFF;
+  border-radius: 20px;
+  padding: 18px 20px;
+  border: 1px solid #EAECEF;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.driver-order-card.stepper-card-style:hover {
+  border-color: #CBD5E1;
+}
+
+.driver-order-card.stepper-card-style.unread {
+  border-color: #BFDBFE;
+  background: #FAFCFF;
+}
+
+.stepper-stop-row {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+}
+
+.stepper-rail-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 22px;
+  flex-shrink: 0;
+}
+
+.stepper-check-ring {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: #FFFFFF;
+  box-sizing: border-box;
+}
+
+.stepper-check-ring.active-blue {
+  border: 1.5px solid #2563EB;
+}
+
+.stepper-check-ring.active-blue .stepper-check-inner {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #2563EB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stepper-check-ring.muted-gray {
+  border: 1.5px solid #D1D5DB;
+}
+
+.stepper-check-ring.muted-gray .stepper-check-inner {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #D1D5DB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stepper-dashed-line {
+  flex: 1;
+  width: 0;
+  border-left: 1.5px dashed #CBD5E1;
+  margin: 5px 0;
+  min-height: 24px;
+}
+
+.stepper-dashed-line.completed {
+  border-left-color: #93C5FD;
+}
+
+.stepper-stop-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.stepper-stop-content.first-stop {
+  padding-bottom: 18px;
+}
+
+.stepper-stop-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-height: 22px;
+}
+
+.stepper-stop-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #8E95A2;
+  text-transform: uppercase;
+}
+
+.stepper-status-pill {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 2.5px 9px;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+
+.stepper-status-pill.completed {
+  background: #E8F8F0;
+  color: #0D9458;
+}
+
+.stepper-status-pill.in-progress {
+  background: #EFF6FF;
+  color: #2563EB;
+}
+
+.stepper-status-pill.cancelled {
+  background: #FEF2F2;
+  color: #DC2626;
+}
+
+.stepper-stop-title {
+  font-size: 15.5px;
+  font-weight: 700;
+  color: #111827;
+  margin: 4px 0 2px;
+  line-height: 1.3;
+}
+
+.stepper-stop-address {
+  font-size: 13.5px;
+  font-weight: 400;
+  color: #374151;
+  margin: 0 0 4px;
+  line-height: 1.4;
+}
+
+.stepper-stop-meta {
+  font-size: 12.5px;
+  font-weight: 400;
+  color: #8E95A2;
+  margin: 0;
+  line-height: 1.35;
+}
+
+/* Empty State */
+.driver-orders-empty {
+  background: #FFFFFF;
+  border-radius: 16px;
+  padding: 28px 20px;
+  border: 1px dashed #CBD5E1;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.empty-icon-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #FDF2F8;
+  color: #FF337F;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.empty-orders-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0;
+}
+
+.empty-orders-sub {
+  font-size: 12.5px;
+  color: #64748B;
+  margin: 0;
+  max-width: 280px;
+  line-height: 1.5;
+}
+

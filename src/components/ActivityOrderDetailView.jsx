@@ -25,6 +25,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { formatRupiah } from '../utils/fareCalculator.js';
+import dbService from '../services/dbService.js';
 
 export default function ActivityOrderDetailView({
   order,
@@ -63,12 +64,28 @@ export default function ActivityOrderDetailView({
   const orderCode = order.orderCode || (order.id ? `#${String(order.id).slice(-4).toUpperCase()}` : '#8L9A');
   const orderNumber = order.orderNumber || '3301447308559872213';
   const isDelivered = order.status !== 'cancelled';
+  const currentDriverStep =
+    order.status === 'cancelled' ? 'cancelled' : order.driverStep || 'completed';
+  const activeStepIndex =
+    currentDriverStep === 'assigned'
+      ? 0
+      : currentDriverStep === 'arrived'
+      ? 1
+      : currentDriverStep === 'picked_up'
+      ? 2
+      : 3;
   const deliveryFeeStr = order.deliveryFee || order.formattedPrice || formatRupiah(order.price || 9600);
   const totalEarningsStr = order.totalEarnings || order.formattedPrice || deliveryFeeStr;
+  const isQrisPayment = String(order.paymentMethod || 'cash').toLowerCase() === 'qris';
+  const fareAmountStr = order.formattedPrice || formatRupiah(order.price || 15000);
 
   // Tagihan tunai / Penyesuaian Driver matching format reference
-  const cashCollectedStr = order.cashCollected || (order.price ? `-${formatRupiah(order.price)}` : '-Rp282.062');
-  const adjustmentStr = order.adjustment || cashCollectedStr;
+  const cashCollectedStr = isQrisPayment
+    ? formatRupiah(0)
+    : order.cashCollected || (order.price ? `-${formatRupiah(order.price)}` : '-Rp282.062');
+  const adjustmentStr = isQrisPayment
+    ? formatRupiah(0)
+    : order.adjustment || cashCollectedStr;
 
   // Timeline stations
   const timeline = order.timeline || {
@@ -127,6 +144,16 @@ export default function ActivityOrderDetailView({
       : 'Jl. Pengayoman, Panakkukang, Makassar'
   };
 
+  const buildGoogleMapsUrl = (loc) => {
+    if (loc?.lat && loc?.lng) {
+      return `https://www.google.com/maps/search/?api=1&query=${loc.lat},${loc.lng}`;
+    }
+    const q = [loc?.name, loc?.address && loc.address !== loc.name ? loc.address : '']
+      .filter(Boolean)
+      .join(', ');
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q || 'Makassar')}`;
+  };
+
   const handleCopyOrderNumber = () => {
     try {
       navigator.clipboard.writeText(orderNumber);
@@ -173,6 +200,14 @@ export default function ActivityOrderDetailView({
   };
 
 
+
+  const handleAdvanceDriverStep = (nextStep, toastMessage) => {
+    if (!order?.id) return;
+    dbService.bookings.advanceDriverStep(order.id, nextStep);
+    if (toastMessage) {
+      showToast(toastMessage);
+    }
+  };
 
   const handleReorderClick = () => {
     showToast(`Membuat pesanan ulang ${serviceDisplayName}...`);
@@ -276,6 +311,15 @@ export default function ActivityOrderDetailView({
                       <span style={{ fontSize: 12, color: '#6B7280', marginTop: 1 }}>{pickupLoc.address}</span>
                     )}
                   </div>
+                  <a
+                    href={buildGoogleMapsUrl(pickupLoc)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="driver-route-maps-link"
+                    title={`Buka lokasi jemput (${pickupLoc.name}) di Google Maps`}
+                  >
+                    Maps
+                  </a>
                 </div>
 
                 {/* Connecting Vertical Line */}
@@ -294,30 +338,27 @@ export default function ActivityOrderDetailView({
                       <span style={{ fontSize: 12, color: '#6B7280', marginTop: 1 }}>{dropoffLoc.address}</span>
                     )}
                   </div>
+                  <a
+                    href={buildGoogleMapsUrl(dropoffLoc)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="driver-route-maps-link"
+                    title={`Buka lokasi tujuan (${dropoffLoc.name}) di Google Maps`}
+                  >
+                    Maps
+                  </a>
                 </div>
               </div>
 
-              {/* Informasi Pelanggan yang Ditugaskan Admin */}
-              <div
-                style={{
-                  marginTop: 14,
-                  padding: '10px 12px',
-                  backgroundColor: '#F9FAFB',
-                  border: '1px solid #E5E7EB',
-                  borderRadius: 10,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 10
-                }}
-              >
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <span style={{ fontSize: 11.5, color: '#6B7280', fontWeight: 500 }}>
-                    Pelanggan ({serviceDisplayName})
-                  </span>
-                  <span style={{ fontSize: 13.5, fontWeight: 700, color: '#111827' }}>
+              {/* Informasi Pelanggan (Clean Minimalist Divider Row) */}
+              <div className="driver-customer-row">
+                <div className="driver-customer-info">
+                  <span className="driver-customer-name">
                     {order.customerName || 'Pelanggan OTWJek'}
-                    {order.customerPhone ? ` • ${order.customerPhone}` : ''}
+                  </span>
+                  <span className="driver-customer-meta">
+                    {order.customerPhone ? `${order.customerPhone} · ` : ''}
+                    {serviceDisplayName} · {order.distanceKm ? `${order.distanceKm} km` : '3.2 km'} · {isQrisPayment ? 'QRIS' : 'Tunai'}
                   </span>
                 </div>
                 {order.customerPhone && (
@@ -327,22 +368,113 @@ export default function ActivityOrderDetailView({
                     )}`}
                     target="_blank"
                     rel="noreferrer"
-                    style={{
-                      backgroundColor: '#10B981',
-                      color: '#FFFFFF',
-                      fontSize: 12,
-                      fontWeight: 700,
-                      padding: '6px 12px',
-                      borderRadius: 8,
-                      textDecoration: 'none',
-                      flexShrink: 0
-                    }}
+                    className="driver-btn-contact"
                   >
-                    Chat WA
+                    Hubungi
                   </a>
                 )}
               </div>
+
+              {/* Catatan Jemput / Instruksi Pelanggan */}
+              {order.customerNotes && (
+                <div className="driver-customer-note-row">
+                  <span className="driver-note-label">Catatan</span>
+                  <span className="driver-note-text">{order.customerNotes}</span>
+                </div>
+              )}
             </section>
+
+            {/* Section Khusus Driver: Detail Paket & Penerima (Muncul jika layanan Paket) */}
+            {isPackage && order.packageInfo && (
+              <>
+                <div className="order-section-divider" />
+
+                <section className="order-detail-card-section">
+                  <div className="section-title-row">
+                    <Package size={18} className="section-header-icon" strokeWidth={2} />
+                    <h2 className="section-title-text">Detail Paket</h2>
+                  </div>
+
+                  <div className="section-content-list">
+                    {order.packageInfo.senderName && (
+                      <div className="section-data-row">
+                        <span className="data-row-label">Pengirim</span>
+                        <span className="data-row-value">
+                          {order.packageInfo.senderName}
+                          {order.packageInfo.senderPhone ? ` · ${order.packageInfo.senderPhone}` : ''}
+                        </span>
+                      </div>
+                    )}
+
+                    {order.packageInfo.recipientName && (
+                      <div className="section-data-row order-number-row">
+                        <span className="data-row-label">Penerima</span>
+                        <span className="order-number-text" style={{ color: '#111827', fontWeight: 500 }}>
+                          {order.packageInfo.recipientName}
+                          {order.packageInfo.recipientPhone && order.packageInfo.recipientPhone !== '-'
+                            ? ` · ${order.packageInfo.recipientPhone}`
+                            : ''}
+                        </span>
+                        {order.packageInfo.recipientPhone &&
+                          order.packageInfo.recipientPhone !== '-' && (
+                            <a
+                              href={`https://wa.me/${String(order.packageInfo.recipientPhone)
+                                .replace(/\D/g, '')
+                                .replace(/^0/, '62')}?text=${encodeURIComponent(
+                                `Halo Kak ${order.packageInfo.recipientName}, saya ${driverInfo.name} (Mitra Kurir OTWJek) sedang mengantarkan paket pesanan ${orderCode} menuju alamat Anda.`
+                              )}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="btn-copy-order-number"
+                              style={{ textDecoration: 'none' }}
+                            >
+                              Hubungi
+                            </a>
+                          )}
+                      </div>
+                    )}
+
+                    {order.packageInfo.floorUnit && (
+                      <div className="section-data-row">
+                        <span className="data-row-label">Patokan Tujuan</span>
+                        <span className="data-row-value">{order.packageInfo.floorUnit}</span>
+                      </div>
+                    )}
+
+                    {(order.packageInfo.itemName || order.packageInfo.category) && (
+                      <div className="section-data-row">
+                        <span className="data-row-label">Jenis Barang</span>
+                        <span className="data-row-value">
+                          {order.packageInfo.itemName || order.packageInfo.category}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="section-data-row">
+                      <span className="data-row-label">Ukuran & Berat</span>
+                      <span className="data-row-value">
+                        {order.packageInfo.size || 'S (Kecil)'}
+                        {order.packageInfo.weight ? ` · ${order.packageInfo.weight} kg` : ''}
+                      </span>
+                    </div>
+
+                    {order.packageInfo.deliverySpeed && (
+                      <div className="section-data-row">
+                        <span className="data-row-label">Layanan</span>
+                        <span className="data-row-value">{order.packageInfo.deliverySpeed}</span>
+                      </div>
+                    )}
+
+                    {order.packageInfo.notes && order.packageInfo.notes !== order.customerNotes && (
+                      <div className="section-data-row">
+                        <span className="data-row-label">Catatan Paket</span>
+                        <span className="data-row-value">{order.packageInfo.notes}</span>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              </>
+            )}
 
             {/* Section Divider Strip */}
             <div className="order-section-divider" />
@@ -356,6 +488,13 @@ export default function ActivityOrderDetailView({
               </div>
 
               <div className="section-content-list">
+                <div className="section-data-row">
+                  <span className="data-row-label">Metode Pembayaran</span>
+                  <span className="data-row-value">
+                    {isQrisPayment ? 'QRIS (Non-Tunai)' : `Tunai · Tagih ${fareAmountStr}`}
+                  </span>
+                </div>
+
                 <div className="section-data-row">
                   <span className="data-row-label">Biaya Pengantaran</span>
                   <span className="data-row-value">{deliveryFeeStr}</span>
@@ -467,37 +606,50 @@ export default function ActivityOrderDetailView({
               <div className="order-timeline-stepper">
                 {/* Top Labels */}
                 <div className="timeline-labels-row">
-                  <span className="timeline-label-item">Diterima</span>
-                  <span className="timeline-label-item">Tiba</span>
-                  <span className="timeline-label-item">Diambil</span>
-                  <span className="timeline-label-item active">Selesai</span>
+                  <span className={`timeline-label-item ${activeStepIndex === 0 ? 'active' : ''}`}>
+                    Diterima
+                  </span>
+                  <span className={`timeline-label-item ${activeStepIndex === 1 ? 'active' : ''}`}>
+                    Tiba
+                  </span>
+                  <span className={`timeline-label-item ${activeStepIndex === 2 ? 'active' : ''}`}>
+                    Diambil
+                  </span>
+                  <span className={`timeline-label-item ${activeStepIndex === 3 ? 'active' : ''}`}>
+                    Selesai
+                  </span>
                 </div>
 
                 {/* Stepper Track Line & Dots */}
                 <div className="timeline-track-row" aria-hidden="true">
                   <div className="timeline-track-line" />
-                  <div className="timeline-station">
-                    <div className="timeline-dot" />
-                  </div>
-                  <div className="timeline-station">
-                    <div className="timeline-dot" />
-                  </div>
-                  <div className="timeline-station">
-                    <div className="timeline-dot" />
-                  </div>
-                  <div className="timeline-station">
-                    <div className="timeline-dot-completed">
-                      <Check size={12} strokeWidth={3} color="#FFFFFF" />
+                  {[0, 1, 2, 3].map((idx) => (
+                    <div key={idx} className="timeline-station">
+                      {idx === activeStepIndex ? (
+                        <div className="timeline-dot-completed">
+                          <Check size={12} strokeWidth={3} color="#FFFFFF" />
+                        </div>
+                      ) : (
+                        <div
+                          className={`timeline-dot ${idx > activeStepIndex ? 'upcoming' : ''}`}
+                        />
+                      )}
                     </div>
-                  </div>
+                  ))}
                 </div>
 
                 {/* Bottom Timestamps */}
                 <div className="timeline-times-row">
-                  <span className="timeline-time-item">{timeline.received}</span>
-                  <span className="timeline-time-item">{timeline.arrived}</span>
-                  <span className="timeline-time-item">{timeline.pickedUp}</span>
-                  <span className="timeline-time-item">{timeline.completed}</span>
+                  <span className="timeline-time-item">{timeline.received || '--:--'}</span>
+                  <span className="timeline-time-item">
+                    {activeStepIndex >= 1 ? timeline.arrived || '--:--' : '--:--'}
+                  </span>
+                  <span className="timeline-time-item">
+                    {activeStepIndex >= 2 ? timeline.pickedUp || '--:--' : '--:--'}
+                  </span>
+                  <span className="timeline-time-item">
+                    {activeStepIndex >= 3 ? timeline.completed || '--:--' : '--:--'}
+                  </span>
                 </div>
               </div>
             </section>
@@ -851,6 +1003,70 @@ export default function ActivityOrderDetailView({
           </div>
         )}
       </main>
+
+      {/* Driver Live Step-by-Step Action Bar */}
+      {isDriverView && order.status !== 'cancelled' && (
+        <div className="customer-action-footer">
+          {currentDriverStep === 'assigned' && (
+            <button
+              type="button"
+              className="btn-driver-step-primary"
+              onClick={() =>
+                handleAdvanceDriverStep('arrived', 'Status diperbarui: Tiba di Titik Jemput')
+              }
+            >
+              <span>Tiba di Titik Jemput (Stop 1)</span>
+            </button>
+          )}
+
+          {currentDriverStep === 'arrived' && (
+            <button
+              type="button"
+              className="btn-driver-step-primary"
+              onClick={() =>
+                handleAdvanceDriverStep('picked_up', 'Status diperbarui: Pengantaran dimulai')
+              }
+            >
+              <span>Mulai Pengantaran ke Tujuan</span>
+            </button>
+          )}
+
+          {currentDriverStep === 'picked_up' && (
+            <button
+              type="button"
+              className="btn-driver-step-primary complete"
+              onClick={() =>
+                handleAdvanceDriverStep('completed', 'Pesanan telah diselesaikan!')
+              }
+            >
+              <span>Selesaikan Pesanan (Stop 2)</span>
+            </button>
+          )}
+
+          {currentDriverStep === 'completed' && (
+            <>
+              <button
+                type="button"
+                className="btn-customer-cs-help"
+                onClick={() =>
+                  handleAdvanceDriverStep('assigned', 'Tahapan kerja dimulai dari awal')
+                }
+              >
+                <RotateCcw size={15} />
+                <span>Ulangi Tahapan</span>
+              </button>
+              <button
+                type="button"
+                className="btn-customer-cs-help"
+                onClick={handleContactCS}
+              >
+                <Headphones size={16} />
+                <span>Bantuan</span>
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Customer Action Bottom Bar (constrained inside order-detail-viewport) */}
       {!isDriverView && (
