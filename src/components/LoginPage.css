@@ -73,14 +73,10 @@
 
 /* Header Section */
 .login-header-group {
-  margin-bottom: 28px;
-}
-
-.login-header-group.is-driver-header {
   margin-bottom: 22px;
 }
 
-/* Driver Login Hero Illustration */
+/* Driver / Customer Login Hero Illustration */
 .driver-login-hero-container {
   display: flex;
   justify-content: center;
@@ -102,35 +98,21 @@
 }
 
 .login-headline {
-  font-size: 26px;
-  font-weight: 800;
-  color: #14171A;
-  letter-spacing: -0.5px;
-  margin: 0 0 8px 0;
-  line-height: 1.25;
-}
-
-.is-driver-header .login-headline {
   font-size: 23px;
   font-weight: 800;
+  color: #14171A;
   letter-spacing: -0.35px;
   margin: 0 0 6px 0;
   line-height: 1.25;
 }
 
 .login-subheadline {
-  font-size: 14.5px;
-  font-weight: 400;
-  color: #71767F;
-  line-height: 1.5;
-  margin: 0;
-  letter-spacing: -0.15px;
-}
-
-.is-driver-header .login-subheadline {
   font-size: 13.5px;
+  font-weight: 400;
   color: #64748B;
   line-height: 1.45;
+  margin: 0;
+  letter-spacing: -0.15px;
 }
 
 @media (max-height: 720px) {
@@ -141,13 +123,13 @@
     max-width: 250px;
     max-height: 205px;
   }
-  .is-driver-header .login-headline {
+  .login-headline {
     font-size: 21px;
   }
-  .is-driver-header .login-subheadline {
+  .login-subheadline {
     font-size: 13px;
   }
-  .login-header-group.is-driver-header {
+  .login-header-group {
     margin-bottom: 16px;
   }
 }
@@ -269,7 +251,7 @@
   font-weight: 500;
 }
 
-/* Bottom Action Container (Menetap di bawah, non-sticky) */
+/* Bottom Action Container (Menetap di bawah untuk driver, sticky untuk customer) */
 .login-bottom-section {
   padding: 24px 0 0 0;
   background: transparent;
@@ -286,6 +268,22 @@
 .login-bottom-section.is-driver-bottom {
   margin-top: 28px;
   padding-top: 0;
+}
+
+.login-bottom-section.is-customer-sticky {
+  position: sticky;
+  bottom: 0;
+  background: #FFFFFF;
+  padding: 14px 0 24px 0;
+  margin-top: auto;
+  z-index: 10;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.03);
+}
+
+@media (max-height: 720px) {
+  .login-bottom-section.is-customer-sticky {
+    padding: 10px 0 16px 0;
+  }
 }
 
 .btn-login-submit {

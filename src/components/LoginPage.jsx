@@ -120,16 +120,14 @@ export default function LoginPage({ isDriver = false, onBack, onSuccess, onGoToS
       {/* Main Scrollable Content */}
       <div className="login-scroll-content">
         {/* Header Text */}
-        <div className={`login-header-group ${isDriver ? 'is-driver-header' : ''}`}>
-          {isDriver && (
-            <div className="driver-login-hero-container">
-              <img
-                src={driverLoginHero}
-                alt="Masuk Mitra Driver OTWJek"
-                className="driver-login-hero-img"
-              />
-            </div>
-          )}
+        <div className="login-header-group has-hero-header">
+          <div className="driver-login-hero-container">
+            <img
+              src={driverLoginHero}
+              alt={isDriver ? 'Masuk Mitra Driver OTWJek' : 'Masuk Pelanggan OTWJek'}
+              className="driver-login-hero-img"
+            />
+          </div>
           <h1 className="login-headline">
             {isDriver ? 'Masuk Mitra Driver' : 'Selamat Datang Kembali!'}
           </h1>
@@ -191,8 +189,8 @@ export default function LoginPage({ isDriver = false, onBack, onSuccess, onGoToS
           </div>
         </form>
 
-        {/* Bottom Action Section (Menetap di bawah dalam alur konten, tidak sticky) */}
-        <div className={`login-bottom-section ${isDriver ? 'is-driver-bottom' : ''}`}>
+        {/* Bottom Action Section (Menetap untuk driver, sticky untuk customer) */}
+        <div className={`login-bottom-section ${isDriver ? 'is-driver-bottom' : 'is-customer-sticky'}`}>
           <button
             type="button"
             className="btn-login-submit"
