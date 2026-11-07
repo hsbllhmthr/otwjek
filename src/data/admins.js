@@ -29,17 +29,6 @@ export const ADMINS = [
   {
     id: 'admin-3',
     name: 'Admin 3',
-    role: 'Dispatch Area Barat',
-    phone: '6282345614803',
-    displayPhone: '+62 823-4561-4803',
-    status: 'online',
-    statusText: 'Online',
-    avatar: '👩‍🦱',
-    badge: 'Cadangan'
-  },
-  {
-    id: 'admin-4',
-    name: 'Admin 4',
     role: 'Dispatch Area Timur',
     phone: '6281545629713',
     displayPhone: '+62 815-4562-9713',
