@@ -92,6 +92,8 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
   const [selectedCustomerDetail, setSelectedCustomerDetail] = useState(null);
   const [customerStatusConfirm, setCustomerStatusConfirm] = useState(null);
   const [customerDeleteConfirm, setCustomerDeleteConfirm] = useState(null);
+  const [driverDeleteConfirm, setDriverDeleteConfirm] = useState(null);
+  const [clearDbModalOpen, setClearDbModalOpen] = useState(false);
 
   // =========================================================================
   // STATE PESANAN & PENUGASAN DRIVER (ORDER DISPATCH)
@@ -286,7 +288,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
       if (overviewDriverStatusFilter === 'pending') {
         result = result.filter((d) => d.verification_status === 'pending');
       } else if (overviewDriverStatusFilter === 'approved') {
-        result = result.filter((d) => (d.verification_status || 'approved') === 'approved');
+        result = result.filter((d) => d.verification_status === 'approved');
       } else if (overviewDriverStatusFilter === 'rejected') {
         result = result.filter((d) => d.verification_status === 'rejected');
       }
@@ -315,8 +317,8 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
         return overviewDriverSortDir === 'asc' ? areaA.localeCompare(areaB) : areaB.localeCompare(areaA);
       }
       if (overviewDriverSortKey === 'status') {
-        const sA = a.verification_status || 'approved';
-        const sB = b.verification_status || 'approved';
+        const sA = a.verification_status || 'pending';
+        const sB = b.verification_status || 'pending';
         return overviewDriverSortDir === 'asc' ? sA.localeCompare(sB) : sB.localeCompare(sA);
       }
       // Default: 'created_at'
@@ -440,7 +442,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
   // =========================================================================
   const driverCounts = useMemo(() => {
     const pending = drivers.filter((d) => d.verification_status === 'pending').length;
-    const approved = drivers.filter((d) => (d.verification_status || 'approved') === 'approved').length;
+    const approved = drivers.filter((d) => d.verification_status === 'approved').length;
     const rejected = drivers.filter((d) => d.verification_status === 'rejected').length;
     return { all: drivers.length, pending, approved, rejected };
   }, [drivers]);
@@ -451,7 +453,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
     if (driverTab === 'pending') {
       result = result.filter((d) => d.verification_status === 'pending');
     } else if (driverTab === 'approved') {
-      result = result.filter((d) => (d.verification_status || 'approved') === 'approved');
+      result = result.filter((d) => d.verification_status === 'approved');
     } else if (driverTab === 'rejected') {
       result = result.filter((d) => d.verification_status === 'rejected');
     }
@@ -507,8 +509,8 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
         return driverSortDir === 'asc' ? (completeA ? 1 : -1) : (completeB ? 1 : -1);
       }
       if (driverSortKey === 'status') {
-        const statusA = a.verification_status || 'approved';
-        const statusB = b.verification_status || 'approved';
+        const statusA = a.verification_status || 'pending';
+        const statusB = b.verification_status || 'pending';
         return driverSortDir === 'asc' ? statusA.localeCompare(statusB) : statusB.localeCompare(statusA);
       }
       if (driverSortKey === 'operationalArea') {
@@ -979,6 +981,22 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
     if (selectedCustomerDetail?.id === customer.id) {
       setSelectedCustomerDetail(null);
     }
+    setToastMessage(`Akun pelanggan "${customer.full_name}" berhasil dihapus.`);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleDeleteDriver = (driver) => {
+    dbService.drivers.delete(driver.id);
+    setDriverDeleteConfirm(null);
+    setToastMessage(`Data mitra driver "${driver.name}" berhasil dihapus.`);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleClearEntireDatabase = () => {
+    dbService.clearAllData();
+    setClearDbModalOpen(false);
+    setToastMessage('Seluruh database berhasil dibersihkan! Semua pengguna & mitra driver telah dihapus.');
+    setTimeout(() => setToastMessage(null), 4000);
   };
 
 
@@ -1141,6 +1159,21 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
               </div>
             </button>
           )}
+
+          <button
+            type="button"
+            className="sidebar-nav-item btn-sidebar-clear-db"
+            onClick={() => setClearDbModalOpen(true)}
+            title="Bersihkan Seluruh Database (Hapus Semua Pengguna & Driver)"
+            style={{ color: '#EF4444' }}
+          >
+            <div className="sidebar-nav-left">
+              <Trash2 size={18} color="#EF4444" />
+              <span className="nav-item-label" style={{ color: '#EF4444', fontWeight: 700 }}>
+                Bersihkan Database
+              </span>
+            </div>
+          </button>
         </nav>
 
         <div className="admin-sidebar-footer">
@@ -1236,20 +1269,31 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                   : 'Pesanan Pelanggan (Riwayat & Detail)'}
               </h2>
             </div>
-            <div className="page-header-breadcrumb">
-              <span className="breadcrumb-lead">Dashboard</span>
-              <span className="breadcrumb-slash">/</span>
-              <span className="breadcrumb-active-tag">
-                {mainSection === 'overview'
-                  ? 'Overview'
-                  : mainSection === 'drivers'
-                  ? 'Verifikasi Driver'
-                  : mainSection === 'customers'
-                  ? 'Data Pelanggan'
-                  : mainSection === 'orders'
-                  ? 'Penugasan Pesanan'
-                  : 'Pesanan Pelanggan'}
-              </span>
+            <div className="page-header-actions-row">
+              <button
+                type="button"
+                className="btn-header-clean-db"
+                onClick={() => setClearDbModalOpen(true)}
+                title="Bersihkan Seluruh Database"
+              >
+                <Trash2 size={14} />
+                <span>Bersihkan Database</span>
+              </button>
+              <div className="page-header-breadcrumb">
+                <span className="breadcrumb-lead">Dashboard</span>
+                <span className="breadcrumb-slash">/</span>
+                <span className="breadcrumb-active-tag">
+                  {mainSection === 'overview'
+                    ? 'Overview'
+                    : mainSection === 'drivers'
+                    ? 'Verifikasi Driver'
+                    : mainSection === 'customers'
+                    ? 'Data Pelanggan'
+                    : mainSection === 'orders'
+                    ? 'Penugasan Pesanan'
+                    : 'Pesanan Pelanggan'}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -1688,16 +1732,25 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                               >
                                 <td className="tailadmin-td user-td">
                                   <div className="table-user-cell">
-                                    <div className="table-user-avatar">
-                                      <img
-                                        src={d.avatar || driverPlaceholder}
-                                        alt={d.name}
-                                        className="table-avatar-photo"
-                                        onError={(e) => {
-                                          e.currentTarget.onerror = null;
-                                          e.currentTarget.src = driverPlaceholder;
-                                        }}
-                                      />
+                                    <div className={`table-user-avatar ${!d.avatar ? 'driver-initial-avatar' : ''}`}>
+                                      {d.avatar ? (
+                                        <img
+                                          src={d.avatar}
+                                          alt={d.name}
+                                          className="table-avatar-photo"
+                                          onError={(e) => {
+                                            e.currentTarget.style.display = 'none';
+                                            const fallback = e.currentTarget.parentElement.querySelector('.driver-initial-text');
+                                            if (fallback) fallback.style.display = 'flex';
+                                          }}
+                                        />
+                                      ) : null}
+                                      <span
+                                        className="driver-initial-text"
+                                        style={{ display: d.avatar ? 'none' : 'flex' }}
+                                      >
+                                        {d.name ? d.name.trim().charAt(0).toUpperCase() : 'D'}
+                                      </span>
                                     </div>
                                     <div className="table-user-meta">
                                       <span className="table-user-name">{d.name}</span>
@@ -1756,6 +1809,18 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                       aria-label="Edit Data Driver"
                                     >
                                       <Edit3 size={15} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn-table-icon-action btn-icon-delete"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDriverDeleteConfirm(d);
+                                      }}
+                                      title="Hapus Data Driver"
+                                      aria-label="Hapus Driver"
+                                    >
+                                      <Trash2 size={15} />
                                     </button>
                                   </div>
                                 </td>
@@ -2671,7 +2736,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                           ].filter(Boolean);
 
                           const isPending = driver.verification_status === 'pending';
-                          const isApproved = (driver.verification_status || 'approved') === 'approved';
+                          const isApproved = driver.verification_status === 'approved';
                           const isRejected = driver.verification_status === 'rejected';
                           const statusClass = isPending ? 'pending' : isRejected ? 'cancel' : 'active';
                           const statusLabel = isPending ? 'Menunggu Review' : isRejected ? 'Ditolak' : 'Disetujui';
@@ -2682,16 +2747,25 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                             <tr key={driver.id} className="tailadmin-tr">
                               <td className="tailadmin-td user-td">
                                 <div className="table-user-cell">
-                                  <div className="table-user-avatar">
-                                    <img
-                                      src={driver.avatar || driverPlaceholder}
-                                      alt={driver.name}
-                                      className="table-avatar-photo"
-                                      onError={(e) => {
-                                        e.currentTarget.onerror = null;
-                                        e.currentTarget.src = driverPlaceholder;
-                                      }}
-                                    />
+                                  <div className={`table-user-avatar ${!driver.avatar ? 'driver-initial-avatar' : ''}`}>
+                                    {driver.avatar ? (
+                                      <img
+                                        src={driver.avatar}
+                                        alt={driver.name}
+                                        className="table-avatar-photo"
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none';
+                                          const fallback = e.currentTarget.parentElement.querySelector('.driver-initial-text');
+                                          if (fallback) fallback.style.display = 'flex';
+                                        }}
+                                      />
+                                    ) : null}
+                                    <span
+                                      className="driver-initial-text"
+                                      style={{ display: driver.avatar ? 'none' : 'flex' }}
+                                    >
+                                      {driver.name ? driver.name.trim().charAt(0).toUpperCase() : 'D'}
+                                    </span>
                                   </div>
                                   <div className="table-user-meta">
                                     <span className="table-user-name">{driver.name}</span>
@@ -2847,6 +2921,19 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                       <CheckCircle2 size={15} />
                                     </button>
                                   )}
+
+                                  <button
+                                    type="button"
+                                    className="btn-table-icon-action btn-icon-delete"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDriverDeleteConfirm(driver);
+                                    }}
+                                    title="Hapus Data Driver"
+                                    aria-label="Hapus Driver"
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
                                 </div>
                               </td>
                             </tr>
@@ -4550,6 +4637,115 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
       )}
 
       {/* ================================================================= */}
+      {/* MODAL: KONFIRMASI HAPUS DRIVER                                    */}
+      {/* ================================================================= */}
+      {driverDeleteConfirm && (
+        <div className="admin-modal-backdrop" onClick={() => setDriverDeleteConfirm(null)}>
+          <div className="admin-modal-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="dialog-header">
+              <div className="dialog-icon-wrap reject">
+                <Trash2 size={22} />
+              </div>
+              <div>
+                <h3 className="dialog-title">Hapus Akun Mitra Driver?</h3>
+                <span className="dialog-sub">Mitra: {driverDeleteConfirm.name}</span>
+              </div>
+              <button
+                type="button"
+                className="btn-close-dialog"
+                onClick={() => setDriverDeleteConfirm(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="dialog-body">
+              <p className="dialog-instruction">
+                Tindakan ini akan menghapus data akun mitra <strong>{driverDeleteConfirm.name}</strong> ({driverDeleteConfirm.phone}) beserta seluruh berkas dokumennya secara permanen dari basis data OTWJek.
+              </p>
+            </div>
+
+            <div className="dialog-footer">
+              <button
+                type="button"
+                className="btn-dialog-cancel"
+                onClick={() => setDriverDeleteConfirm(null)}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                className="btn-dialog-confirm-reject"
+                onClick={() => handleDeleteDriver(driverDeleteConfirm)}
+              >
+                Ya, Hapus Driver
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* MODAL: KONFIRMASI BERSIHKAN SELURUH DATABASE                      */}
+      {/* ================================================================= */}
+      {clearDbModalOpen && (
+        <div className="admin-modal-backdrop" onClick={() => setClearDbModalOpen(false)}>
+          <div className="admin-modal-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="dialog-header">
+              <div className="dialog-icon-wrap reject">
+                <AlertTriangle size={22} />
+              </div>
+              <div>
+                <h3 className="dialog-title" style={{ color: '#DC2626' }}>Bersihkan Seluruh Database?</h3>
+                <span className="dialog-sub">Tindakan ini permanen dan tidak dapat dibatalkan</span>
+              </div>
+              <button
+                type="button"
+                className="btn-close-dialog"
+                onClick={() => setClearDbModalOpen(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="dialog-body">
+              <p className="dialog-instruction" style={{ lineHeight: 1.6 }}>
+                Apakah Anda yakin ingin <strong>membersihkan seluruh basis data OTWJek</strong>?
+                <br /><br />
+                • Seluruh <strong>data mitra driver</strong> akan dihapus permanen.
+                <br />
+                • Seluruh <strong>berkas dokumen KTP/SIM/STNK</strong> akan dihapus.
+                <br />
+                • Seluruh <strong>akun pengguna & pelanggan</strong> akan dihapus.
+                <br />
+                • Seluruh <strong>riwayat pesanan</strong> akan dihapus.
+                <br /><br />
+                <em>Hanya akun Super Admin yang akan tetap dipertahankan agar Anda tetap dapat login.</em>
+              </p>
+            </div>
+
+            <div className="dialog-footer">
+              <button
+                type="button"
+                className="btn-dialog-cancel"
+                onClick={() => setClearDbModalOpen(false)}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                className="btn-dialog-confirm-reject"
+                onClick={handleClearEntireDatabase}
+                style={{ backgroundColor: '#DC2626', borderColor: '#DC2626' }}
+              >
+                Ya, Bersihkan Seluruh Database
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
       {/* MODAL 7: EDIT & LENGKAPI DATA DRIVER (SIMPLE, CLEAN & MINIMALIST) */}
       {/* ================================================================= */}
       {editingDriver && editDriverForm && (
@@ -4626,15 +4822,32 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                 <div className="edit-section-stack">
                   {/* Avatar minimal */}
                   <div className="avatar-row-minimal">
-                    <img
-                      src={editDriverForm.avatar || driverPlaceholder}
-                      alt="Driver Avatar"
-                      className="avatar-thumb-minimal"
-                      onError={(e) => {
-                        e.currentTarget.onerror = null;
-                        e.currentTarget.src = driverPlaceholder;
-                      }}
-                    />
+                    {editDriverForm.avatar ? (
+                      <img
+                        src={editDriverForm.avatar}
+                        alt="Driver Avatar"
+                        className="avatar-thumb-minimal"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <div
+                        className="avatar-thumb-minimal"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: 'linear-gradient(135deg, #FF337F 0%, #E11D6F 100%)',
+                          color: '#FFFFFF',
+                          fontWeight: 800,
+                          fontSize: 18,
+                          borderRadius: '50%'
+                        }}
+                      >
+                        {(editDriverForm.name || 'D').trim().charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     <div className="avatar-info-minimal">
                       <span className="avatar-label-minimal">Foto Profil Mitra</span>
                       <label className="btn-file-text-minimal">
@@ -5120,7 +5333,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
 
               {/* Approved Drivers List */}
               {(() => {
-                const approvedList = drivers.filter((d) => (d.verification_status || 'approved') === 'approved');
+                const approvedList = drivers.filter((d) => d.verification_status === 'approved');
                 const orderNeedsCar =
                   assignModalOrder.service_type === 'mobil' ||
                   assignModalOrder.service_type === 'car' ||
@@ -5192,15 +5405,32 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                           className={`assign-driver-card ${isCurrentlyAssigned ? 'is-assigned' : ''}`}
                         >
                           <div className="assign-driver-left">
-                            <img
-                              src={drv.avatar || driverPlaceholder}
-                              alt={drv.name}
-                              className="assign-driver-avatar"
-                              onError={(e) => {
-                                e.currentTarget.onerror = null;
-                                e.currentTarget.src = driverPlaceholder;
-                              }}
-                            />
+                            {drv.avatar ? (
+                              <img
+                                src={drv.avatar}
+                                alt={drv.name}
+                                className="assign-driver-avatar"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <div
+                                className="assign-driver-avatar"
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  background: 'linear-gradient(135deg, #FF337F 0%, #E11D6F 100%)',
+                                  color: '#FFFFFF',
+                                  fontWeight: 800,
+                                  fontSize: 14,
+                                  borderRadius: '50%'
+                                }}
+                              >
+                                {(drv.name || 'D').trim().charAt(0).toUpperCase()}
+                              </div>
+                            )}
                             <div className="assign-driver-info">
                               <div className="assign-driver-name-row">
                                 <span className="assign-driver-name">{drv.name}</span>

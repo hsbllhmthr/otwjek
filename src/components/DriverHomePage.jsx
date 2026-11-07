@@ -3,7 +3,8 @@ import './DriverHomePage.css';
 import {
   Wallet,
   Inbox,
-  X
+  X,
+  ChevronRight
 } from 'lucide-react';
 import dbService, { normalizePhone } from '../services/dbService.js';
 import { formatRupiah } from '../utils/fareCalculator.js';

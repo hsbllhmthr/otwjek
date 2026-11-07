@@ -57,15 +57,33 @@ export default function DriverShowcase({
               onClick={() => onSelectDriver(driver)}
             >
               <div className="avatar-wrapper">
-                <img
-                  src={driver.avatar || driverPlaceholder}
-                  alt={driver.name}
-                  className="driver-avatar-img"
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = driverPlaceholder;
-                  }}
-                />
+                {driver.avatar ? (
+                  <img
+                    src={driver.avatar}
+                    alt={driver.name}
+                    className="driver-avatar-img"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #FF337F 0%, #E11D6F 100%)',
+                      color: '#FFFFFF',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 800,
+                      fontSize: 20
+                    }}
+                  >
+                    {(driver.name || 'D').trim().charAt(0).toUpperCase()}
+                  </div>
+                )}
                 <span className="status-dot-active" title="Aktif Online" />
               </div>
 

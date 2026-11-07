@@ -8,9 +8,9 @@
   flex-direction: column;
   width: 100%;
   height: 100%;
-  background-color: #F5F6F8;
-  color: #1F2937;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: #F8FAFC;
+  color: #0F172A;
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   overflow: hidden;
   position: relative;
 }
@@ -23,7 +23,7 @@
   height: 56px;
   padding: 0 16px;
   background-color: #FFFFFF;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  border-bottom: 1px solid #E2E8F0;
   flex-shrink: 0;
   z-index: 10;
 }
@@ -37,21 +37,22 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #1F2937;
+  color: #0F172A;
   border-radius: 50%;
   transition: background-color 0.15s ease;
 }
 
 .btn-activity-back:active {
-  background-color: #F3F4F6;
+  background-color: #F1F5F9;
 }
 
 .activity-topbar-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: #111827;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  color: #0F172A;
   margin: 0;
-  letter-spacing: -0.2px;
+  letter-spacing: -0.01em;
 }
 
 /* 2. Tabs Bar (Selesai | Dibatalkan) */
@@ -59,7 +60,7 @@
   display: flex;
   width: 100%;
   background-color: #FFFFFF;
-  border-bottom: 1px solid #E5E7EB;
+  border-bottom: 1px solid #E2E8F0;
   flex-shrink: 0;
   z-index: 10;
 }
@@ -69,19 +70,20 @@
   background: transparent;
   border: none;
   padding: 13px 0;
-  font-size: 15px;
-  font-weight: 500;
-  color: #6B7280;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #64748B;
   cursor: pointer;
   position: relative;
   text-align: center;
-  transition: color 0.2s ease;
+  transition: color 0.15s ease;
   user-select: none;
 }
 
 .activity-tab-btn.active {
-  color: #EE4335;
-  font-weight: 700;
+  color: #0F172A;
+  font-weight: 800;
 }
 
 .activity-tab-indicator {
@@ -90,7 +92,7 @@
   left: 0;
   width: 100%;
   height: 2.5px;
-  background-color: #EE4335;
+  background-color: #FF337F;
   border-radius: 2px 2px 0 0;
 }
 
@@ -124,9 +126,10 @@
   padding: 4px 6px;
   margin-left: -6px;
   cursor: pointer;
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 14.5px;
-  font-weight: 600;
-  color: #1F2937;
+  font-weight: 700;
+  color: #0F172A;
   border-radius: 6px;
   transition: background-color 0.15s ease;
 }
@@ -164,6 +167,7 @@
   background: transparent;
   border: none;
   padding: 9px 16px;
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 13.5px;
   color: #374151;
   cursor: pointer;
@@ -396,4 +400,175 @@
   margin: 0;
   max-width: 260px;
   line-height: 1.45;
+}
+
+/* ========================================================================== */
+/* DRIVER TASK HISTORY CARD STYLES (Matching Driver Home Stepper)             */
+/* ========================================================================== */
+.driver-order-card.stepper-card-style {
+  background: #FFFFFF;
+  border-radius: 20px;
+  padding: 18px 20px;
+  border: 1px solid #EAECEF;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.driver-order-card.stepper-card-style:hover {
+  border-color: #CBD5E1;
+}
+
+.driver-order-card.stepper-card-style.unread {
+  border-color: #BFDBFE;
+  background: #FAFCFF;
+}
+
+.driver-order-card.stepper-card-style .stepper-stop-row {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+}
+
+.driver-order-card.stepper-card-style .stepper-rail-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 22px;
+  flex-shrink: 0;
+}
+
+.driver-order-card.stepper-card-style .stepper-check-ring {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: #FFFFFF;
+  box-sizing: border-box;
+}
+
+.driver-order-card.stepper-card-style .stepper-check-ring.active-blue {
+  border: 1.5px solid #2563EB;
+}
+
+.driver-order-card.stepper-card-style .stepper-check-ring.active-blue .stepper-check-inner {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #2563EB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.driver-order-card.stepper-card-style .stepper-check-ring.muted-gray {
+  border: 1.5px solid #D1D5DB;
+}
+
+.driver-order-card.stepper-card-style .stepper-check-ring.muted-gray .stepper-check-inner {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #D1D5DB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.driver-order-card.stepper-card-style .stepper-dashed-line {
+  flex: 1;
+  width: 0;
+  border-left: 1.5px dashed #CBD5E1;
+  margin: 5px 0;
+  min-height: 24px;
+}
+
+.driver-order-card.stepper-card-style .stepper-dashed-line.completed {
+  border-left-color: #93C5FD;
+}
+
+.driver-order-card.stepper-card-style .stepper-stop-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.driver-order-card.stepper-card-style .stepper-stop-content.first-stop {
+  padding-bottom: 18px;
+}
+
+.driver-order-card.stepper-card-style .stepper-stop-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-height: 22px;
+}
+
+.driver-order-card.stepper-card-style .stepper-stop-kicker {
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #8E95A2;
+  text-transform: uppercase;
+}
+
+.driver-order-card.stepper-card-style .stepper-status-pill {
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 2.5px 9px;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+
+.driver-order-card.stepper-card-style .stepper-status-pill.completed {
+  background: #E8F8F0;
+  color: #0D9458;
+}
+
+.driver-order-card.stepper-card-style .stepper-status-pill.in-progress {
+  background: #EFF6FF;
+  color: #2563EB;
+}
+
+.driver-order-card.stepper-card-style .stepper-status-pill.cancelled {
+  background: #FEF2F2;
+  color: #DC2626;
+}
+
+.driver-order-card.stepper-card-style .stepper-stop-title {
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 15.5px;
+  font-weight: 700;
+  color: #111827;
+  margin: 4px 0 2px;
+  line-height: 1.3;
+}
+
+.driver-order-card.stepper-card-style .stepper-stop-address {
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 13.5px;
+  font-weight: 400;
+  color: #374151;
+  margin: 0 0 4px;
+  line-height: 1.4;
+}
+
+.driver-order-card.stepper-card-style .stepper-stop-meta {
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: #8E95A2;
+  margin: 0;
+  line-height: 1.35;
 }

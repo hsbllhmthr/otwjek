@@ -22,7 +22,8 @@ import {
   Utensils,
   Shirt,
   Laptop,
-  AlertCircle
+  AlertCircle,
+  ShieldCheck
 } from 'lucide-react';
 import { formatRupiah, calculateFare } from '../utils/fareCalculator.js';
 import { calculateHaversineDistance, reverseGeocodeNominatim } from '../utils/geoUtils.js';

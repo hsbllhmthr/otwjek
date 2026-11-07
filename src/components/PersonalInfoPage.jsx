@@ -253,6 +253,10 @@ export default function PersonalInfoPage({ initialData = {}, isDriver = false, o
           >
             {avatarUrl ? (
               <img src={avatarUrl} alt="Avatar" className="personal-avatar-img" />
+            ) : fullName.trim() ? (
+              <div className="personal-avatar-initial">
+                <span>{fullName.trim().charAt(0).toUpperCase()}</span>
+              </div>
             ) : (
               <User size={52} strokeWidth={1.5} className="personal-avatar-icon" />
             )}

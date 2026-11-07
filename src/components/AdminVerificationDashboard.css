@@ -583,6 +583,42 @@
   font-weight: 600;
 }
 
+.page-header-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.btn-header-clean-db {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: #FEF2F2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-header-clean-db:hover {
+  background-color: #FEE2E2;
+  border-color: #FCA5A5;
+  color: #B91C1C;
+}
+
+.btn-header-clean-db:active {
+  transform: scale(0.97);
+}
+
+.btn-sidebar-clear-db:hover {
+  background-color: rgba(239, 68, 68, 0.08) !important;
+}
+
 /* ==========================================================================
    VIEW 0: TAILADMIN OVERVIEW (RINGKASAN)
    ========================================================================== */
@@ -1090,6 +1126,24 @@
 }
 
 .table-user-avatar.customer-initial-avatar .customer-initial-text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: #FFFFFF;
+  font-size: 15px;
+  font-weight: 700;
+  user-select: none;
+}
+
+.table-user-avatar.driver-initial-avatar {
+  background: linear-gradient(135deg, #FF337F 0%, #E11D6F 100%);
+  color: #FFFFFF;
+  border-color: #FF337F;
+}
+
+.table-user-avatar.driver-initial-avatar .driver-initial-text {
   display: flex;
   align-items: center;
   justify-content: center;

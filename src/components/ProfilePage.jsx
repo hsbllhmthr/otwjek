@@ -64,10 +64,13 @@ export default function ProfilePage({ user: propUser, onBack, onLogout }) {
     return (
       drivers.find(
         (d) =>
-          (currentUser.id && d.user_id === currentUser.id) ||
+          (currentUser.id && (d.user_id === currentUser.id || d.id === currentUser.id)) ||
+          (currentUser.driver?.id && d.id === currentUser.driver.id) ||
           (currentUser.phone && normalizePhone(d.phone) === normalizePhone(currentUser.phone)) ||
           (cName && d.name?.toLowerCase().trim() === cName)
-      ) || null
+      ) ||
+      currentUser.driver ||
+      null
     );
   }, [isDriver, currentUser, driverStateVersion]);
 
@@ -85,36 +88,20 @@ export default function ProfilePage({ user: propUser, onBack, onLogout }) {
   // Format tanggal lahir
   const displayBirthDate = currentUser.birthDate || currentUser.birth_date || '12-27-1995';
 
-  // Avatar resolution
+  const initialLetter = useMemo(() => {
+    const name = (displayName || '').trim();
+    return name ? name.charAt(0).toUpperCase() : 'U';
+  }, [displayName]);
+
+  // Avatar resolution: hanya gunakan foto yang valid & diunggah, jika tidak ada fallback ke inisial nama
   const avatarUrl = useMemo(() => {
+    // 1. Cek langsung dari akun currentUser
     const userImg = currentUser.avatarUrl || currentUser.avatar_url;
     if (userImg && !userImg.includes('unsplash.com')) {
       return userImg;
     }
 
-    try {
-      const sessionStr = localStorage.getItem('otwjek_db_current_session');
-      if (sessionStr) {
-        const session = JSON.parse(sessionStr);
-        const sessionImg = session?.user?.avatar_url || session?.avatar_url;
-        if (sessionImg && !sessionImg.includes('unsplash.com')) {
-          return sessionImg;
-        }
-      }
-    } catch (_) {}
-
-    try {
-      const allUsers = JSON.parse(localStorage.getItem('otwjek_db_users') || '[]');
-      const match = allUsers.find(
-        (u) =>
-          u.id === currentUser.id ||
-          (u.full_name || u.fullName) === (currentUser.full_name || currentUser.fullName)
-      );
-      if (match?.avatar_url && !match.avatar_url.includes('unsplash.com')) {
-        return match.avatar_url;
-      }
-    } catch (_) {}
-
+    // 2. Cek dari profil driver yang terhubung
     if (isDriver && driverProfile?.avatar && !driverProfile.avatar.includes('unsplash.com')) {
       return driverProfile.avatar;
     }
@@ -433,7 +420,7 @@ export default function ProfilePage({ user: propUser, onBack, onLogout }) {
     if (onLogout) onLogout();
   };
 
-  const verificationStatus = driverProfile?.verification_status || 'approved';
+  const verificationStatus = driverProfile?.verification_status || currentUser?.driver?.verification_status || 'pending';
 
   return (
     <div className="profile-page-flat">
@@ -471,8 +458,8 @@ export default function ProfilePage({ user: propUser, onBack, onLogout }) {
             {displayAvatar ? (
               <img src={displayAvatar} alt={displayName} className="profile-flat-avatar-img" />
             ) : (
-              <div className="profile-flat-avatar-fallback">
-                <User size={50} strokeWidth={1.5} />
+              <div className="profile-flat-avatar-initial">
+                <span>{initialLetter}</span>
               </div>
             )}
             {isEditing && (
@@ -487,61 +474,73 @@ export default function ProfilePage({ user: propUser, onBack, onLogout }) {
         {isDriver && (
           <>
             {verificationStatus === 'pending' && (
-              <div className="profile-verification-banner pending">
-                <div className="banner-icon-title">
-                  <Clock size={18} className="banner-icon" />
-                  <span className="banner-title">Menunggu Verifikasi Admin</span>
+              <div className="driver-verify-card pending" style={{ marginBottom: 20 }}>
+                <div className="driver-verify-icon-outer">
+                  <div className="driver-verify-icon-inner">i</div>
                 </div>
-                <p className="banner-desc">
-                  Data diri, kendaraan, dan dokumen KTP/SIM/STNK Anda sedang ditinjau oleh Admin OTWJek.
-                </p>
+                <div className="driver-verify-body">
+                  <h3 className="driver-verify-title">Menunggu Verifikasi Admin</h3>
+                  <p className="driver-verify-desc">
+                    Berkas KTP, SIM, dan STNK Anda sedang ditinjau oleh tim Admin OTWJek.
+                  </p>
+                </div>
               </div>
             )}
 
             {verificationStatus === 'rejected' && (
-              <div className="profile-verification-banner rejected">
-                <div className="banner-icon-title">
-                  <AlertTriangle size={18} className="banner-icon" />
-                  <span className="banner-title">Pendaftaran Belum Disetujui</span>
+              <div className="driver-verify-card rejected" style={{ marginBottom: 20 }}>
+                <div className="driver-verify-icon-outer">
+                  <div className="driver-verify-icon-inner">!</div>
                 </div>
-                <p className="banner-desc">
-                  <strong>Alasan Penolakan:</strong> {driverProfile?.rejection_reason || 'Dokumen belum lengkap atau tidak terbaca jelas.'}
-                </p>
-                <p className="banner-sub-desc">
-                  Silakan periksa atau unggah ulang foto KTP, SIM, atau STNK Anda di bawah ini, kemudian klik tombol ajukan ulang.
-                </p>
-                <button
-                  type="button"
-                  className="btn-resubmit-verification"
-                  onClick={handleResubmitVerification}
-                  disabled={isResubmitting}
-                >
-                  {isResubmitting ? 'Mengirim permohonan...' : 'Ajukan Ulang Verifikasi'}
-                </button>
+                <div className="driver-verify-body">
+                  <h3 className="driver-verify-title">Verifikasi Perlu Diperbaiki</h3>
+                  <p className="driver-verify-desc">
+                    <strong>Alasan Penolakan:</strong> {driverProfile?.rejection_reason || 'Dokumen belum lengkap atau tidak terbaca jelas.'}
+                  </p>
+                  <p className="driver-verify-sub-desc">
+                    Silakan periksa atau unggah ulang foto KTP, SIM, atau STNK Anda di bawah ini, kemudian klik tombol ajukan ulang.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn-resubmit-verification"
+                    onClick={handleResubmitVerification}
+                    disabled={isResubmitting}
+                  >
+                    {isResubmitting ? 'Mengirim permohonan...' : 'Ajukan Ulang Verifikasi'}
+                  </button>
+                </div>
               </div>
             )}
 
             {verificationStatus === 'approved' && (
-              <div className="profile-verification-banner approved">
-                <div className="banner-icon-title">
-                  <CheckCircle2 size={18} className="banner-icon" />
-                  <span className="banner-title">Mitra Pengemudi Resmi Terverifikasi</span>
+              <div className="driver-verify-card approved" style={{ marginBottom: 20 }}>
+                <div className="driver-verify-icon-outer">
+                  <div className="driver-verify-icon-inner">
+                    <Check size={14} strokeWidth={3} />
+                  </div>
                 </div>
-                <p className="banner-desc">
-                  Akun Anda telah diverifikasi resmi oleh Admin OTWJek.
-                </p>
+                <div className="driver-verify-body">
+                  <h3 className="driver-verify-title">Mitra Pengemudi Resmi Terverifikasi</h3>
+                  <p className="driver-verify-desc">
+                    Akun Anda telah diverifikasi resmi oleh Admin OTWJek.
+                  </p>
+                </div>
               </div>
             )}
 
             {resubmitNotice && (
-              <div className="profile-verification-banner pending" style={{ marginTop: 0 }}>
-                <div className="banner-icon-title">
-                  <Check size={18} className="banner-icon" />
-                  <span className="banner-title">Permohonan Berhasil Diajukan Ulang!</span>
+              <div className="driver-verify-card pending" style={{ marginBottom: 20 }}>
+                <div className="driver-verify-icon-outer">
+                  <div className="driver-verify-icon-inner" style={{ background: '#10B981' }}>
+                    <Check size={14} strokeWidth={3} />
+                  </div>
                 </div>
-                <p className="banner-desc">
-                  Admin OTWJek akan segera meninjau kembali perbaikan data dan dokumen Anda.
-                </p>
+                <div className="driver-verify-body">
+                  <h3 className="driver-verify-title">Permohonan Berhasil Diajukan Ulang!</h3>
+                  <p className="driver-verify-desc">
+                    Admin OTWJek akan segera meninjau kembali perbaikan data dan dokumen Anda.
+                  </p>
+                </div>
               </div>
             )}
           </>

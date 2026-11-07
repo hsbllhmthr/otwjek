@@ -90,8 +90,83 @@ function setStoredArray(key, array) {
   }
 }
 
+export const DB_PURGE_VERSION_KEY = 'otwjek_db_purge_all_v4';
+
+/**
+ * Membersihkan seluruh database lokal:
+ * - Menghapus seluruh data mitra driver
+ * - Menghapus seluruh berkas dokumen
+ * - Menghapus seluruh pengguna/pelanggan (hanya mempertahankan Super Admin)
+ * - Menghapus seluruh riwayat pesanan & pengiriman
+ * - Mengosongkan sesi aktif pengguna
+ */
+export function clearEntireDatabase() {
+  if (typeof localStorage === 'undefined') return;
+
+  // 1. Dapatkan atau buat akun superadmin
+  const existingUsers = getStoredArray(STORAGE_KEYS.USERS, []);
+  const superAdmin = existingUsers.find(
+    (u) => u.role === 'admin' || u.id === 'admin-master-01' || (ADMIN_EMAIL && u.email === ADMIN_EMAIL)
+  ) || {
+    id: 'admin-master-01',
+    full_name: 'Admin Verifikasi OTWJek',
+    email: ADMIN_EMAIL,
+    phone: '+62882021942470',
+    gender: 'Perempuan',
+    role: 'admin',
+    status: 'active',
+    created_at: new Date().toISOString()
+  };
+
+  // 2. Simpan hanya akun superadmin ke tabel USERS
+  setStoredArray(STORAGE_KEYS.USERS, [superAdmin]);
+
+  // 3. Kosongkan tabel DRIVERS
+  setStoredArray(STORAGE_KEYS.DRIVERS, []);
+
+  // 4. Kosongkan tabel DRIVER_DOCS
+  setStoredArray(STORAGE_KEYS.DRIVER_DOCS, []);
+
+  // 5. Kosongkan tabel BOOKINGS & DELIVERIES
+  setStoredArray(STORAGE_KEYS.BOOKINGS, []);
+  setStoredArray(STORAGE_KEYS.DELIVERIES, []);
+
+  // 6. Bersihkan sesi user jika bukan admin
+  try {
+    const sessionStr = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+    if (sessionStr) {
+      const sess = JSON.parse(sessionStr);
+      if (sess && sess.role !== 'admin') {
+        localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+      }
+    }
+  } catch (_) {}
+
+  // 7. Tandai versi purge
+  try {
+    localStorage.setItem(DB_PURGE_VERSION_KEY, 'done');
+  } catch (_) {}
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('otwjek_db_change', {
+        detail: { key: 'all', timestamp: Date.now() }
+      })
+    );
+  }
+}
+
 // Inisialisasi awal database lokal & pembersihan data dummy bawaan
 export function initializeLocalDatabase() {
+  if (typeof localStorage === 'undefined') return;
+
+  // Eksekusi pembersihan menyeluruh jika purge versi saat ini belum berjalan
+  const isPurged = localStorage.getItem(DB_PURGE_VERSION_KEY);
+  if (isPurged !== 'done') {
+    clearEntireDatabase();
+    return;
+  }
+
   // 1. Bersihkan tabel USERS: hapus sample dummy pelanggan, pertahankan data riil & superadmin
   const existingUsers = getStoredArray(STORAGE_KEYS.USERS, []);
   const dummyCustomerPhones = ['81234567890', '85712348901', '89698765432', '82133445566'];
@@ -111,6 +186,11 @@ export function initializeLocalDatabase() {
       return false;
     }
     return true;
+  }).map((u) => {
+    if (typeof u.avatar_url === 'string' && u.avatar_url.includes('unsplash.com')) {
+      return { ...u, avatar_url: null, avatarUrl: null };
+    }
+    return u;
   });
 
   // Pastikan akun superadmin default tersedia untuk akses portal admin
@@ -134,15 +214,44 @@ export function initializeLocalDatabase() {
   setStoredArray(STORAGE_KEYS.USERS, realUsers);
 
   // 2. Bersihkan tabel DRIVERS dari data dummy bawaan (drv-1 s/d drv-4 atau berawalan drv-)
+  // dan pastikan driver tanpa unggahan foto riil tidak menggunakan foto dummy/unsplash
   const existingDrivers = getStoredArray(STORAGE_KEYS.DRIVERS, []);
-  const realDrivers = existingDrivers.filter((d) => {
-    if (!d) return false;
-    if (typeof d.id === 'string' && d.id.startsWith('drv-')) {
-      return false;
-    }
-    return true;
-  });
+  const realDrivers = existingDrivers
+    .filter((d) => {
+      if (!d) return false;
+      if (typeof d.id === 'string' && d.id.startsWith('drv-')) {
+        return false;
+      }
+      return true;
+    })
+    .map((d) => {
+      if (typeof d.avatar === 'string' && d.avatar.includes('unsplash.com')) {
+        return { ...d, avatar: null };
+      }
+      return d;
+    });
   setStoredArray(STORAGE_KEYS.DRIVERS, realDrivers);
+
+  // Bersihkan sesi aktif dari avatar dummy unsplash jika ada
+  try {
+    const sessionStr = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+    if (sessionStr) {
+      const sess = JSON.parse(sessionStr);
+      let changed = false;
+      if (sess?.avatar_url && sess.avatar_url.includes('unsplash.com')) {
+        sess.avatar_url = null;
+        sess.avatarUrl = null;
+        changed = true;
+      }
+      if (sess?.driver?.avatar && sess.driver.avatar.includes('unsplash.com')) {
+        sess.driver.avatar = null;
+        changed = true;
+      }
+      if (changed) {
+        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(sess));
+      }
+    }
+  } catch (_) {}
 
   // 3. Bersihkan tabel DRIVER_DOCS yang terikat dengan driver dummy
   const existingDocs = getStoredArray(STORAGE_KEYS.DRIVER_DOCS, []);
@@ -243,6 +352,7 @@ export const dbService = {
         const existingIdx = users.findIndex((u) => normalizePhone(u.phone) === targetDigits);
         if (existingIdx !== -1) {
           const rawName = (userData.fullName || userData.full_name || users[existingIdx].full_name || users[existingIdx].fullName || '').trim();
+          const incomingAvatar = userData.avatarUrl || userData.avatar_url || null;
           const updated = {
             ...users[existingIdx],
             ...userData,
@@ -250,9 +360,9 @@ export const dbService = {
             full_name: rawName,
             fullName: rawName,
             birth_date: userData.birthDate || userData.birth_date || users[existingIdx].birth_date || users[existingIdx].birthDate || null,
-            birthDate: userData.birthDate || userData.birth_date || users[existingIdx].birthDate || users[existingIdx].birth_date || null,
-            avatar_url: userData.avatarUrl || userData.avatar_url || users[existingIdx].avatar_url || users[existingIdx].avatarUrl || null,
-            avatarUrl: userData.avatarUrl || userData.avatar_url || users[existingIdx].avatarUrl || users[existingIdx].avatar_url || null,
+            birthDate: userData.birthDate || userData.birth_date || users[existingIdx].birthDate || users[existingIdx].birthDate || null,
+            avatar_url: incomingAvatar,
+            avatarUrl: incomingAvatar,
             role: userData.role || users[existingIdx].role || 'customer',
             updated_at: new Date().toISOString()
           };
@@ -349,7 +459,7 @@ export const dbService = {
     // Driver yang disetujui (Approved) untuk katalog GrabNow & Order Pelanggan
     getApprovedDrivers() {
       const drivers = this.getAll();
-      return drivers.filter((d) => (d.verification_status || 'approved') === 'approved');
+      return drivers.filter((d) => d.verification_status === 'approved');
     },
 
     // Driver yang menunggu verifikasi (Pending) untuk dashboard admin
@@ -379,11 +489,14 @@ export const dbService = {
      * Driver baru otomatis berstatus 'pending' dan 'offline'
      */
     registerDriver(userData, vehicleData = {}, documents = {}) {
+      const incomingAvatar = userData.avatarUrl || userData.avatar_url || null;
       // 1. Buat data user akun driver jika belum ada
       let user = dbService.users.findByPhone(userData.phone);
       if (!user) {
         user = dbService.users.create({
           ...userData,
+          avatarUrl: incomingAvatar,
+          avatar_url: incomingAvatar,
           role: 'driver'
         });
       } else {
@@ -393,8 +506,8 @@ export const dbService = {
           full_name: userData.fullName || userData.full_name || user.full_name,
           fullName: userData.fullName || userData.full_name || user.fullName,
           email: userData.email || user.email,
-          avatar_url: userData.avatarUrl || userData.avatar_url || user.avatar_url,
-          avatarUrl: userData.avatarUrl || userData.avatar_url || user.avatarUrl,
+          avatar_url: incomingAvatar,
+          avatarUrl: incomingAvatar,
           birth_date: userData.birthDate || userData.birth_date || user.birth_date,
           birthDate: userData.birthDate || userData.birth_date || user.birthDate
         });
@@ -410,7 +523,7 @@ export const dbService = {
         user_id: user.id,
         name: user.full_name || user.fullName,
         phone: user.phone,
-        avatar: user.avatar_url || user.avatarUrl || null,
+        avatar: incomingAvatar,
         
         // Data Kendaraan Mandiri
         vehicleType: vehicleData.vehicleType || 'motor', // 'motor' | 'mobil'
@@ -432,14 +545,14 @@ export const dbService = {
         emergencyContactName: vehicleData.emergencyContactName || '',
         emergencyContactPhone: vehicleData.emergencyContactPhone ? formatStandardPhone(vehicleData.emergencyContactPhone) : '',
 
-        // Status Verifikasi & Operasional
+        // Status Verifikasi & Operasional: Setiap pendaftaran baru/permohonan ulang wajib diverifikasi admin
         rating: existingIdx !== -1 ? (drivers[existingIdx].rating || 5.0) : 5.0,
         tripsCount: existingIdx !== -1 ? (drivers[existingIdx].tripsCount || 0) : 0,
-        status: existingIdx !== -1 ? drivers[existingIdx].status : 'Menunggu Verifikasi',
-        verification_status: existingIdx !== -1 ? drivers[existingIdx].verification_status : 'pending',
+        status: 'Menunggu Verifikasi',
+        verification_status: 'pending',
         rejection_reason: null,
         is_online: false,
-        badge: existingIdx !== -1 ? (drivers[existingIdx].badge || 'Calon Mitra 🌸') : 'Calon Mitra 🌸',
+        badge: 'Calon Mitra 🌸',
         bio: vehicleData.bio || 'Mitra Pengemudi Amanah OTWJek Khusus Perempuan.'
       };
 
@@ -448,6 +561,7 @@ export const dbService = {
         activeDriver = {
           ...drivers[existingIdx],
           ...driverPayload,
+          avatar: incomingAvatar,
           updated_at: new Date().toISOString()
         };
         drivers[existingIdx] = activeDriver;
@@ -455,6 +569,7 @@ export const dbService = {
         activeDriver = {
           id: generateUUID(),
           ...driverPayload,
+          avatar: incomingAvatar,
           created_at: new Date().toISOString()
         };
         drivers.push(activeDriver);
@@ -766,6 +881,38 @@ export const dbService = {
     getDocuments(driverId) {
       const storedDocs = getStoredArray(STORAGE_KEYS.DRIVER_DOCS, []);
       return storedDocs.filter((d) => d.driver_id === driverId);
+    },
+
+    delete(driverId) {
+      let drivers = getStoredArray(STORAGE_KEYS.DRIVERS, []);
+      const targetDriver = drivers.find((d) => d.id === driverId);
+      drivers = drivers.filter((d) => d.id !== driverId);
+      setStoredArray(STORAGE_KEYS.DRIVERS, drivers);
+
+      // Hapus berkas dokumen driver
+      let storedDocs = getStoredArray(STORAGE_KEYS.DRIVER_DOCS, []);
+      storedDocs = storedDocs.filter((d) => d.driver_id !== driverId);
+      setStoredArray(STORAGE_KEYS.DRIVER_DOCS, storedDocs);
+
+      // Hapus user terkait jika ada
+      if (targetDriver && targetDriver.user_id) {
+        let users = getStoredArray(STORAGE_KEYS.USERS, []);
+        users = users.filter((u) => u.id !== targetDriver.user_id);
+        setStoredArray(STORAGE_KEYS.USERS, users);
+      }
+
+      dbService.notifyChange('all');
+      return true;
+    },
+
+    deleteAll() {
+      setStoredArray(STORAGE_KEYS.DRIVERS, []);
+      setStoredArray(STORAGE_KEYS.DRIVER_DOCS, []);
+      let users = getStoredArray(STORAGE_KEYS.USERS, []);
+      users = users.filter((u) => u.role === 'admin' || u.id === 'admin-master-01');
+      setStoredArray(STORAGE_KEYS.USERS, users);
+      dbService.notifyChange('all');
+      return true;
     }
   },
 
@@ -1418,8 +1565,18 @@ export const dbService = {
 
   // Bersihkan data dummy bawaan secara manual dan sinkronisasi realtime
   clearDummyData() {
-    initializeLocalDatabase();
-    this.notifyChange('all');
+    clearEntireDatabase();
+    return true;
+  },
+
+  // Bersihkan seluruh database secara menyeluruh (hapus semua user & driver)
+  clearAllData() {
+    clearEntireDatabase();
+    return true;
+  },
+
+  clearEntireDatabase() {
+    clearEntireDatabase();
     return true;
   },
 

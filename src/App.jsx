@@ -136,6 +136,7 @@ export default function App() {
 
   // Selected Ride & Driver state
   const [selectedRideId, setSelectedRideId] = useState('protect');
+  const [showAllRides, setShowAllRides] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState(null);
 
   // Mitra Driver Riil Terverifikasi dari Database Lokal

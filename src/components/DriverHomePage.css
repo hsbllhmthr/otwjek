@@ -174,9 +174,9 @@
   padding: 16px 18px;
   border-radius: 16px;
   border: 3px solid #FFFFFF;
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+  box-shadow: none;
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.15s ease;
 }
 
 .driver-verify-card:active {
@@ -185,6 +185,10 @@
 
 .driver-verify-card.pending {
   background: #FDF5EA;
+}
+
+.driver-verify-card.approved {
+  background: #ECFDF5;
 }
 
 .driver-verify-card.rejected {
@@ -200,6 +204,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow: none;
 }
 
 .driver-verify-icon-inner {

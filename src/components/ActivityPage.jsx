@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import './ActivityPage.css';
+import './DriverHomePage.css';
 import {
   ArrowLeft,
   ChevronDown,

@@ -119,15 +119,34 @@ export default function DriverCatalogModal({
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                  <img
-                    src={driver.avatar || driverPlaceholder}
-                    alt={driver.name}
-                    style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover' }}
-                    onError={(e) => {
-                      e.currentTarget.onerror = null;
-                      e.currentTarget.src = driverPlaceholder;
-                    }}
-                  />
+                  {driver.avatar ? (
+                    <img
+                      src={driver.avatar}
+                      alt={driver.name}
+                      style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover' }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #FF337F 0%, #E11D6F 100%)',
+                        color: '#FFFFFF',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 800,
+                        fontSize: 18,
+                        flexShrink: 0
+                      }}
+                    >
+                      {(driver.name || 'D').trim().charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: '#1C1C1E' }}>{driver.name}</span>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import './LoginPage.css';
 import { ArrowLeft, Check, Loader2 } from 'lucide-react';
 import dbService, { normalizePhone } from '../services/dbService.js';
+import driverLoginHero from '../assets/driver_login_hero.png';
 
 export default function LoginPage({ isDriver = false, onBack, onSuccess, onGoToSignUp }) {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -119,7 +120,16 @@ export default function LoginPage({ isDriver = false, onBack, onSuccess, onGoToS
       {/* Main Scrollable Content */}
       <div className="login-scroll-content">
         {/* Header Text */}
-        <div className="login-header-group">
+        <div className={`login-header-group ${isDriver ? 'is-driver-header' : ''}`}>
+          {isDriver && (
+            <div className="driver-login-hero-container">
+              <img
+                src={driverLoginHero}
+                alt="Masuk Mitra Driver OTWJek"
+                className="driver-login-hero-img"
+              />
+            </div>
+          )}
           <h1 className="login-headline">
             {isDriver ? 'Masuk Mitra Driver' : 'Selamat Datang Kembali!'}
           </h1>

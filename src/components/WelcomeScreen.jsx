@@ -2,24 +2,35 @@ import React, { useState } from 'react';
 import './WelcomeScreen.css';
 import { X as CloseIcon } from 'lucide-react';
 import otwjekLogo from '../assets/otwjek_logo.png';
+import driverWelcomeHero from '../assets/driver_welcome_hero.png';
 
 export default function WelcomeScreen({ isDriver = false, onContinue, onSignUp, onSignIn }) {
   const [activeModal, setActiveModal] = useState(null); // 'terms' | 'privacy' | null
 
   return (
-    <div className="welcome-screen-container">
+    <div className={`welcome-screen-container ${isDriver ? 'is-driver-view' : ''}`}>
       {/* Main Viewport Content Area */}
       <div className="welcome-main-content">
         <div className="welcome-center-section">
-          {/* App Logo */}
-          <div className="welcome-logo-wrapper">
-            <div className="welcome-brand-mark">
-              <img
-                src={otwjekLogo}
-                alt="OTWJek Logo"
-                className="welcome-logo-img"
-              />
-            </div>
+          {/* App Logo or Driver Welcome Hero */}
+          <div className={`welcome-logo-wrapper ${isDriver ? 'welcome-driver-hero-wrapper' : ''}`}>
+            {isDriver ? (
+              <div className="welcome-driver-hero-box">
+                <img
+                  src={driverWelcomeHero}
+                  alt="Selamat Datang Mitra OTWJek"
+                  className="welcome-driver-hero-img"
+                />
+              </div>
+            ) : (
+              <div className="welcome-brand-mark">
+                <img
+                  src={otwjekLogo}
+                  alt="OTWJek Logo"
+                  className="welcome-logo-img"
+                />
+              </div>
+            )}
           </div>
 
           {/* Heading & Subtitle in Indonesian */}
