@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import './WelcomeScreen.css';
 import { X as CloseIcon } from 'lucide-react';
-import otwjekLogo from '../assets/otwjek_logo.png';
 import driverWelcomeHero from '../assets/driver_welcome_hero.png';
+import customerWelcomeHero from '../assets/customer_welcome_hero.png';
 
 export default function WelcomeScreen({ isDriver = false, onContinue, onSignUp, onSignIn }) {
   const [activeModal, setActiveModal] = useState(null); // 'terms' | 'privacy' | null
@@ -12,8 +12,8 @@ export default function WelcomeScreen({ isDriver = false, onContinue, onSignUp, 
       {/* Main Viewport Content Area */}
       <div className="welcome-main-content">
         <div className="welcome-center-section">
-          {/* App Logo or Driver Welcome Hero */}
-          <div className={`welcome-logo-wrapper ${isDriver ? 'welcome-driver-hero-wrapper' : ''}`}>
+          {/* Welcome Hero Illustration */}
+          <div className={`welcome-logo-wrapper ${isDriver ? 'welcome-driver-hero-wrapper' : 'welcome-customer-hero-wrapper'}`}>
             {isDriver ? (
               <div className="welcome-driver-hero-box">
                 <img
@@ -23,11 +23,11 @@ export default function WelcomeScreen({ isDriver = false, onContinue, onSignUp, 
                 />
               </div>
             ) : (
-              <div className="welcome-brand-mark">
+              <div className="welcome-customer-hero-box">
                 <img
-                  src={otwjekLogo}
-                  alt="OTWJek Logo"
-                  className="welcome-logo-img"
+                  src={customerWelcomeHero}
+                  alt="Selamat Datang Pelanggan OTWJek"
+                  className="welcome-customer-hero-img"
                 />
               </div>
             )}

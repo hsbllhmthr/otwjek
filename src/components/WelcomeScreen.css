@@ -43,12 +43,42 @@
   margin: auto 0;
 }
 
-/* App Logo Section */
+/* Welcome Hero Sections */
 .welcome-logo-wrapper {
   display: flex;
   justify-content: center;
   align-items: center;
   margin-bottom: 24px;
+}
+
+/* Customer Welcome Hero Section */
+.welcome-customer-hero-wrapper {
+  margin-bottom: 26px;
+  width: 100%;
+}
+
+.welcome-customer-hero-box {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.welcome-customer-hero-img {
+  width: 100%;
+  max-width: 270px;
+  max-height: 270px;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+  transition: transform 0.25s ease;
+}
+
+.welcome-customer-hero-img:hover {
+  transform: scale(1.02);
 }
 
 /* Driver Welcome Hero Section */
@@ -74,6 +104,11 @@
   display: block;
   user-select: none;
   -webkit-user-drag: none;
+  transition: transform 0.25s ease;
+}
+
+.welcome-driver-hero-img:hover {
+  transform: scale(1.02);
 }
 
 .welcome-brand-mark {
@@ -98,7 +133,7 @@
 /* Heading & Subtitle */
 .welcome-text-group {
   text-align: center;
-  margin-bottom: 36px;
+  margin-bottom: 32px;
 }
 
 .welcome-screen-container.is-driver-view .welcome-text-group {
@@ -106,12 +141,12 @@
 }
 
 .welcome-title {
-  font-size: 32px;
+  font-size: 28px;
   font-weight: 800;
   color: #1A1D20;
-  letter-spacing: -0.6px;
-  margin: 0 0 10px 0;
-  line-height: 1.2;
+  letter-spacing: -0.5px;
+  margin: 0 0 8px 0;
+  line-height: 1.25;
 }
 
 .welcome-screen-container.is-driver-view .welcome-title {
@@ -120,12 +155,13 @@
 }
 
 .welcome-subtitle {
-  font-size: 15px;
+  font-size: 14.5px;
   font-weight: 400;
-  color: #8E9297;
-  letter-spacing: -0.2px;
-  margin: 0;
+  color: #64748B;
+  letter-spacing: -0.15px;
+  margin: 0 auto;
   line-height: 1.45;
+  max-width: 320px;
 }
 
 .welcome-screen-container.is-driver-view .welcome-subtitle {
@@ -135,6 +171,13 @@
 }
 
 @media (max-height: 720px) {
+  .welcome-customer-hero-wrapper {
+    margin-bottom: 16px;
+  }
+  .welcome-customer-hero-img {
+    max-width: 210px;
+    max-height: 210px;
+  }
   .welcome-driver-hero-wrapper {
     margin-bottom: 18px;
   }
@@ -142,10 +185,10 @@
     max-width: 240px;
     max-height: 195px;
   }
-  .welcome-screen-container.is-driver-view .welcome-title {
-    font-size: 23px;
+  .welcome-title {
+    font-size: 24px;
   }
-  .welcome-screen-container.is-driver-view .welcome-text-group {
+  .welcome-text-group {
     margin-bottom: 22px;
   }
 }
