@@ -189,8 +189,8 @@ export default function LoginPage({ isDriver = false, onBack, onSuccess, onGoToS
           </div>
         </form>
 
-        {/* Bottom Action Section (Menetap untuk driver, sticky untuk customer) */}
-        <div className={`login-bottom-section ${isDriver ? 'is-driver-bottom' : 'is-customer-sticky'}`}>
+        {/* Bottom Action Section (mengalir di bawah form di dalam scroll content agar tidak menutupi input saat keyboard muncul) */}
+        <div className="login-bottom-section">
           <button
             type="button"
             className="btn-login-submit"
@@ -207,7 +207,6 @@ export default function LoginPage({ isDriver = false, onBack, onSuccess, onGoToS
             )}
           </button>
 
-          {/* Helper switcher to Sign up if user doesn't have an account */}
           {onGoToSignUp && (
             <div className="login-footer-switcher">
               <span className="login-switcher-text">

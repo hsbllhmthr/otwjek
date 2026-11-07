@@ -138,6 +138,8 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
           p.id !== d.id ||
           p.verification_status !== d.verification_status ||
           p.status !== d.status ||
+          p.is_online !== d.is_online ||
+          p.online_updated_at !== d.online_updated_at ||
           p.name !== d.name ||
           p.phone !== d.phone ||
           p.avatar !== d.avatar ||
@@ -173,6 +175,8 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
             p.id !== b.id ||
             p.driver_id !== b.driver_id ||
             p.assignment_status !== b.assignment_status ||
+            p.driver_step !== b.driver_step ||
+            p.booking_status !== b.booking_status ||
             p.updated_at !== b.updated_at
           );
         });
@@ -530,6 +534,41 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
   // =========================================================================
   // CUSTOMER COUNTS & FILTERS
   // =========================================================================
+  const [seenCustomerIds, setSeenCustomerIds] = useState(() => {
+    try {
+      const raw = localStorage.getItem('otwjek_admin_seen_customer_ids');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+      const initialIds = (dbService.users.getCustomers() || []).map((c) => c.id).filter(Boolean);
+      localStorage.setItem('otwjek_admin_seen_customer_ids', JSON.stringify(initialIds));
+      return initialIds;
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    if (mainSection === 'customers' && customers.length > 0) {
+      const currentIds = customers.map((c) => c.id).filter(Boolean);
+      setSeenCustomerIds((prev) => {
+        const merged = Array.from(new Set([...prev, ...currentIds]));
+        if (merged.length === prev.length) return prev;
+        try {
+          localStorage.setItem('otwjek_admin_seen_customer_ids', JSON.stringify(merged));
+        } catch {
+          // ignore storage quota errors
+        }
+        return merged;
+      });
+    }
+  }, [mainSection, customers]);
+
+  const newCustomersCount = useMemo(() => {
+    return customers.filter((c) => c.id && !seenCustomerIds.includes(c.id)).length;
+  }, [customers, seenCustomerIds]);
+
   const customerCounts = useMemo(() => {
     const total = customers.length;
     const active = customers.filter((c) => c.status === 'active' || !c.status).length;
@@ -616,13 +655,26 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
   // =========================================================================
   // ORDERS / DISPATCH COUNTS, FILTERS & HANDLERS
   // =========================================================================
+  const isOrderDispatchCompleted = useCallback((b) => {
+    if (!b) return false;
+    return (
+      b.assignment_status === 'assigned' &&
+      b.booking_status !== 'cancelled' &&
+      (!b.driver_step || b.driver_step === 'completed')
+    );
+  }, []);
+
   const orderCounts = useMemo(() => {
     const list = Array.isArray(bookings) ? bookings : [];
-    const total = list.length;
-    const assigned = list.filter((b) => b.assignment_status === 'assigned').length;
-    const unassigned = Math.max(0, total - assigned);
-    return { total, assigned, unassigned };
-  }, [bookings]);
+    const completedAssigned = list.filter((b) => isOrderDispatchCompleted(b)).length;
+    const activeDispatch = list.filter((b) => !isOrderDispatchCompleted(b)).length;
+    const unassigned = list.filter((b) => b.assignment_status !== 'assigned').length;
+    return {
+      total: activeDispatch,
+      assigned: completedAssigned,
+      unassigned
+    };
+  }, [bookings, isOrderDispatchCompleted]);
 
   const filteredOrders = useMemo(() => {
     let result = Array.isArray(bookings) ? [...bookings] : [];
@@ -630,7 +682,11 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
     if (orderTab === 'unassigned') {
       result = result.filter((b) => b.assignment_status !== 'assigned');
     } else if (orderTab === 'assigned') {
-      result = result.filter((b) => b.assignment_status === 'assigned');
+      result = result.filter((b) => isOrderDispatchCompleted(b));
+    } else {
+      // Tab "Semua Pesanan" hanya menampilkan pesanan yang belum selesai ditugaskan;
+      // begitu selesai ditugaskan, item otomatis berpindah ke tab "Sudah Ditugaskan".
+      result = result.filter((b) => !isOrderDispatchCompleted(b));
     }
 
     if (orderServiceFilter !== 'all') {
@@ -658,7 +714,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
     }
 
     return result;
-  }, [bookings, orderTab, orderServiceFilter, orderSearchQuery]);
+  }, [bookings, orderTab, orderServiceFilter, orderSearchQuery, isOrderDispatchCompleted]);
 
   useEffect(() => {
     setOrdersViewPage(1);
@@ -669,33 +725,50 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
   // =========================================================================
   // MEMO: METRIK & FILTER SEMUA PESANAN PELANGGAN
   // =========================================================================
+  const isCustomerOrderCompleted = useCallback((b) => {
+    if (!b) return false;
+    if (b.booking_status === 'cancelled' || b.driver_step === 'cancelled') return false;
+    if (b.driver_step) return b.driver_step === 'completed';
+    if (b.assignment_status === 'assigned') return b.booking_status === 'completed';
+    return Boolean(b.status_note && b.booking_status === 'completed');
+  }, []);
+
+  const isCustomerOrderCancelled = useCallback((b) => {
+    if (!b) return false;
+    return b.booking_status === 'cancelled' || b.driver_step === 'cancelled';
+  }, []);
+
   const allOrdersMetrics = useMemo(() => {
     const list = Array.isArray(bookings) ? bookings : [];
-    const total = list.length;
-    const completed = list.filter((b) => b.booking_status === 'completed').length;
-    const cancelled = list.filter((b) => b.booking_status === 'cancelled').length;
+    const completed = list.filter((b) => isCustomerOrderCompleted(b)).length;
+    const cancelled = list.filter((b) => isCustomerOrderCancelled(b)).length;
     const inProgress = list.filter(
-      (b) => b.booking_status !== 'completed' && b.booking_status !== 'cancelled'
+      (b) => !isCustomerOrderCompleted(b) && !isCustomerOrderCancelled(b)
     ).length;
+    // Tab "Semua" menampilkan pesanan yang belum selesai agar item yang sudah selesai berpindah ke tab "Selesai"
+    const total = list.filter((b) => !isCustomerOrderCompleted(b)).length;
     const totalRevenue = list
-      .filter((b) => b.booking_status === 'completed')
+      .filter((b) => isCustomerOrderCompleted(b))
       .reduce((sum, b) => sum + Number(b.fare_amount || 0), 0);
 
     return { total, completed, cancelled, inProgress, totalRevenue };
-  }, [bookings]);
+  }, [bookings, isCustomerOrderCompleted, isCustomerOrderCancelled]);
 
   const filteredAllOrders = useMemo(() => {
     let result = Array.isArray(bookings) ? [...bookings] : [];
 
     // Filter status tab
     if (allOrdersStatusTab === 'completed') {
-      result = result.filter((b) => b.booking_status === 'completed');
+      result = result.filter((b) => isCustomerOrderCompleted(b));
     } else if (allOrdersStatusTab === 'cancelled') {
-      result = result.filter((b) => b.booking_status === 'cancelled');
+      result = result.filter((b) => isCustomerOrderCancelled(b));
     } else if (allOrdersStatusTab === 'in_progress') {
       result = result.filter(
-        (b) => b.booking_status !== 'completed' && b.booking_status !== 'cancelled'
+        (b) => !isCustomerOrderCompleted(b) && !isCustomerOrderCancelled(b)
       );
+    } else {
+      // Pada tab "Semua", pesanan yang sudah selesai otomatis berpindah ke tab "Selesai"
+      result = result.filter((b) => !isCustomerOrderCompleted(b));
     }
 
     // Filter layanan
@@ -729,7 +802,14 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
     }
 
     return result;
-  }, [bookings, allOrdersStatusTab, allOrdersServiceFilter, allOrdersSearchQuery]);
+  }, [
+    bookings,
+    allOrdersStatusTab,
+    allOrdersServiceFilter,
+    allOrdersSearchQuery,
+    isCustomerOrderCompleted,
+    isCustomerOrderCancelled
+  ]);
 
   useEffect(() => {
     setAllOrdersViewPage(1);
@@ -994,6 +1074,12 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
 
   const handleClearEntireDatabase = () => {
     dbService.clearAllData();
+    try {
+      localStorage.removeItem('otwjek_admin_seen_customer_ids');
+    } catch {
+      // ignore
+    }
+    setSeenCustomerIds([]);
     setClearDbModalOpen(false);
     setToastMessage('Seluruh database berhasil dibersihkan! Semua pengguna & mitra driver telah dihapus.');
     setTimeout(() => setToastMessage(null), 4000);
@@ -1088,10 +1174,8 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
               <Bike size={18} />
               <span className="nav-item-label">Verifikasi Driver</span>
             </div>
-            {driverCounts.pending > 0 ? (
+            {driverCounts.pending > 0 && (
               <span className="sidebar-badge-alert">{driverCounts.pending}</span>
-            ) : (
-              <span className="sidebar-badge-count">{driverCounts.all}</span>
             )}
           </button>
 
@@ -1107,7 +1191,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
               <Users size={18} />
               <span className="nav-item-label">Data Pelanggan</span>
             </div>
-            <span className="sidebar-badge-count">{customerCounts.total}</span>
+            {newCustomersCount > 0 && (
+              <span className="sidebar-badge-count">{newCustomersCount}</span>
+            )}
           </button>
 
           <button
@@ -1124,9 +1210,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
             </div>
             {orderCounts.unassigned > 0 ? (
               <span className="sidebar-badge-alert">{orderCounts.unassigned}</span>
-            ) : (
+            ) : orderCounts.total > 0 ? (
               <span className="sidebar-badge-count">{orderCounts.total}</span>
-            )}
+            ) : null}
           </button>
 
           <button
@@ -1141,7 +1227,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
               <Receipt size={18} />
               <span className="nav-item-label">Pesanan Pelanggan</span>
             </div>
-            <span className="sidebar-badge-count">{bookings.length}</span>
+            {allOrdersMetrics.inProgress > 0 && (
+              <span className="sidebar-badge-count">{allOrdersMetrics.inProgress}</span>
+            )}
           </button>
 
           <div className="sidebar-section-title">LAYANAN & LAINNYA</div>
@@ -1238,7 +1326,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
               aria-label="Notifikasi"
             >
               <Bell size={18} />
-              <span className="topbar-notification-dot" />
+              {(driverCounts.pending + newCustomersCount + orderCounts.total + allOrdersMetrics.inProgress) > 0 && (
+                <span className="topbar-notification-dot" />
+              )}
             </button>
 
             {/* User Profile Capsule */}
@@ -1719,6 +1809,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                             const isRejected = d.verification_status === 'rejected';
                             const statusClass = isPending ? 'pending' : isRejected ? 'cancel' : 'active';
                             const statusLabel = isPending ? 'Menunggu Review' : isRejected ? 'Ditolak' : 'Disetujui';
+                            const isOnline = typeof d.is_online === 'boolean' ? d.is_online : d.verification_status === 'approved';
 
                             return (
                               <tr
@@ -1792,9 +1883,35 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                   </div>
                                 </td>
                                 <td className="tailadmin-td status-td">
-                                  <span className={`table-status-pill ${statusClass}`}>
-                                    {statusLabel}
-                                  </span>
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 5 }}>
+                                    <span className={`table-status-pill ${statusClass}`}>
+                                      {statusLabel}
+                                    </span>
+                                    <span
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 5,
+                                        padding: '2px 8px',
+                                        borderRadius: 999,
+                                        fontSize: 11,
+                                        fontWeight: 700,
+                                        backgroundColor: isOnline ? '#ECFDF5' : '#F1F5F9',
+                                        color: isOnline ? '#059669' : '#64748B',
+                                        border: isOnline ? '1px solid #A7F3D0' : '1px solid #E2E8F0'
+                                      }}
+                                    >
+                                      <span
+                                        style={{
+                                          width: 6,
+                                          height: 6,
+                                          borderRadius: '50%',
+                                          backgroundColor: isOnline ? '#10B981' : '#94A3B8'
+                                        }}
+                                      />
+                                      {isOnline ? 'Online · Siap Order' : 'Offline · Istirahat'}
+                                    </span>
+                                  </div>
                                 </td>
                                 <td className="tailadmin-td action-td text-right">
                                   <div className="table-action-group table-action-icons-row">
@@ -2740,6 +2857,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                           const isRejected = driver.verification_status === 'rejected';
                           const statusClass = isPending ? 'pending' : isRejected ? 'cancel' : 'active';
                           const statusLabel = isPending ? 'Menunggu Review' : isRejected ? 'Ditolak' : 'Disetujui';
+                          const isOnline = typeof driver.is_online === 'boolean' ? driver.is_online : isApproved;
 
                           const waPhone = (driver.phone || '').replace(/^\+?62|^0/, '62');
 
@@ -2844,9 +2962,35 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 </div>
                               </td>
                               <td className="tailadmin-td status-td">
-                                <span className={`table-status-pill ${statusClass}`}>
-                                  {statusLabel}
-                                </span>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 5 }}>
+                                  <span className={`table-status-pill ${statusClass}`}>
+                                    {statusLabel}
+                                  </span>
+                                  <span
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 5,
+                                      padding: '2px 8px',
+                                      borderRadius: 999,
+                                      fontSize: 11,
+                                      fontWeight: 700,
+                                      backgroundColor: isOnline ? '#ECFDF5' : '#F1F5F9',
+                                      color: isOnline ? '#059669' : '#64748B',
+                                      border: isOnline ? '1px solid #A7F3D0' : '1px solid #E2E8F0'
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        width: 6,
+                                        height: 6,
+                                        borderRadius: '50%',
+                                        backgroundColor: isOnline ? '#10B981' : '#94A3B8'
+                                      }}
+                                    />
+                                    {isOnline ? 'Online · Siap Order' : 'Offline · Istirahat'}
+                                  </span>
+                                </div>
                               </td>
                               <td className="tailadmin-td action-td text-right">
                                 <div className="table-action-group table-action-icons-row">
@@ -3165,8 +3309,8 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                               })
                             : 'Baru saja';
 
-                          const isCompleted = ord.booking_status === 'completed';
-                          const isCancelled = ord.booking_status === 'cancelled';
+                          const isCancelled = isCustomerOrderCancelled(ord);
+                          const isCompleted = isCustomerOrderCompleted(ord);
                           const isAssigned = ord.assignment_status === 'assigned';
 
                           return (
@@ -3229,9 +3373,41 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                               <td className="tailadmin-td">
                                 {isAssigned ? (
                                   <div className="table-cell-meta">
-                                    <span className="table-primary-text" style={{ fontWeight: 600 }}>
-                                      {ord.driver_name || ord.driver?.name || 'Mitra Driver'}
-                                    </span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                      <span className="table-primary-text" style={{ fontWeight: 600 }}>
+                                        {ord.driver_name || ord.driver?.name || 'Mitra Driver'}
+                                      </span>
+                                      <span
+                                        className={`table-status-pill ${
+                                          isCancelled ? 'cancel' : isCompleted ? 'active' : 'pending'
+                                        }`}
+                                        style={
+                                          isCompleted
+                                            ? {
+                                                fontSize: 10,
+                                                padding: '1px 7px',
+                                                backgroundColor: '#ECFDF5',
+                                                color: '#059669',
+                                                border: '1px solid #A7F3D0'
+                                              }
+                                            : isCancelled
+                                            ? { fontSize: 10, padding: '1px 7px' }
+                                            : {
+                                                fontSize: 10,
+                                                padding: '1px 7px',
+                                                backgroundColor: '#EFF6FF',
+                                                color: '#2563EB',
+                                                border: '1px solid #BFDBFE'
+                                              }
+                                        }
+                                      >
+                                        {isCancelled
+                                          ? 'Dibatalkan'
+                                          : isCompleted
+                                          ? 'Selesai Ditugaskan'
+                                          : 'Ditugaskan'}
+                                      </span>
+                                    </div>
                                     <span className="table-secondary-text">
                                       {ord.driver_plate || ord.driver?.plateNumber || 'DD - MKS'}
                                     </span>
@@ -3999,7 +4175,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                               <span>
                                 {orderSearchQuery
                                   ? `Tidak ditemukan pesanan yang cocok dengan "${orderSearchQuery}".`
-                                  : 'Belum ada pesanan pelanggan yang masuk.'}
+                                  : orderTab === 'assigned'
+                                  ? 'Belum ada pesanan yang selesai ditugaskan.'
+                                  : 'Semua pesanan aktif telah selesai ditugaskan (lihat di tab Sudah Ditugaskan).'}
                               </span>
                             </div>
                           </td>
@@ -4011,6 +4189,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                           const isSend = sType === 'paket' || sType === 'send' || sType === 'package' || sType === 'food';
                           const sLabel = isCar ? 'Mobil' : isSend ? 'Paket' : 'Motor';
                           const isAssigned = ord.assignment_status === 'assigned';
+                          const isTaskCompleted = isOrderDispatchCompleted(ord);
+                          const isTaskCancelled =
+                            ord.booking_status === 'cancelled' || ord.driver_step === 'cancelled';
                           const orderCode = ord.order_code || ord.booking_code || '#ORD';
                           const fareFormatted = `Rp ${Number(ord.fare_amount || 15000).toLocaleString('id-ID')}`;
                           const createdDateStr = ord.created_at
@@ -4091,12 +4272,42 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                               <td className="tailadmin-td">
                                 {isAssigned ? (
                                   <div className="table-cell-meta">
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                                       <span className="table-primary-text" style={{ color: '#059669', fontWeight: 700 }}>
                                         {ord.driver_name || ord.driver?.name || 'Mitra Driver'}
                                       </span>
-                                      <span className="table-status-pill active" style={{ fontSize: 10.5, padding: '1px 7px' }}>
-                                        Ditugaskan
+                                      <span
+                                        className={`table-status-pill ${
+                                          isTaskCancelled ? 'cancel' : isTaskCompleted ? 'active' : 'pending'
+                                        }`}
+                                        style={
+                                          isTaskCompleted
+                                            ? {
+                                                fontSize: 10.5,
+                                                padding: '1px 8px',
+                                                backgroundColor: '#ECFDF5',
+                                                color: '#059669',
+                                                border: '1px solid #A7F3D0'
+                                              }
+                                            : isTaskCancelled
+                                            ? {
+                                                fontSize: 10.5,
+                                                padding: '1px 8px'
+                                              }
+                                            : {
+                                                fontSize: 10.5,
+                                                padding: '1px 8px',
+                                                backgroundColor: '#EFF6FF',
+                                                color: '#2563EB',
+                                                border: '1px solid #BFDBFE'
+                                              }
+                                        }
+                                      >
+                                        {isTaskCancelled
+                                          ? 'Dibatalkan'
+                                          : isTaskCompleted
+                                          ? 'Selesai Ditugaskan'
+                                          : 'Ditugaskan'}
                                       </span>
                                     </div>
                                     <span className="table-secondary-text">
@@ -4116,56 +4327,58 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                               </td>
 
                               <td className="tailadmin-td action-td text-right">
-                                <div className="table-action-group" style={{ justifyContent: 'flex-end', gap: 6 }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setAssignModalOrder(ord);
-                                      setAssignDriverSearch('');
-                                      setAssignVehicleFilter('recommended');
-                                    }}
-                                    style={{
-                                      backgroundColor: isAssigned ? '#F1F5F9' : '#EE4335',
-                                      color: isAssigned ? '#334155' : '#FFFFFF',
-                                      border: isAssigned ? '1px solid #CBD5E1' : 'none',
-                                      borderRadius: 8,
-                                      padding: '6px 12px',
-                                      fontSize: 12,
-                                      fontWeight: 700,
-                                      cursor: 'pointer',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: 5
-                                    }}
-                                  >
-                                    <UserCheck size={14} />
-                                    <span>{isAssigned ? 'Ganti Driver' : 'Tugaskan Driver'}</span>
-                                  </button>
-
-                                  {isAssigned && (ord.driver_phone || ord.driver?.phone) && (
-                                    <a
-                                      href={buildDriverTaskWhatsAppUrl(ord, ord.driver)}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      title="Kirim rincian tugas pesanan ke WhatsApp Driver"
+                                {!isTaskCompleted && (
+                                  <div className="table-action-group" style={{ justifyContent: 'flex-end', gap: 6 }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setAssignModalOrder(ord);
+                                        setAssignDriverSearch('');
+                                        setAssignVehicleFilter('recommended');
+                                      }}
                                       style={{
-                                        backgroundColor: '#10B981',
-                                        color: '#FFFFFF',
+                                        backgroundColor: isAssigned ? '#F1F5F9' : '#EE4335',
+                                        color: isAssigned ? '#334155' : '#FFFFFF',
+                                        border: isAssigned ? '1px solid #CBD5E1' : 'none',
                                         borderRadius: 8,
-                                        padding: '6px 10px',
+                                        padding: '6px 12px',
                                         fontSize: 12,
                                         fontWeight: 700,
-                                        textDecoration: 'none',
+                                        cursor: 'pointer',
                                         display: 'inline-flex',
                                         alignItems: 'center',
-                                        gap: 4
+                                        gap: 5
                                       }}
                                     >
-                                      <span>WA Driver</span>
-                                      <ExternalLink size={12} />
-                                    </a>
-                                  )}
-                                </div>
+                                      <UserCheck size={14} />
+                                      <span>{isAssigned ? 'Ganti Driver' : 'Tugaskan Driver'}</span>
+                                    </button>
+
+                                    {isAssigned && (ord.driver_phone || ord.driver?.phone) && (
+                                      <a
+                                        href={buildDriverTaskWhatsAppUrl(ord, ord.driver)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        title="Kirim rincian tugas pesanan ke WhatsApp Driver"
+                                        style={{
+                                          backgroundColor: '#10B981',
+                                          color: '#FFFFFF',
+                                          borderRadius: 8,
+                                          padding: '6px 10px',
+                                          fontSize: 12,
+                                          fontWeight: 700,
+                                          textDecoration: 'none',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: 4
+                                        }}
+                                      >
+                                        <span>WA Driver</span>
+                                        <ExternalLink size={12} />
+                                      </a>
+                                    )}
+                                  </div>
+                                )}
                               </td>
                             </tr>
                           );
@@ -5362,6 +5575,19 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                   );
                 }
 
+                // Prioritaskan driver yang sedang Online (Siap Terima Order) di urutan teratas
+                candidateDrivers = [...candidateDrivers].sort((a, b) => {
+                  const aOnline = typeof a.is_online === 'boolean' ? a.is_online : true;
+                  const bOnline = typeof b.is_online === 'boolean' ? b.is_online : true;
+                  if (aOnline !== bOnline) return aOnline ? -1 : 1;
+                  return 0;
+                });
+
+                const onlineCount = candidateDrivers.filter((d) =>
+                  typeof d.is_online === 'boolean' ? d.is_online : true
+                ).length;
+                const offlineCount = Math.max(0, candidateDrivers.length - onlineCount);
+
                 if (approvedList.length === 0) {
                   return (
                     <div style={{ textAlign: 'center', padding: '24px 16px', color: '#64748B', fontSize: 13 }}>
@@ -5391,58 +5617,117 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                 }
 
                 return (
-                  <div className="assign-drivers-list">
-                    {candidateDrivers.map((drv) => {
-                      const isCurrentlyAssigned =
-                        assignModalOrder.assignment_status === 'assigned' &&
-                        assignModalOrder.driver_id === drv.id;
+                  <>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 8,
+                        padding: '7px 12px',
+                        borderRadius: 10,
+                        backgroundColor: '#F8FAFC',
+                        border: '1px solid #E2E8F0',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: '#475569'
+                      }}
+                    >
+                      <span>Status Kesiapan Driver:</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#059669', fontWeight: 700 }}>
+                          <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: '#10B981' }} />
+                          {onlineCount} Siap Order
+                        </span>
+                        <span style={{ color: '#CBD5E1' }}>•</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#64748B', fontWeight: 600 }}>
+                          <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: '#94A3B8' }} />
+                          {offlineCount} Istirahat
+                        </span>
+                      </div>
+                    </div>
 
-                      const isCar = (drv.vehicleType || '').toLowerCase() === 'mobil';
+                    <div className="assign-drivers-list">
+                      {candidateDrivers.map((drv) => {
+                        const isCurrentlyAssigned =
+                          assignModalOrder.assignment_status === 'assigned' &&
+                          assignModalOrder.driver_id === drv.id;
 
-                      return (
-                        <div
-                          key={drv.id}
-                          className={`assign-driver-card ${isCurrentlyAssigned ? 'is-assigned' : ''}`}
-                        >
-                          <div className="assign-driver-left">
-                            {drv.avatar ? (
-                              <img
-                                src={drv.avatar}
-                                alt={drv.name}
-                                className="assign-driver-avatar"
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none';
-                                }}
-                              />
-                            ) : (
-                              <div
-                                className="assign-driver-avatar"
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  background: 'linear-gradient(135deg, #FF337F 0%, #E11D6F 100%)',
-                                  color: '#FFFFFF',
-                                  fontWeight: 800,
-                                  fontSize: 14,
-                                  borderRadius: '50%'
-                                }}
-                              >
-                                {(drv.name || 'D').trim().charAt(0).toUpperCase()}
-                              </div>
-                            )}
-                            <div className="assign-driver-info">
-                              <div className="assign-driver-name-row">
-                                <span className="assign-driver-name">{drv.name}</span>
-                                <span className={`assign-veh-badge ${isCar ? 'mobil' : 'motor'}`}>
-                                  {isCar ? 'Mobil' : 'Motor'}
-                                </span>
-                                {isCurrentlyAssigned && (
-                                  <span className="assign-status-assigned-pill">
-                                    <Check size={11} strokeWidth={2.8} /> Ditugaskan
+                        const isCar = (drv.vehicleType || '').toLowerCase() === 'mobil';
+                        const isDrvOnline = typeof drv.is_online === 'boolean' ? drv.is_online : true;
+
+                        return (
+                          <div
+                            key={drv.id}
+                            className={`assign-driver-card ${isCurrentlyAssigned ? 'is-assigned' : ''}`}
+                            style={!isDrvOnline && !isCurrentlyAssigned ? { opacity: 0.78 } : undefined}
+                          >
+                            <div className="assign-driver-left">
+                              {drv.avatar ? (
+                                <img
+                                  src={drv.avatar}
+                                  alt={drv.name}
+                                  className="assign-driver-avatar"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                  }}
+                                />
+                              ) : (
+                                <div
+                                  className="assign-driver-avatar"
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    background: 'linear-gradient(135deg, #FF337F 0%, #E11D6F 100%)',
+                                    color: '#FFFFFF',
+                                    fontWeight: 800,
+                                    fontSize: 14,
+                                    borderRadius: '50%'
+                                  }}
+                                >
+                                  {(drv.name || 'D').trim().charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                              <div className="assign-driver-info">
+                                <div className="assign-driver-name-row" style={{ flexWrap: 'wrap' }}>
+                                  <span className="assign-driver-name">{drv.name}</span>
+                                  <span className={`assign-veh-badge ${isCar ? 'mobil' : 'motor'}`}>
+                                    {isCar ? 'Mobil' : 'Motor'}
                                   </span>
-                                )}
-                              </div>
+                                  <span
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 4,
+                                      padding: '2px 7px',
+                                      borderRadius: 999,
+                                      fontSize: 10.5,
+                                      fontWeight: 700,
+                                      backgroundColor: isDrvOnline ? '#ECFDF5' : '#F1F5F9',
+                                      color: isDrvOnline ? '#059669' : '#64748B',
+                                      border: isDrvOnline ? '1px solid #A7F3D0' : '1px solid #E2E8F0'
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        width: 5.5,
+                                        height: 5.5,
+                                        borderRadius: '50%',
+                                        backgroundColor: isDrvOnline ? '#10B981' : '#94A3B8'
+                                      }}
+                                    />
+                                    {isDrvOnline ? 'Siap Terima Order' : 'Istirahat'}
+                                  </span>
+                                  {isCurrentlyAssigned && (
+                                    <span className="assign-status-assigned-pill">
+                                      <Check size={11} strokeWidth={2.8} />{' '}
+                                      {!assignModalOrder.driver_step || assignModalOrder.driver_step === 'completed'
+                                        ? 'Selesai Ditugaskan'
+                                        : 'Ditugaskan'}
+                                    </span>
+                                  )}
+                                </div>
                               <div className="assign-driver-meta-row">
                                 <span className="assign-plate-text">{drv.plateNumber || 'DD - MKS'}</span>
                                 <span className="assign-meta-divider">•</span>
@@ -5508,7 +5793,8 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                         </div>
                       );
                     })}
-                  </div>
+                    </div>
+                  </>
                 );
               })()}
             </div>
@@ -5898,43 +6184,43 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {ord.booking_status !== 'completed' && (
-                    <button
-                      type="button"
-                      style={{
-                        height: 34,
-                        padding: '0 12px',
-                        borderRadius: 8,
-                        border: 'none',
-                        backgroundColor: '#10B981',
-                        color: '#FFFFFF',
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: 'pointer'
-                      }}
-                      onClick={() => handleUpdateOrderStatus(ord.id, 'completed', 'Diselesaikan oleh Admin')}
-                    >
-                      Tandai Selesai
-                    </button>
-                  )}
-                  {ord.booking_status !== 'cancelled' && (
-                    <button
-                      type="button"
-                      style={{
-                        height: 34,
-                        padding: '0 12px',
-                        borderRadius: 8,
-                        border: '1px solid #FECACA',
-                        backgroundColor: '#FFFFFF',
-                        color: '#DC2626',
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: 'pointer'
-                      }}
-                      onClick={() => handleUpdateOrderStatus(ord.id, 'cancelled', 'Dibatalkan oleh Admin')}
-                    >
-                      Batalkan Pesanan
-                    </button>
+                  {!isCustomerOrderCompleted(ord) && !isCustomerOrderCancelled(ord) && (
+                    <>
+                      <button
+                        type="button"
+                        style={{
+                          height: 34,
+                          padding: '0 12px',
+                          borderRadius: 8,
+                          border: 'none',
+                          backgroundColor: '#10B981',
+                          color: '#FFFFFF',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => handleUpdateOrderStatus(ord.id, 'completed', 'Diselesaikan oleh Admin')}
+                      >
+                        Tandai Selesai
+                      </button>
+                      <button
+                        type="button"
+                        style={{
+                          height: 34,
+                          padding: '0 12px',
+                          borderRadius: 8,
+                          border: '1px solid #FECACA',
+                          backgroundColor: '#FFFFFF',
+                          color: '#DC2626',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => handleUpdateOrderStatus(ord.id, 'cancelled', 'Dibatalkan oleh Admin')}
+                      >
+                        Batalkan Pesanan
+                      </button>
+                    </>
                   )}
                 </div>
 

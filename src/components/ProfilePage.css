@@ -617,29 +617,32 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 16px;
-  padding: 16px 18px;
-  border-radius: 16px;
-  border: 3px solid #FFFFFF;
+  gap: 13px;
+  padding: 13px 16px;
+  border-radius: 14px;
+  border: 1px solid transparent;
   box-shadow: none;
   transition: transform 0.15s ease;
 }
 
 .driver-verify-card.pending {
   background: #FDF5EA;
+  border-color: #FDE6C4;
 }
 
 .driver-verify-card.approved {
   background: #ECFDF5;
+  border-color: #D1FAE5;
 }
 
 .driver-verify-card.rejected {
   background: #FEF2F2;
+  border-color: #FEE2E2;
 }
 
 .driver-verify-icon-outer {
-  width: 50px;
-  height: 50px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   background: #FFFFFF;
   display: flex;
@@ -650,14 +653,14 @@
 }
 
 .driver-verify-icon-inner {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #FFFFFF;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 800;
   font-family: inherit;
   line-height: 1;
@@ -680,15 +683,15 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
 
 .driver-verify-title {
   margin: 0;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
-  color: #1E293B;
-  line-height: 1.25;
+  color: #0F172A;
+  line-height: 1.3;
   letter-spacing: -0.2px;
 }
 
@@ -740,4 +743,105 @@
   border-bottom: 1.5px solid #F3F4F6;
   letter-spacing: -0.2px;
 }
+
+/* ==========================================================================
+   SWITCH STATUS OPERASIONAL MITRA DRIVER (MINIMALIST & CLEAN)
+   ========================================================================== */
+.driver-online-switch-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 16px;
+  border-radius: 12px;
+  border: 1px solid #F1F5F9;
+  background-color: #F8FAFC;
+  margin-bottom: 16px;
+  box-shadow: none;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.driver-online-switch-card.is-online {
+  background-color: #F0FDF4;
+  border-color: #DCFCE7;
+}
+
+.driver-online-switch-card.is-offline {
+  background-color: #F8FAFC;
+  border-color: #F1F5F9;
+}
+
+.driver-online-left {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.driver-online-text-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.driver-online-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+  letter-spacing: -0.2px;
+  line-height: 1.3;
+}
+
+.driver-online-switch-card.is-online .driver-online-title {
+  color: #065F46;
+}
+
+.driver-online-sub {
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748B;
+  line-height: 1.3;
+}
+
+.driver-online-switch-card.is-online .driver-online-sub {
+  color: #059669;
+}
+
+/* Toggle Switch Button */
+.driver-toggle-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  border: none;
+  background-color: #CBD5E1;
+  padding: 2px;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  box-shadow: none;
+  transition: background-color 0.2s ease;
+}
+
+.driver-toggle-switch.active {
+  background-color: #10B981;
+}
+
+.driver-toggle-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: #FFFFFF;
+  transform: translateX(0);
+  box-shadow: none;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.driver-toggle-switch.active .driver-toggle-thumb {
+  transform: translateX(20px);
+}
+
 

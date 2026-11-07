@@ -56,6 +56,16 @@ export default function ProfilePage({ user: propUser, onBack, onLogout }) {
   const isDriver = currentUser.role === 'driver';
   const [driverStateVersion, setDriverStateVersion] = useState(0);
 
+  // Subscribe ke perubahan database agar status verifikasi & online tersinkronisasi real-time
+  useEffect(() => {
+    const unsub = dbService.subscribe(() => {
+      setDriverStateVersion((v) => v + 1);
+    });
+    return () => {
+      if (typeof unsub === 'function') unsub();
+    };
+  }, []);
+
   // Ambil data driver spesifik jika ada
   const driverProfile = useMemo(() => {
     if (!isDriver) return null;
@@ -422,6 +432,35 @@ export default function ProfilePage({ user: propUser, onBack, onLogout }) {
 
   const verificationStatus = driverProfile?.verification_status || currentUser?.driver?.verification_status || 'pending';
 
+  const isDriverOnline = useMemo(() => {
+    if (!isDriver) return false;
+    if (driverProfile && typeof driverProfile.is_online === 'boolean') {
+      return driverProfile.is_online;
+    }
+    if (currentUser?.driver && typeof currentUser.driver.is_online === 'boolean') {
+      return currentUser.driver.is_online;
+    }
+    return verificationStatus === 'approved';
+  }, [isDriver, driverProfile, currentUser, verificationStatus]);
+
+  const handleToggleOnlineStatus = useCallback(
+    (targetOnline) => {
+      const nextState = typeof targetOnline === 'boolean' ? targetOnline : !isDriverOnline;
+      const targetDriverId = driverProfile?.id || currentUser?.driver?.id;
+      if (targetDriverId) {
+        dbService.drivers.setOnlineStatus(targetDriverId, nextState);
+      } else if (isDriver && currentUser) {
+        // Jika objek driver belum terdaftar di tabel drivers, daftarkan & set statusnya
+        const created = dbService.drivers.registerDriver(currentUser, activeDriver || {}, {});
+        if (created?.driver?.id) {
+          dbService.drivers.setOnlineStatus(created.driver.id, nextState);
+        }
+      }
+      setDriverStateVersion((v) => v + 1);
+    },
+    [isDriverOnline, driverProfile, currentUser, isDriver, activeDriver]
+  );
+
   return (
     <div className="profile-page-flat">
       {/* Top Header */}
@@ -513,16 +552,16 @@ export default function ProfilePage({ user: propUser, onBack, onLogout }) {
             )}
 
             {verificationStatus === 'approved' && (
-              <div className="driver-verify-card approved" style={{ marginBottom: 20 }}>
+              <div className="driver-verify-card approved" style={{ marginBottom: 14 }}>
                 <div className="driver-verify-icon-outer">
                   <div className="driver-verify-icon-inner">
                     <Check size={14} strokeWidth={3} />
                   </div>
                 </div>
                 <div className="driver-verify-body">
-                  <h3 className="driver-verify-title">Mitra Pengemudi Resmi Terverifikasi</h3>
+                  <h3 className="driver-verify-title">Mitra Resmi Terverifikasi</h3>
                   <p className="driver-verify-desc">
-                    Akun Anda telah diverifikasi resmi oleh Admin OTWJek.
+                    Akun Anda telah disetujui oleh Admin OTWJek.
                   </p>
                 </div>
               </div>
@@ -543,6 +582,45 @@ export default function ProfilePage({ user: propUser, onBack, onLogout }) {
                 </div>
               </div>
             )}
+
+            {/* Switch Online / Offline (Minimalist & Clean) */}
+            <div
+              className={`driver-online-switch-card ${isDriverOnline ? 'is-online' : 'is-offline'}`}
+              onClick={() => handleToggleOnlineStatus(!isDriverOnline)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleToggleOnlineStatus(!isDriverOnline);
+                }
+              }}
+            >
+              <div className="driver-online-left">
+                <div className="driver-online-text-wrap">
+                  <span className="driver-online-title">
+                    {isDriverOnline ? 'Siap Terima Order' : 'Sedang Istirahat'}
+                  </span>
+                  <span className="driver-online-sub">
+                    {isDriverOnline ? 'Online · Aktif di Admin Dashboard' : 'Offline · Tidak menerima order'}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                role="switch"
+                aria-checked={isDriverOnline}
+                aria-label="Switch Status Online atau Istirahat"
+                className={`driver-toggle-switch ${isDriverOnline ? 'active' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleOnlineStatus(!isDriverOnline);
+                }}
+              >
+                <span className="driver-toggle-thumb" />
+              </button>
+            </div>
           </>
         )}
 

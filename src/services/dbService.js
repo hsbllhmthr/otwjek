@@ -368,6 +368,7 @@ export const dbService = {
           };
           users[existingIdx] = updated;
           setStoredArray(STORAGE_KEYS.USERS, users);
+          dbService.notifyChange('users');
           return updated;
         }
       }
@@ -394,6 +395,7 @@ export const dbService = {
 
       users.push(newUser);
       setStoredArray(STORAGE_KEYS.USERS, users);
+      dbService.notifyChange('users');
       return newUser;
     },
 
@@ -417,6 +419,7 @@ export const dbService = {
       };
       users[index] = updated;
       setStoredArray(STORAGE_KEYS.USERS, users);
+      dbService.notifyChange('users');
 
       // Sinkronisasi dengan sesi aktif jika user yang diubah adalah currentUser
       const currentUser = dbService.session.getCurrentUser();
@@ -444,6 +447,7 @@ export const dbService = {
       let users = getStoredArray(STORAGE_KEYS.USERS, []);
       users = users.filter((u) => u.id !== id);
       setStoredArray(STORAGE_KEYS.USERS, users);
+      dbService.notifyChange('users');
       return true;
     }
   },
@@ -609,6 +613,7 @@ export const dbService = {
       user.driver = activeDriver;
       user.vehicleData = vehicleData || {};
       user.documents = documents || {};
+      dbService.notifyChange('drivers');
       return { user, driver: activeDriver };
     },
 
@@ -718,6 +723,7 @@ export const dbService = {
         dbService.session.setCurrentUser(sessionUser);
       }
 
+      dbService.notifyChange('drivers');
       return drivers[idx];
     },
 
@@ -729,10 +735,12 @@ export const dbService = {
       const idx = drivers.findIndex((d) => d.id === driverId);
       if (idx === -1) return null;
 
+      const nextOnline = drivers[idx].is_online !== undefined ? Boolean(drivers[idx].is_online) : true;
       drivers[idx] = {
         ...drivers[idx],
         verification_status: 'approved',
-        status: 'Tersedia',
+        is_online: nextOnline,
+        status: nextOnline ? 'Siap Terima Order' : 'Istirahat (Offline)',
         badge: 'Mitra Resmi 🌸',
         reviewed_by: reviewerName,
         reviewed_at: new Date().toISOString(),
@@ -764,6 +772,7 @@ export const dbService = {
         dbService.session.setCurrentUser(sessionUser);
       }
 
+      dbService.notifyChange('drivers');
       return drivers[idx];
     },
 
@@ -809,6 +818,7 @@ export const dbService = {
         dbService.session.setCurrentUser(sessionUser);
       }
 
+      dbService.notifyChange('drivers');
       return drivers[idx];
     },
 
@@ -859,6 +869,7 @@ export const dbService = {
         }
       });
       setStoredArray(STORAGE_KEYS.DRIVER_DOCS, storedDocs);
+      dbService.notifyChange('drivers');
 
       return drivers[idx];
     },
@@ -875,6 +886,48 @@ export const dbService = {
       };
 
       setStoredArray(STORAGE_KEYS.DRIVERS, drivers);
+      dbService.notifyChange('drivers');
+      return drivers[idx];
+    },
+
+    /**
+     * Mengubah Status Operasional Online / Offline (Siap Terima Order vs Istirahat)
+     * Langsung tersinkronisasi ke Admin Dashboard dan Session Driver
+     */
+    setOnlineStatus(driverId, isOnline) {
+      const drivers = this.getAll();
+      const idx = drivers.findIndex((d) => d.id === driverId);
+      if (idx === -1) return null;
+
+      const nextOnline = Boolean(isOnline);
+      const isApproved = drivers[idx].verification_status === 'approved';
+      const nextStatusLabel = isApproved
+        ? nextOnline
+          ? 'Siap Terima Order'
+          : 'Istirahat (Offline)'
+        : drivers[idx].status || 'Menunggu Verifikasi';
+
+      drivers[idx] = {
+        ...drivers[idx],
+        is_online: nextOnline,
+        status: nextStatusLabel,
+        online_updated_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      setStoredArray(STORAGE_KEYS.DRIVERS, drivers);
+
+      // Sinkronisasi session lokal jika sedang login sebagai driver tersebut
+      const sessionUser = dbService.session.getCurrentUser();
+      if (
+        sessionUser &&
+        (sessionUser.id === drivers[idx].user_id || sessionUser.driver?.id === driverId)
+      ) {
+        sessionUser.driver = drivers[idx];
+        dbService.session.setCurrentUser(sessionUser);
+      }
+
+      dbService.notifyChange('drivers');
       return drivers[idx];
     },
 
@@ -1157,6 +1210,7 @@ export const dbService = {
         bookings.unshift(newBooking);
       }
       setStoredArray(STORAGE_KEYS.BOOKINGS, bookings);
+      dbService.notifyChange('bookings');
       return newBooking;
     },
 
@@ -1206,11 +1260,15 @@ export const dbService = {
         driver: assignedDriverObj,
         assignment_status: 'assigned',
         driver_step: existing.booking_status === 'cancelled' ? 'cancelled' : 'assigned',
+        booking_status: existing.booking_status === 'cancelled' ? 'cancelled' : 'in_progress',
         assigned_by: reviewerName,
         assigned_at: new Date().toISOString(),
         timeline: {
           ...(existing.timeline || {}),
-          received: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':')
+          received: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':'),
+          arrived: '--:--',
+          pickedUp: '--:--',
+          completed: '--:--'
         },
         is_read_driver: false,
         is_read: false,
@@ -1235,6 +1293,7 @@ export const dbService = {
         }
       }
 
+      dbService.notifyChange('bookings');
       return updatedBooking;
     },
 
@@ -1247,12 +1306,19 @@ export const dbService = {
       const updated = {
         ...bookings[idx],
         booking_status: status,
+        driver_step:
+          status === 'completed'
+            ? 'completed'
+            : status === 'cancelled'
+            ? 'cancelled'
+            : bookings[idx].driver_step,
         status_note: note || bookings[idx].status_note || null,
         updated_at: new Date().toISOString()
       };
 
       bookings[idx] = updated;
       setStoredArray(STORAGE_KEYS.BOOKINGS, bookings);
+      dbService.notifyChange('bookings');
       return updated;
     },
 
@@ -1302,13 +1368,19 @@ export const dbService = {
       const updated = {
         ...existing,
         driver_step: nextStep,
-        booking_status: nextStep === 'cancelled' ? 'cancelled' : 'completed',
+        booking_status:
+          nextStep === 'cancelled'
+            ? 'cancelled'
+            : nextStep === 'completed'
+            ? 'completed'
+            : 'in_progress',
         timeline: nextTimeline,
         updated_at: new Date().toISOString()
       };
 
       bookings[idx] = updated;
       setStoredArray(STORAGE_KEYS.BOOKINGS, bookings);
+      dbService.notifyChange('bookings');
       return updated;
     },
 
@@ -1355,12 +1427,18 @@ export const dbService = {
           const dPhone = matchedDriver?.phone ? normalizePhone(matchedDriver.phone) : uPhone;
           const dName = (matchedDriver?.name || uName || '').trim().toLowerCase();
 
+          const seenIds = new Set();
           return realBookings.filter((b) => {
-            if (dId && b.driver_id === dId) return true;
-            if (uId && (b.driver_user_id === uId || b.driver_id === uId)) return true;
-            if (dPhone && b.driver_phone && normalizePhone(b.driver_phone) === dPhone && b.assignment_status === 'assigned') return true;
-            if (dName && b.driver_name && b.driver_name.trim().toLowerCase() === dName && b.assignment_status === 'assigned') return true;
-            return false;
+            if (b.assignment_status !== 'assigned') return false;
+            let isMatch = false;
+            if (dId && b.driver_id === dId) isMatch = true;
+            else if (uId && (b.driver_user_id === uId || b.driver_id === uId)) isMatch = true;
+            else if (dPhone && b.driver_phone && normalizePhone(b.driver_phone) === dPhone) isMatch = true;
+            else if (dName && b.driver_name && b.driver_name.trim().toLowerCase() === dName) isMatch = true;
+            if (!isMatch) return false;
+            if (b.id && seenIds.has(b.id)) return false;
+            if (b.id) seenIds.add(b.id);
+            return true;
           });
         }
 

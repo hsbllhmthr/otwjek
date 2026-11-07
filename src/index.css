@@ -1475,50 +1475,12 @@ button, input, select, textarea {
   transform: scale(0.97);
 }
 
-/* Promo & Where-to Widget */
+/* Where-to Search Widget */
 .ridego-promo-search-widget {
   padding: 0 16px;
-  margin-top: -76px;
+  margin-top: -28px;
   position: relative;
   z-index: 10;
-}
-
-.ridego-discount-banner {
-  position: relative;
-  z-index: 1;
-  background: linear-gradient(135deg, #FF337F 0%, #E83A82 100%);
-  border-radius: 20px 20px 0 0;
-  padding: 13px 18px 26px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: #FFFFFF;
-  cursor: pointer;
-  box-shadow: 0 4px 16px rgba(255, 51, 127, 0.25);
-  transition: filter 0.15s ease;
-}
-
-.ridego-discount-banner:hover {
-  filter: brightness(1.04);
-}
-
-.discount-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: -0.1px;
-}
-
-.discount-tag-icon {
-  flex-shrink: 0;
-  transform: rotate(45deg);
-}
-
-.discount-chevron {
-  opacity: 0.9;
-  flex-shrink: 0;
 }
 
 .ridego-where-to-pill {
@@ -1530,7 +1492,7 @@ button, input, select, textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: -16px;
+  margin-top: 0;
   border: 1.5px solid #E5E7EB;
   cursor: pointer;
   transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;

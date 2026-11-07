@@ -251,39 +251,20 @@
   font-weight: 500;
 }
 
-/* Bottom Action Container (Menetap di bawah untuk driver, sticky untuk customer) */
+/* Bottom Action Container */
 .login-bottom-section {
-  padding: 24px 0 0 0;
+  position: static;
+  margin-top: 28px;
+  padding: 0;
   background: transparent;
   border-top: none;
+  box-shadow: none;
   max-width: 440px;
-  margin-top: auto;
   width: 100%;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 14px;
-}
-
-.login-bottom-section.is-driver-bottom {
-  margin-top: 28px;
-  padding-top: 0;
-}
-
-.login-bottom-section.is-customer-sticky {
-  position: sticky;
-  bottom: 0;
-  background: #FFFFFF;
-  padding: 14px 0 24px 0;
-  margin-top: auto;
-  z-index: 10;
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.03);
-}
-
-@media (max-height: 720px) {
-  .login-bottom-section.is-customer-sticky {
-    padding: 10px 0 16px 0;
-  }
 }
 
 .btn-login-submit {

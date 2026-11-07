@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Search,
-  Tag,
-  ChevronRight,
-  CheckCircle2
+  ChevronRight
 } from 'lucide-react';
 import sherideHeroArt from '../assets/sheride_hero_pink.png';
 import iconSheRide from '../assets/icon_sheride.png';
@@ -69,7 +67,6 @@ export default function HomePage({
   onSelectService,
   currentLocation = 'Makassar, Sulawesi Selatan'
 }) {
-  const [toastMessage, setToastMessage] = useState(null);
   const [activeSlide, setActiveSlide] = useState(0);
   const [prevSlide, setPrevSlide] = useState(null);
 
@@ -131,27 +128,8 @@ export default function HomePage({
     }
   ];
 
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 2800);
-  };
-
-  const handleCopyPromo = () => {
-    showToast('🎉 Kode promo "OTWJEK" berhasil disalin! Diskon hingga 30%.');
-  };
-
   return (
     <div className="ridego-homepage">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="ridego-toast-banner">
-          <CheckCircle2 size={16} color="#FF337F" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
       {/* Scrollable Container */}
       <div className="ridego-scroll-container">
         {/* Hero Section with Illustration as Background */}
@@ -166,17 +144,8 @@ export default function HomePage({
           </div>
         </section>
 
-        {/* Overlapping Promo & Search Widget */}
+        {/* Overlapping Search Widget */}
         <div className="ridego-promo-search-widget">
-          {/* Green Promo Banner */}
-          <div className="ridego-discount-banner" onClick={handleCopyPromo}>
-            <div className="discount-left">
-              <Tag size={15} className="discount-tag-icon" />
-              <span className="discount-text">Discount up to 30% with &ldquo;OTWJEK&rdquo;</span>
-            </div>
-            <ChevronRight size={18} className="discount-chevron" />
-          </div>
-
           {/* "Where to?" Search Bar */}
           <div
             className="ridego-where-to-pill"

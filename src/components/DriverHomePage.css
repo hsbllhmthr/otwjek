@@ -1,5 +1,5 @@
 /* ==========================================================================
-   DriverHomePage.css — Dashboard Beranda Khusus Mitra Driver OTWJek
+   DriverHomePage.css — Dashboard Beranda Mitra Driver OTWJek (Pink Brand UI)
    ========================================================================== */
 
 .driver-home-viewport {
@@ -7,7 +7,7 @@
   flex-direction: column;
   width: 100%;
   height: 100%;
-  background-color: #F8FAFC;
+  background-color: #FFFFFF;
   font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   color: #0F172A;
   overflow: hidden;
@@ -18,58 +18,30 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 16px 16px 104px;
+  padding: 0 0 108px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
   -webkit-overflow-scrolling: touch;
 }
 
-/* Toast Notification */
-.driver-toast-banner {
-  position: fixed;
-  top: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1200;
-  background: #0F172A;
+/* ==========================================================================
+   1. TOP PINK HERO HEADER (Reference Header with OTWJek Pink Palette)
+   ========================================================================== */
+.driver-hero-banner {
+  background: linear-gradient(155deg, #FF337F 0%, #E11D6F 55%, #BE125D 100%);
+  padding: 24px 20px 104px;
   color: #FFFFFF;
-  padding: 10px 16px;
-  border-radius: 12px;
-  font-size: 13px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
-  max-width: 90%;
-  animation: driverToastFadeIn 0.2s ease-out;
+  flex-shrink: 0;
 }
 
-@keyframes driverToastFadeIn {
-  from {
-    opacity: 0;
-    transform: translate(-50%, -8px);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, 0);
-  }
-}
-
-/* 1. Top Header Bar */
-.driver-top-header {
+.driver-hero-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  background: #FFFFFF;
-  padding: 14px 16px;
-  border-radius: 16px;
-  border: 1px solid #E2E8F0;
 }
 
-.driver-identity-left {
+.driver-hero-user {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -77,103 +49,595 @@
   cursor: pointer;
 }
 
-.driver-avatar-box {
-  width: 48px;
-  height: 48px;
+.driver-hero-avatar {
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  background: #FDF2F8;
-  border: 2px solid #FBCFE8;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   flex-shrink: 0;
-  color: #FF337F;
 }
 
-.driver-avatar-img {
+.driver-hero-avatar-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.driver-identity-texts {
+.driver-hero-avatar-initial {
+  font-size: 18px;
+  font-weight: 800;
+  color: #FFFFFF;
+  text-transform: uppercase;
+}
+
+.driver-hero-greeting {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
 }
 
-.driver-greeting-name {
-  font-size: 16px;
-  font-weight: 700;
-  color: #0F172A;
+.driver-hero-hello {
   margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #FFFFFF;
+  letter-spacing: -0.2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.driver-badges-row {
+.driver-hero-welcome {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.driver-hero-bell-btn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease;
+}
+
+.driver-hero-bell-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.driver-hero-bell-dot {
+  position: absolute;
+  top: 8px;
+  right: 9px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #FDE047;
+  border: 1.5px solid #E11D6F;
+}
+
+/* ==========================================================================
+   2. MAIN BODY & OVERLAPPING FLOATING WALLET CARD
+   ========================================================================== */
+.driver-home-body {
+  padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.driver-wallet-card {
+  margin-top: -78px;
+  background: #FFFFFF;
+  border-radius: 20px;
+  padding: 20px 18px 18px;
+  border: 1px solid #FCE7F3;
+  box-shadow: 0 10px 30px rgba(225, 29, 111, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wallet-card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wallet-card-kicker {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #8E95A2;
+  text-transform: uppercase;
+}
+
+.wallet-period-pills {
+  display: inline-flex;
+  background: #FFF0F6;
+  padding: 2.5px;
+  border-radius: 8px;
+  gap: 2px;
+}
+
+.wallet-period-pill {
+  border: none;
+  background: transparent;
+  padding: 4px 9px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: inherit;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.wallet-period-pill.active {
+  background: #FFFFFF;
+  color: #FF337F;
+}
+
+.wallet-balance-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wallet-balance-amount {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  color: #0F172A;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.wallet-eye-btn {
+  background: transparent;
+  border: none;
+  padding: 4px;
+  color: #94A3B8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color 0.15s ease;
+}
+
+.wallet-eye-btn:hover {
+  color: #FF337F;
+}
+
+/* 4 Circular Pink Icon Actions Row */
+.wallet-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding-top: 8px;
+}
+
+.wallet-action-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 5px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.wallet-action-circle {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: #FF337F;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.wallet-action-item:hover .wallet-action-circle {
+  background: #E11D6F;
+  transform: translateY(-1px);
+}
+
+.wallet-action-item:active .wallet-action-circle {
+  transform: scale(0.95);
+}
+
+.wallet-action-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  line-height: 1.2;
+}
+
+.wallet-action-val {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #64748B;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* ==========================================================================
+   3. FINANCIAL INSIGHT / REKAP BANNER (Soft Pink Theme)
+   ========================================================================== */
+.driver-insight-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background-color: #FFF0F6;
+  border: 1px solid #FCE7F3;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s ease;
+}
+
+.driver-insight-banner:hover {
+  background-color: #FCE7F3;
+}
+
+.driver-insight-icon-wrap {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #FF337F 0%, #E11D6F 100%);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.driver-insight-text {
+  flex: 1;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1E293B;
+  line-height: 1.4;
+}
+
+.driver-insight-text strong {
+  font-weight: 800;
+  color: #BE185D;
+}
+
+.driver-insight-chevron {
+  color: #BE185D;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.driver-insight-chevron.rotated {
+  transform: rotate(90deg);
+}
+
+/* ==========================================================================
+   4. EXPANDABLE WEEKLY RECAP & CUSTOM DATE FILTER CARD
+   ========================================================================== */
+.driver-recap-card {
+  background: #FFFFFF;
+  border-radius: 16px;
+  padding: 16px;
+  border: 1px solid #FCE7F3;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.recap-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.earnings-card-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #475569;
+}
+
+.recap-period-tabs {
+  display: inline-flex;
+  background: #FFF0F6;
+  padding: 3px;
+  border-radius: 8px;
+  gap: 2px;
+}
+
+.period-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  font-family: inherit;
+  color: #64748B;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.period-tab-btn.active {
+  background: #FFFFFF;
+  color: #FF337F;
+}
+
+/* Custom Date Picker Box */
+.earnings-custom-date-box {
+  background: #FFF8FB;
+  border: 1px solid #FCE7F3;
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.custom-date-inputs-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.custom-date-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.custom-date-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748B;
+}
+
+.custom-date-input {
+  width: 100%;
+  padding: 7px 8px;
+  border-radius: 8px;
+  border: 1px solid #FBCFE8;
+  background: #FFFFFF;
+  color: #0F172A;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.custom-date-input:focus {
+  border-color: #FF337F;
+}
+
+.custom-date-presets {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
 }
 
-.driver-role-pill {
-  font-size: 11px;
-  font-weight: 700;
-  color: #BE185D;
-  background: #FDF2F8;
-  padding: 2px 8px;
-  border-radius: 6px;
+.date-preset-chip {
+  padding: 4px 9px;
+  border-radius: 999px;
   border: 1px solid #FBCFE8;
-}
-
-.driver-rating-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 11.5px;
-  font-weight: 700;
-  color: #B45309;
-  background: #FEF3C7;
-  padding: 2px 7px;
-  border-radius: 6px;
-}
-
-.btn-driver-support {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: 1px solid #E2E8F0;
-  background: #F8FAFC;
-  color: #334155;
-  font-size: 12px;
-  font-weight: 700;
+  background: #FFFFFF;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
   cursor: pointer;
-  flex-shrink: 0;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: all 0.15s ease;
 }
 
-.btn-driver-support:hover {
-  background: #F1F5F9;
-  border-color: #CBD5E1;
+.date-preset-chip:hover {
+  border-color: #FF337F;
+  background: #FFF0F6;
+  color: #BE185D;
 }
 
-/* 2. Verification Status Alert Banner (Reference Notification Style) */
+.earnings-period-caption {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #64748B;
+}
+
+.earnings-commission-summary {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.commission-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+}
+
+.commission-row .commission-val {
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.commission-row.deduction .commission-val {
+  color: #EF4444;
+}
+
+.commission-row.net-total {
+  padding-top: 7px;
+  border-top: 1px solid #E2E8F0;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.commission-row.net-total .commission-val {
+  color: #10B981;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+/* Weekly Bar Chart (7 Days) */
+.earnings-weekly-chart-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.weekly-chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.weekly-chart-hint {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #94A3B8;
+}
+
+.weekly-bars-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  align-items: end;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 12px 8px 10px;
+}
+
+.weekly-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 4px 2px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.weekly-bar-col:hover {
+  background: #FFFFFF;
+  border-color: #E2E8F0;
+}
+
+.weekly-bar-col.is-selected {
+  background: #FFF0F6;
+  border-color: #FBCFE8;
+}
+
+.weekly-bar-order-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: #64748B;
+  line-height: 1;
+}
+
+.weekly-bar-col.has-value .weekly-bar-order-badge {
+  color: #BE185D;
+}
+
+.weekly-bar-track {
+  width: 16px;
+  height: 58px;
+  background: #E2E8F0;
+  border-radius: 999px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+
+.weekly-bar-fill {
+  width: 100%;
+  background: #CBD5E1;
+  border-radius: 999px;
+  transition: height 0.25s ease;
+}
+
+.weekly-bar-col.has-value .weekly-bar-fill {
+  background: linear-gradient(180deg, #FF337F 0%, #E11D6F 100%);
+}
+
+.weekly-bar-col.is-today .weekly-bar-day {
+  color: #FF337F;
+  font-weight: 800;
+}
+
+.weekly-bar-day {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #334155;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.weekly-bar-date {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #94A3B8;
+  line-height: 1;
+}
+
+/* ==========================================================================
+   5. VERIFICATION STATUS ALERT BANNER
+   ========================================================================== */
 .driver-verify-card {
   position: relative;
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 16px;
-  padding: 16px 18px;
+  gap: 14px;
+  padding: 14px 16px;
   border-radius: 16px;
-  border: 3px solid #FFFFFF;
   box-shadow: none;
   cursor: pointer;
   transition: transform 0.15s ease;
@@ -187,37 +651,31 @@
   background: #FDF5EA;
 }
 
-.driver-verify-card.approved {
-  background: #ECFDF5;
-}
-
 .driver-verify-card.rejected {
   background: #FEF2F2;
 }
 
 .driver-verify-icon-outer {
-  width: 50px;
-  height: 50px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: #FFFFFF;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: none;
 }
 
 .driver-verify-icon-inner {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #FFFFFF;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 800;
-  font-family: inherit;
   line-height: 1;
 }
 
@@ -234,25 +692,20 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
 
 .driver-verify-title {
   margin: 0;
   padding-right: 22px;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
   color: #1E293B;
   line-height: 1.25;
-  letter-spacing: -0.2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .driver-verify-desc {
   margin: 0;
-  padding-right: 4px;
   font-size: 12px;
   font-weight: 400;
   color: #64748B;
@@ -261,8 +714,8 @@
 
 .driver-verify-close {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 10px;
+  right: 10px;
   background: transparent;
   border: none;
   color: #94A3B8;
@@ -272,303 +725,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.15s ease, background-color 0.15s ease;
 }
 
-.driver-verify-close:hover {
-  color: #475569;
-  background: rgba(15, 23, 42, 0.04);
-}
-
-/* 3. Online / Offline Status Switch Card */
-.driver-status-card {
-  background: #FFFFFF;
-  border-radius: 16px;
-  padding: 16px;
-  border: 1.5px solid #E2E8F0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
-}
-
-.driver-status-card.is-online {
-  border-color: #10B981;
-  background: linear-gradient(180deg, #ECFDF5 0%, #FFFFFF 65%);
-}
-
-.driver-status-main-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.driver-status-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.driver-status-indicator-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.status-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #94A3B8;
-}
-
-.status-dot.online {
-  background: #10B981;
-  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
-}
-
-.driver-status-heading {
-  font-size: 15px;
-  font-weight: 800;
-  color: #0F172A;
-}
-
-.driver-status-subtext {
-  font-size: 12.5px;
-  color: #64748B;
-  margin: 0;
-}
-
-/* Toggle Switch Button */
-.btn-online-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 16px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 700;
-  border: none;
-  cursor: pointer;
-  transition: transform 0.12s ease, background-color 0.2s ease;
-  flex-shrink: 0;
-}
-
-.btn-online-toggle:active {
-  transform: scale(0.97);
-}
-
-.btn-online-toggle.offline-mode {
-  background: #0F172A;
-  color: #FFFFFF;
-}
-
-.btn-online-toggle.online-mode {
-  background: #10B981;
-  color: #FFFFFF;
-}
-
-.driver-status-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding-top: 10px;
-  border-top: 1px solid #F1F5F9;
-  flex-wrap: wrap;
-}
-
-.driver-area-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #475569;
-}
-
-.btn-report-ready-wa {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: #FDF2F8;
-  color: #FF337F;
-  border: 1px solid #FBCFE8;
-  padding: 6px 11px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-/* 4. Earnings & Performance Summary Card */
-.driver-earnings-card {
-  background: #FFFFFF;
-  border-radius: 16px;
-  padding: 16px;
-  border: 1px solid #E2E8F0;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.earnings-card-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.earnings-card-label {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 13px;
-  font-weight: 700;
-  color: #475569;
-}
-
-.earnings-period-tabs {
-  display: inline-flex;
-  background: #F1F5F9;
-  padding: 3px;
-  border-radius: 8px;
-}
-
-.period-tab-btn {
-  border: none;
-  background: transparent;
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 11.5px;
-  font-weight: 700;
-  color: #64748B;
-  cursor: pointer;
-}
-
-.period-tab-btn.active {
-  background: #FFFFFF;
-  color: #0F172A;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
-}
-
-.earnings-main-amount {
-  font-size: 26px;
-  font-weight: 800;
-  color: #0F172A;
-  letter-spacing: -0.02em;
-  margin: 0;
-}
-
-.earnings-metrics-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  padding-top: 12px;
-  border-top: 1px solid #F1F5F9;
-}
-
-.earnings-metric-box {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.metric-box-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: #64748B;
-}
-
-.metric-box-value {
-  font-size: 13.5px;
-  font-weight: 700;
-  color: #0F172A;
-}
-
-/* 5. Active Vehicle Info Strip */
-.driver-vehicle-card {
-  background: #FFFFFF;
-  border-radius: 14px;
-  padding: 13px 16px;
-  border: 1px solid #E2E8F0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.vehicle-card-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-
-.vehicle-icon-circle {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: #FDF2F8;
-  color: #FF337F;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.vehicle-card-texts {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.vehicle-model-title {
-  font-size: 13.5px;
-  font-weight: 700;
-  color: #0F172A;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.vehicle-plate-sub {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: #64748B;
-}
-
-.plate-badge {
-  background: #0F172A;
-  color: #FFFFFF;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 1.5px 7px;
-  border-radius: 4px;
-  letter-spacing: 0.03em;
-}
-
-.btn-vehicle-edit {
-  border: 1px solid #E2E8F0;
-  background: #F8FAFC;
-  color: #475569;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 6px 11px;
-  border-radius: 8px;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-/* 6. Assigned Orders Section */
+/* ==========================================================================
+   6. PESANAN DITUGASKAN (Recent Transactions Reference Style)
+   ========================================================================== */
 .driver-orders-section {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding-top: 2px;
 }
 
 .driver-section-header {
@@ -578,26 +744,12 @@
   gap: 8px;
 }
 
-.driver-section-title-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .driver-section-title {
-  font-size: 15.5px;
+  font-size: 18px;
   font-weight: 800;
   color: #0F172A;
+  letter-spacing: -0.3px;
   margin: 0;
-}
-
-.orders-count-badge {
-  background: #FF337F;
-  color: #FFFFFF;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 999px;
 }
 
 .btn-see-all-orders {
@@ -609,7 +761,7 @@
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
 }
 
 /* Order Filter Pills */
@@ -622,7 +774,7 @@
 }
 
 .order-filter-pill {
-  border: 1px solid #E2E8F0;
+  border: 1px solid #FCE7F3;
   background: #FFFFFF;
   color: #475569;
   padding: 6px 13px;
@@ -631,182 +783,198 @@
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
+  font-family: inherit;
 }
 
 .order-filter-pill.active {
-  background: #0F172A;
+  background: #FF337F;
   color: #FFFFFF;
-  border-color: #0F172A;
+  border-color: #FF337F;
 }
 
-/* Order Card (2-Stop Stepper Style) */
-.driver-order-card.stepper-card-style {
-  background: #FFFFFF;
-  border-radius: 20px;
-  padding: 18px 20px;
-  border: 1px solid #EAECEF;
+/* Recent Transactions List (Clean & Detailed without Icons) */
+.driver-tx-list {
   display: flex;
   flex-direction: column;
+  gap: 10px;
+}
+
+.driver-tx-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 15px;
+  background-color: #FFFFFF;
+  border: 1px solid #F1F5F9;
+  border-radius: 14px;
   cursor: pointer;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
-.driver-order-card.stepper-card-style:hover {
-  border-color: #CBD5E1;
+.driver-tx-item:hover {
+  background-color: #FFF8FB;
+  border-color: #FCE7F3;
 }
 
-.driver-order-card.stepper-card-style.unread {
-  border-color: #BFDBFE;
-  background: #FAFCFF;
+.driver-tx-item.unread {
+  background-color: #FFF0F6;
+  border-color: #FBCFE8;
 }
 
-.stepper-stop-row {
+.driver-tx-left {
   display: flex;
-  align-items: stretch;
-  gap: 14px;
-}
-
-.stepper-rail-col {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 22px;
-  flex-shrink: 0;
-}
-
-.stepper-check-ring {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  background: #FFFFFF;
-  box-sizing: border-box;
-}
-
-.stepper-check-ring.active-blue {
-  border: 1.5px solid #2563EB;
-}
-
-.stepper-check-ring.active-blue .stepper-check-inner {
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background: #2563EB;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.stepper-check-ring.muted-gray {
-  border: 1.5px solid #D1D5DB;
-}
-
-.stepper-check-ring.muted-gray .stepper-check-inner {
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background: #D1D5DB;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.stepper-dashed-line {
-  flex: 1;
-  width: 0;
-  border-left: 1.5px dashed #CBD5E1;
-  margin: 5px 0;
-  min-height: 24px;
-}
-
-.stepper-dashed-line.completed {
-  border-left-color: #93C5FD;
-}
-
-.stepper-stop-content {
-  flex: 1;
+  align-items: flex-start;
   min-width: 0;
+  flex: 1;
+}
+
+.driver-tx-meta {
   display: flex;
   flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
 }
 
-.stepper-stop-content.first-stop {
-  padding-bottom: 18px;
-}
-
-.stepper-stop-header {
+.driver-tx-top-tags {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
-  min-height: 22px;
+  margin-bottom: 1px;
 }
 
-.stepper-stop-kicker {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  color: #8E95A2;
-  text-transform: uppercase;
-}
-
-.stepper-status-pill {
+.driver-tx-service-badge {
   font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 0.03em;
-  padding: 2.5px 9px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #FFF0F6;
+  color: #DB2777;
+  line-height: 1.3;
+}
+
+.driver-tx-order-code {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748B;
+  line-height: 1.3;
+}
+
+.driver-tx-status-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
   border-radius: 999px;
-  text-transform: uppercase;
+  line-height: 1.3;
+  white-space: nowrap;
 }
 
-.stepper-status-pill.completed {
-  background: #E8F8F0;
-  color: #0D9458;
+.driver-tx-status-badge.active {
+  background: #FEF3C7;
+  color: #B45309;
 }
 
-.stepper-status-pill.in-progress {
-  background: #EFF6FF;
-  color: #2563EB;
+.driver-tx-status-badge.completed {
+  background: #ECFDF5;
+  color: #059669;
 }
 
-.stepper-status-pill.cancelled {
+.driver-tx-status-badge.cancelled {
   background: #FEF2F2;
   color: #DC2626;
 }
 
-.stepper-stop-title {
-  font-size: 15.5px;
+.driver-tx-title {
+  font-size: 15px;
   font-weight: 700;
-  color: #111827;
-  margin: 4px 0 2px;
+  color: #0F172A;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   line-height: 1.3;
 }
 
-.stepper-stop-address {
-  font-size: 13.5px;
-  font-weight: 400;
-  color: #374151;
-  margin: 0 0 4px;
-  line-height: 1.4;
+.driver-tx-subtitle {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #64748B;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
 }
 
-.stepper-stop-meta {
-  font-size: 12.5px;
-  font-weight: 400;
-  color: #8E95A2;
-  margin: 0;
-  line-height: 1.35;
+.driver-tx-subtitle strong {
+  font-weight: 600;
+  color: #334155;
+}
+
+.driver-tx-extra-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #94A3B8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.driver-tx-extra-meta .meta-dot {
+  color: #CBD5E1;
+}
+
+.driver-tx-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  flex-shrink: 0;
+  padding-top: 1px;
+}
+
+.driver-tx-amount {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0F172A;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.driver-tx-amount.positive {
+  color: #10B981;
+}
+
+.driver-tx-amount.cancelled {
+  color: #EF4444;
+}
+
+.driver-tx-fare-sub {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #64748B;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.driver-tx-date {
+  font-size: 11px;
+  font-weight: 500;
+  color: #94A3B8;
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 /* Empty State */
 .driver-orders-empty {
-  background: #FFFFFF;
+  background: #FFF8FB;
   border-radius: 16px;
   padding: 28px 20px;
-  border: 1px dashed #CBD5E1;
+  border: 1px dashed #FBCFE8;
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -815,15 +983,15 @@
 }
 
 .empty-icon-circle {
-  width: 48px;
-  height: 48px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
-  background: #FDF2F8;
+  background: #FFF0F6;
   color: #FF337F;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .empty-orders-title {
@@ -839,5 +1007,261 @@
   margin: 0;
   max-width: 280px;
   line-height: 1.5;
+}
+
+/* ==========================================================================
+   REAL-TIME BANNER POPUP / TOAST TUGAS BARU MASUK (LINTAS HALAMAN DRIVER)
+   ========================================================================== */
+.driver-task-alert-overlay {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 28px);
+  max-width: 404px;
+  z-index: 9999;
+  pointer-events: none;
+  animation: driverTaskAlertSlideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes driverTaskAlertSlideDown {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -18px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.driver-task-alert-card {
+  pointer-events: auto;
+  background: #FFFFFF;
+  border: 2px solid #FF337F;
+  border-radius: 16px;
+  padding: 13px 14px;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.driver-task-alert-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.driver-task-alert-title-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.driver-task-alert-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #FF337F;
+  flex-shrink: 0;
+  animation: driverAlertPulse 1.4s infinite ease-in-out;
+}
+
+@keyframes driverAlertPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.82);
+  }
+}
+
+.driver-task-alert-bell-icon {
+  color: #FF337F;
+  flex-shrink: 0;
+}
+
+.driver-task-alert-kicker {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  color: #FF337F;
+}
+
+.driver-task-alert-service {
+  display: inline-flex;
+  align-items: center;
+  padding: 1.5px 7px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.driver-task-alert-service.motor {
+  background: #FDF2F8;
+  color: #DB2777;
+}
+
+.driver-task-alert-service.mobil {
+  background: #ECFDF5;
+  color: #059669;
+}
+
+.driver-task-alert-service.paket {
+  background: #FFF7ED;
+  color: #EA580C;
+}
+
+.driver-task-alert-code {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #0F172A;
+}
+
+.driver-task-alert-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.driver-task-alert-icon-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid #E2E8F0;
+  background: #F8FAFC;
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: none;
+}
+
+.driver-task-alert-icon-btn:hover {
+  background: #FFF0F6;
+  border-color: #FBCFE8;
+  color: #FF337F;
+}
+
+.driver-task-alert-body {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.driver-task-alert-route {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.driver-task-alert-point {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12.5px;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.driver-task-alert-point .point-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #64748B;
+  min-width: 46px;
+  flex-shrink: 0;
+}
+
+.driver-task-alert-point .point-val {
+  font-weight: 700;
+  color: #0F172A;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.driver-task-alert-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed #E2E8F0;
+}
+
+.driver-task-alert-customer {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #475569;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.driver-task-alert-earning {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #10B981;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.driver-task-alert-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-task-alert-secondary {
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1px solid #E2E8F0;
+  background: #FFFFFF;
+  color: #475569;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: none;
+  font-family: inherit;
+}
+
+.btn-task-alert-secondary:hover {
+  background: #F8FAFC;
+}
+
+.btn-task-alert-primary {
+  flex: 1;
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: none;
+  background: #FF337F;
+  color: #FFFFFF;
+  font-size: 12.5px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  box-shadow: none;
+  font-family: inherit;
+}
+
+.btn-task-alert-primary:hover {
+  background: #E62E72;
 }
 

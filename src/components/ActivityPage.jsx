@@ -16,6 +16,16 @@ import { formatRupiah } from '../utils/fareCalculator.js';
 import dbService, { normalizePhone } from '../services/dbService.js';
 import ActivityOrderDetailView from './ActivityOrderDetailView.jsx';
 
+function toLocalDateKey(dateInput) {
+  if (!dateInput) return '';
+  const d = dateInput instanceof Date ? dateInput : new Date(dateInput);
+  if (Number.isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 // Helper konversi data booking dari dbService ke format tampilan kartu riwayat pesanan
 function formatBookingToOrder(b) {
   const isCar = b.service_type === 'car' || b.service_type === 'mobil';
@@ -123,6 +133,8 @@ function formatBookingToOrder(b) {
     orderNumber: num,
     time: timeStr,
     date: dateStr,
+    dateKey: toLocalDateKey(createdAtDate),
+    createdAt: b.created_at || new Date().toISOString(),
     fullDateTime: `${dateStr}, ${timeStr}`,
     serviceType: sType,
     serviceName: sName,
@@ -192,6 +204,12 @@ function formatBookingToOrder(b) {
 export default function ActivityPage({ onBack, currentUser, isDriver }) {
   const [activeTab, setActiveTab] = useState('selesai'); // 'selesai' | 'dibatalkan'
   const [selectedDate, setSelectedDate] = useState('all');
+  const [customStartDate, setCustomStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 6);
+    return toLocalDateKey(d);
+  });
+  const [customEndDate, setCustomEndDate] = useState(() => toLocalDateKey(new Date()));
   const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [rawBookings, setRawBookings] = useState([]);
@@ -272,7 +290,7 @@ export default function ActivityPage({ onBack, currentUser, isDriver }) {
     return rawBookings.map((b) => formatBookingToOrder(b));
   }, [rawBookings]);
 
-  // Kumpulan opsi tanggal unik yang diekstrak secara dinamis dari database
+  // Kumpulan opsi tanggal unik yang diekstrak secara dinamis dari database + preset periode
   const availableDates = useMemo(() => {
     const datesSet = new Set();
     allOrders.forEach((ord) => {
@@ -281,6 +299,10 @@ export default function ActivityPage({ onBack, currentUser, isDriver }) {
     const uniqueDates = Array.from(datesSet).map((d) => ({ label: d, value: d }));
     return [
       { label: 'Semua Tanggal', value: 'all' },
+      { label: 'Hari Ini', value: 'today' },
+      { label: 'Minggu Ini (7 Hari)', value: 'week' },
+      { label: 'Bulan Ini', value: 'month' },
+      { label: 'Pilih Rentang Tanggal...', value: 'custom' },
       ...uniqueDates
     ];
   }, [allOrders]);
@@ -294,8 +316,64 @@ export default function ActivityPage({ onBack, currentUser, isDriver }) {
     if (selectedDate === 'all') {
       return filteredByTab;
     }
+
+    const now = new Date();
+    const todayKey = toLocalDateKey(now);
+    const todayDateStr = now.toLocaleDateString('id-ID', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
+
+    if (selectedDate === 'today') {
+      return filteredByTab.filter(
+        (ord) => (ord.dateKey || toLocalDateKey(ord.createdAt)) === todayKey || ord.date === todayDateStr
+      );
+    }
+
+    if (selectedDate === 'week') {
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - 6);
+      const weekStartKey = toLocalDateKey(weekStart);
+      return filteredByTab.filter((ord) => {
+        const k = ord.dateKey || toLocalDateKey(ord.createdAt);
+        return k >= weekStartKey && k <= todayKey;
+      });
+    }
+
+    if (selectedDate === 'month') {
+      const monthPrefix = todayKey.slice(0, 7);
+      return filteredByTab.filter((ord) =>
+        (ord.dateKey || toLocalDateKey(ord.createdAt)).startsWith(monthPrefix)
+      );
+    }
+
+    if (selectedDate === 'custom') {
+      const startKey =
+        customStartDate && customEndDate && customStartDate > customEndDate
+          ? customEndDate
+          : customStartDate;
+      const endKey =
+        customStartDate && customEndDate && customStartDate > customEndDate
+          ? customStartDate
+          : customEndDate;
+      return filteredByTab.filter((ord) => {
+        const k = ord.dateKey || toLocalDateKey(ord.createdAt);
+        if (startKey && endKey) return k >= startKey && k <= endKey;
+        if (startKey) return k >= startKey;
+        if (endKey) return k <= endKey;
+        return true;
+      });
+    }
+
     return filteredByTab.filter((ord) => ord.date === selectedDate);
-  }, [allOrders, activeTab, selectedDate]);
+  }, [allOrders, activeTab, selectedDate, customStartDate, customEndDate]);
+
+  const selectedDateLabel = useMemo(() => {
+    const found = availableDates.find((d) => d.value === selectedDate);
+    if (selectedDate === 'custom') return 'Rentang Kustom';
+    return found ? found.label : selectedDate;
+  }, [availableDates, selectedDate]);
 
   // Helper render ikon kategori layanan: Motor, Mobil, Paket
   const renderServiceBadge = (order) => {
@@ -382,14 +460,14 @@ export default function ActivityPage({ onBack, currentUser, isDriver }) {
 
       {/* 3. Scrollable List Area */}
       <main className="activity-content-scroll">
-        {/* Date Filter Header Selector + Driver Net Earnings Summary */}
+        {/* Date Filter Header Selector */}
         <div className="activity-date-filter-row" ref={dropdownRef}>
           <button
             className="btn-activity-date-selector"
             onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
             aria-expanded={isDateDropdownOpen}
           >
-            <span>{selectedDate === 'all' ? 'Semua Tanggal' : selectedDate}</span>
+            <span>{selectedDateLabel}</span>
             <ChevronDown
               size={16}
               strokeWidth={2.5}
@@ -416,6 +494,34 @@ export default function ActivityPage({ onBack, currentUser, isDriver }) {
             </div>
           )}
         </div>
+
+        {/* Custom Date Range Box in Activity Page */}
+        {selectedDate === 'custom' && (
+          <div className="earnings-custom-date-box" style={{ marginBottom: '12px' }}>
+            <div className="custom-date-inputs-row">
+              <label className="custom-date-field">
+                <span className="custom-date-label">Dari Tanggal</span>
+                <input
+                  type="date"
+                  className="custom-date-input"
+                  value={customStartDate}
+                  max={toLocalDateKey(new Date())}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                />
+              </label>
+              <label className="custom-date-field">
+                <span className="custom-date-label">Sampai Tanggal</span>
+                <input
+                  type="date"
+                  className="custom-date-input"
+                  value={customEndDate}
+                  max={toLocalDateKey(new Date())}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                />
+              </label>
+            </div>
+          </div>
+        )}
 
         {/* Orders List */}
         {displayedOrders.length > 0 ? (
