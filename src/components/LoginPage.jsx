@@ -190,41 +190,41 @@ export default function LoginPage({ isDriver = false, onBack, onSuccess, onGoToS
             <span className="remember-me-label">Ingat saya</span>
           </div>
         </form>
-      </div>
 
-      {/* Bottom Sticky Action Bar */}
-      <div className="login-bottom-section">
-        <button
-          type="button"
-          className="btn-login-submit"
-          onClick={handleSubmit}
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <>
-              <Loader2 size={18} className="spin-loader" />
-              <span>Sedang masuk...</span>
-            </>
-          ) : (
-            'Masuk'
+        {/* Bottom Action Section (Menetap di bawah dalam alur konten, tidak sticky) */}
+        <div className={`login-bottom-section ${isDriver ? 'is-driver-bottom' : ''}`}>
+          <button
+            type="button"
+            className="btn-login-submit"
+            onClick={handleSubmit}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 size={18} className="spin-loader" />
+                <span>Sedang masuk...</span>
+              </>
+            ) : (
+              'Masuk'
+            )}
+          </button>
+
+          {/* Helper switcher to Sign up if user doesn't have an account */}
+          {onGoToSignUp && (
+            <div className="login-footer-switcher">
+              <span className="login-switcher-text">
+                {isDriver ? 'Belum punya akun mitra?' : 'Belum punya akun?'}
+              </span>
+              <button
+                type="button"
+                className="btn-link-signup"
+                onClick={onGoToSignUp}
+              >
+                Daftar
+              </button>
+            </div>
           )}
-        </button>
-
-        {/* Helper switcher to Sign up if user doesn't have an account */}
-        {onGoToSignUp && (
-          <div className="login-footer-switcher">
-            <span className="login-switcher-text">
-              {isDriver ? 'Belum punya akun mitra?' : 'Belum punya akun?'}
-            </span>
-            <button
-              type="button"
-              className="btn-link-signup"
-              onClick={onGoToSignUp}
-            >
-              Daftar
-            </button>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );
