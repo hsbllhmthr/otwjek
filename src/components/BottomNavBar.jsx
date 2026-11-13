@@ -91,7 +91,7 @@ export default function BottomNavBar({ activeTab, onChangeTab, currentUser, isDr
   const [newTaskAlert, setNewTaskAlert] = useState(null);
 
   const activeUser = currentUser || dbService.session.getCurrentUser();
-  const isDriverView = Boolean(isDriver || activeUser?.role === 'driver');
+  const isDriverView = typeof isDriver === 'boolean' ? isDriver : Boolean(activeUser?.role === 'driver');
 
   const resolveQueryAccount = useCallback(() => {
     const user = currentUser || dbService.session.getCurrentUser();

@@ -538,11 +538,11 @@ export default function PickupSelectionPage({
                 ? 'Membaca lokasi...'
                 : selectedPickup?.name
                 ? isDestination
-                  ? `Drop off at ${selectedPickup.name}`
-                  : `Pick up at ${selectedPickup.name}`
+                  ? `Antar ke ${selectedPickup.name}`
+                  : `Jemput di ${selectedPickup.name}`
                 : isDestination
-                ? 'Where to?'
-                : 'Pick up at?'
+                ? 'Mau ke mana?'
+                : 'Jemput di mana?'
             }
             value={searchQuery}
             onChange={(e) => handleSearchPickupChange(e.target.value)}
@@ -654,7 +654,7 @@ export default function PickupSelectionPage({
               tabIndex={0}
             >
               <span className="pickup-notes-empty-label">
-                Add pickup details (e.g. near the gate)
+                Tambah detail penjemputan (cth. dekat pagar/pos satpam)
               </span>
               <button
                 type="button"
@@ -728,7 +728,7 @@ export default function PickupSelectionPage({
           className="btn-choose-this-pickup"
           onClick={handleConfirm}
         >
-          {isDestination ? 'Choose this destination' : 'Choose this pickup'}
+          {isDestination ? 'Pilih tujuan ini' : 'Pilih titik jemput ini'}
         </button>
       </div>
 
@@ -742,12 +742,12 @@ export default function PickupSelectionPage({
             className="note-modal-sheet"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="note-modal-title">Note to driver</div>
+            <div className="note-modal-title">Catatan untuk Pengemudi</div>
 
             <div className="note-modal-textarea-box">
               <textarea
                 className="note-modal-textarea"
-                placeholder="Add pickup details (e.g. near the gate)"
+                placeholder="Tambah detail penjemputan (cth. dekat pagar/pos satpam)"
                 value={tempNotes}
                 maxLength={150}
                 onChange={(e) => setTempNotes(e.target.value)}
@@ -766,7 +766,7 @@ export default function PickupSelectionPage({
                 setIsNoteModalOpen(false);
               }}
             >
-              Save
+              Simpan
             </button>
           </div>
         </div>

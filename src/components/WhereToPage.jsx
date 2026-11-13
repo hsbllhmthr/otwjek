@@ -101,7 +101,7 @@ const RECENT_SEARCH_LOCATIONS = [
   },
   {
     id: 'rec-home',
-    name: 'Home',
+    name: 'Rumah',
     address: 'B/14, Graha Sejahtera Residence, Perumahan Graha Sejahtera Blok B No. 14, Somba Opu, Gowa',
     lat: -5.2012,
     lng: 119.4589
@@ -164,7 +164,7 @@ export default function WhereToPage({
   onSelectPickup,
   selectedVehicleType = 'bike',
   timeMode = 'now',
-  userLocation = 'Current location'
+  userLocation = 'Lokasi saat ini'
 }) {
   const [pickupQuery, setPickupQuery] = useState(userLocation || 'Indo Mode Tamalate');
   const [searchQuery, setSearchQuery] = useState('');
@@ -241,8 +241,8 @@ export default function WhereToPage({
   const handleSwapLocations = () => {
     const tempPickup = pickupQuery;
     const tempDest = searchQuery;
-    setPickupQuery(tempDest || 'Current location');
-    setSearchQuery(tempPickup === 'Current location' ? '' : tempPickup);
+    setPickupQuery(tempDest || 'Lokasi saat ini');
+    setSearchQuery(tempPickup === 'Lokasi saat ini' ? '' : tempPickup);
     showToast('🔄 Titik jemput dan tujuan berhasil ditukar');
   };
 
@@ -303,7 +303,7 @@ export default function WhereToPage({
             <ArrowLeft size={19} color="#1F2937" strokeWidth={2.4} />
           </button>
           <h1 className="whereto-ref2-title">
-            {isPackageMode ? 'Where to send the package?' : 'Where do you want to go?'}
+            {isPackageMode ? 'Mau kirim paket ke mana?' : 'Mau pergi ke mana?'}
           </h1>
         </div>
       </div>
@@ -311,7 +311,7 @@ export default function WhereToPage({
       {/* Main Content Sheet */}
       <div className="whereto-ref2-sheet">
         <div className="whereto-ref2-subtitle">
-          {isPackageMode ? 'Enter pickup and delivery points' : 'Enter your destination'}
+          {isPackageMode ? 'Masukkan titik penjemputan dan tujuan paket' : 'Masukkan destinasi tujuan Anda'}
         </div>
 
         {/* Route Input Card */}
@@ -347,21 +347,21 @@ export default function WhereToPage({
                   onChange={(e) => handlePickupChange(e.target.value)}
                   onFocus={() => {
                     setActiveField('pickup');
-                    if (pickupQuery === 'Current location') {
+                    if (pickupQuery === 'Lokasi saat ini') {
                       setPickupQuery('');
                       setSearchResults([]);
                     }
                   }}
                   onClick={() => {
                     setActiveField('pickup');
-                    if (pickupQuery === 'Current location') {
+                    if (pickupQuery === 'Lokasi saat ini') {
                       setPickupQuery('');
                       setSearchResults([]);
                     }
                   }}
                   onBlur={() => {
                     if (!pickupQuery || !pickupQuery.trim()) {
-                      setPickupQuery('Current location');
+                      setPickupQuery('Lokasi saat ini');
                     }
                   }}
                   onKeyDown={(e) => {
@@ -376,8 +376,8 @@ export default function WhereToPage({
                       destinationInputRef.current?.focus();
                     }
                   }}
-                  placeholder={isPackageMode ? 'Pick up item at?' : 'Pick up at?'}
-                  aria-label="Pickup Location"
+                  placeholder={isPackageMode ? 'Ambil paket di mana?' : 'Jemput di mana?'}
+                  aria-label="Lokasi Penjemputan"
                 />
               </div>
 
@@ -403,8 +403,8 @@ export default function WhereToPage({
                       });
                     }
                   }}
-                  placeholder={isPackageMode ? 'Deliver to?' : 'Where to?'}
-                  aria-label="Destination Location"
+                  placeholder={isPackageMode ? 'Antar paket ke mana?' : 'Mau ke mana?'}
+                  aria-label="Lokasi Tujuan"
                 />
               </div>
             </div>
@@ -416,7 +416,7 @@ export default function WhereToPage({
             className="whereto-ref2-swap-btn"
             onClick={handleSwapLocations}
             title="Tukar titik jemput dan tujuan"
-            aria-label="Swap locations"
+            aria-label="Tukar lokasi"
           >
             <ArrowUpDown size={14} color="#6366F1" />
           </button>
@@ -430,7 +430,7 @@ export default function WhereToPage({
             onClick={() => onOpenMap && onOpenMap(activeField || 'destination')}
           >
             <GreenFoldedMapIcon size={16} />
-            <span>Select on map</span>
+            <span>Pilih lewat peta</span>
           </button>
 
           <button
@@ -439,7 +439,7 @@ export default function WhereToPage({
             onClick={handleAddDestination}
           >
             <PurplePlusCircleIcon size={18} />
-            <span>Add destination</span>
+            <span>Tambah tujuan</span>
           </button>
         </div>
 

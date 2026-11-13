@@ -48,6 +48,6 @@ export function MessageView({ onBack }) {
   );
 }
 
-export function AccountView({ onBack, onLogout, user }) {
-  return <ProfilePage onBack={onBack} onLogout={onLogout} user={user} />;
+export function AccountView({ onBack, onLogout, user, isDriver }) {
+  return <ProfilePage onBack={onBack} onLogout={onLogout} user={user} isDriver={isDriver} />;
 }

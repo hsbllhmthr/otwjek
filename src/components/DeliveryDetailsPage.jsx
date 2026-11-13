@@ -1209,7 +1209,7 @@ export default function DeliveryDetailsPage({
             >
               <ArrowLeft size={22} color="#111827" strokeWidth={2.4} />
             </button>
-            <h1 className="dd-header-title">Item details</h1>
+            <h1 className="dd-header-title">Rincian Barang</h1>
           </div>
         </header>
 
@@ -1217,7 +1217,7 @@ export default function DeliveryDetailsPage({
         <div className="dd-item-page-body">
           {/* Subtitle */}
           <div className="dd-item-helper-text">
-            This helps prepare your driver to handle your item appropriately.
+            Ini membantu pengemudi mempersiapkan penanganan paket Anda dengan tepat.
           </div>
 
           {/* Driver & Box Illustration */}
@@ -1228,7 +1228,7 @@ export default function DeliveryDetailsPage({
             {/* Size Col */}
             <div className="dd-item-size-col">
               <label className="dd-item-field-label">
-                Size<span className="dd-red-star">*</span>
+                Ukuran<span className="dd-red-star">*</span>
               </label>
               <div className="dd-size-btn-group">
                 {['S', 'M', 'L'].map((s) => (
@@ -1247,7 +1247,7 @@ export default function DeliveryDetailsPage({
             {/* Weight Col */}
             <div className="dd-item-weight-col">
               <label className="dd-item-field-label">
-                Weight<span className="dd-red-star">*</span>
+                Berat<span className="dd-red-star">*</span>
               </label>
               <div className="dd-weight-input-wrapper">
                 <input
@@ -1306,7 +1306,7 @@ export default function DeliveryDetailsPage({
             ) : (
               <label htmlFor="dd-item-photo-upload" className="dd-photo-label-trigger">
                 <Camera size={20} color="#004D25" strokeWidth={2.2} />
-                <span>Add photo (optional)</span>
+                <span>Tambah foto (opsional)</span>
               </label>
             )}
           </div>
@@ -1314,23 +1314,23 @@ export default function DeliveryDetailsPage({
           {/* Item Type */}
           <div className="dd-item-type-block">
             <div className="dd-item-type-head">
-              <span className="dd-item-type-heading">Item type</span>
+              <span className="dd-item-type-heading">Jenis barang</span>
               <button
                 type="button"
                 className="dd-prohibited-link"
                 onClick={() => setIsProhibitedModalOpen(true)}
               >
-                What's prohibited?
+                Barang yang dilarang?
               </button>
             </div>
 
             <div className="dd-item-type-chips-row">
               {[
-                { id: 'Document', label: 'Document', icon: <FileText size={16} /> },
-                { id: 'Food', label: 'Food', icon: <Utensils size={16} /> },
-                { id: 'Clothing', label: 'Clothing', icon: <Shirt size={16} /> },
-                { id: 'Electronic', label: 'Electronic', icon: <Laptop size={16} /> },
-                { id: 'Other', label: 'Other', icon: <Package size={16} /> }
+                { id: 'Document', label: 'Dokumen', icon: <FileText size={16} /> },
+                { id: 'Food', label: 'Makanan', icon: <Utensils size={16} /> },
+                { id: 'Clothing', label: 'Pakaian', icon: <Shirt size={16} /> },
+                { id: 'Electronic', label: 'Elektronik', icon: <Laptop size={16} /> },
+                { id: 'Other', label: 'Lainnya', icon: <Package size={16} /> }
               ].map((cat) => (
                 <button
                   key={cat.id}
@@ -1358,7 +1358,7 @@ export default function DeliveryDetailsPage({
               type="text"
               maxLength={120}
               className="dd-input-text dd-rounded-input"
-              placeholder="e.g. Makanan kotak, dokumen berkas, pakaian..."
+              placeholder="cth. Makanan kotak, berkas dokumen, pakaian..."
               value={tempItem.itemName}
               onChange={(e) => setTempItem((prev) => ({ ...prev, itemName: e.target.value }))}
             />
@@ -1385,7 +1385,7 @@ export default function DeliveryDetailsPage({
               showToast('✅ Rincian barang berhasil disimpan');
             }}
           >
-            Confirm
+            Konfirmasi
           </button>
         </div>
 
@@ -1402,7 +1402,7 @@ export default function DeliveryDetailsPage({
               <div className="dd-modal-header">
                 <div className="dd-modal-title-wrap">
                   <AlertCircle size={20} color="#EF4444" />
-                  <h3 className="dd-modal-title">Prohibited Items</h3>
+                  <h3 className="dd-modal-title">Barang yang Dilarang</h3>
                 </div>
                 <button
                   type="button"
@@ -1465,7 +1465,7 @@ export default function DeliveryDetailsPage({
           >
             <ArrowLeft size={22} color="#111827" strokeWidth={2.4} />
           </button>
-          <h1 className="dd-header-title">Delivery Details</h1>
+          <h1 className="dd-header-title">Detail Pengiriman</h1>
         </div>
       </header>
 
@@ -1534,7 +1534,7 @@ export default function DeliveryDetailsPage({
                     </span>
                   ) : (
                     <span className="dd-add-recipient-prompt">
-                      Add recipient details <span className="dd-required-star">*</span>
+                      Tambah detail penerima <span className="dd-required-star">*</span>
                     </span>
                   )}
                 </button>
@@ -1561,13 +1561,13 @@ export default function DeliveryDetailsPage({
               <div className="dd-row-text">
                 <div className="dd-row-title">
                   {deliverySpeed === 'hemat'
-                    ? 'Pick up now (Hemat • 2-3 hrs)'
-                    : 'Pick up now (30 min or less)'}
+                    ? 'Ambil sekarang (Hemat • 2-3 jam)'
+                    : 'Ambil sekarang (30 menit atau kurang)'}
                 </div>
                 <div className="dd-row-sub">
                   {deliverySpeed === 'hemat'
-                    ? `Drop off by ${hematEstimateTime} • Instant - Hemat`
-                    : `Drop off by ${dropoffEstimateTime} • Instant`}
+                    ? `Tiba sekitar ${hematEstimateTime} • Instan - Hemat`
+                    : `Tiba sekitar ${dropoffEstimateTime} • Instan`}
                 </div>
               </div>
             </div>
@@ -1589,12 +1589,12 @@ export default function DeliveryDetailsPage({
               )}
               <div className="dd-row-text">
                 <div className="dd-row-title">
-                  {selectedVehicle === 'car' ? 'Car Cargo' : 'Bike'}
+                  {selectedVehicle === 'car' ? 'Mobil Kargo' : 'Motor Kurir'}
                 </div>
                 <div className="dd-row-sub">
                   {selectedVehicle === 'car'
-                    ? 'For large items, max 50kg'
-                    : 'For small items, max 20kg'}
+                    ? 'Untuk barang besar, maks. 50 kg'
+                    : 'Untuk barang kecil, maks. 20 kg'}
                 </div>
               </div>
             </div>
@@ -1621,14 +1621,14 @@ export default function DeliveryDetailsPage({
                     <span className="dd-filled-item-name">{itemInfo.itemName}</span>
                   ) : (
                     <span className="dd-add-item-prompt">
-                      Add item details <span className="dd-required-star">*</span>
+                      Tambah detail barang <span className="dd-required-star">*</span>
                     </span>
                   )}
                 </div>
                 <div className="dd-row-sub">
                   {itemInfo.weight
-                    ? `Size ${itemInfo.size || 'S'} • ${itemInfo.category || 'Food'}`
-                    : `Delivery Guarantee • ${itemInfo.guarantee}`}
+                    ? `Ukuran ${itemInfo.size || 'S'} • ${itemInfo.category || 'Makanan'}`
+                    : `Jaminan Pengiriman • ${itemInfo.guarantee}`}
                 </div>
               </div>
             </div>
@@ -1706,7 +1706,7 @@ export default function DeliveryDetailsPage({
             className="dd-btn-review-order"
             onClick={handleReviewOrderClick}
           >
-            Review Order
+            Tinjau Pesanan
           </button>
         </div>
       </div>
@@ -1727,7 +1727,7 @@ export default function DeliveryDetailsPage({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="dd-modal-header">
-              <h3 className="dd-modal-title">Select Delivery Vehicle</h3>
+              <h3 className="dd-modal-title">Pilih Kendaraan Pengiriman</h3>
               <button
                 type="button"
                 className="dd-btn-close-modal"
@@ -1744,14 +1744,14 @@ export default function DeliveryDetailsPage({
                 onClick={() => {
                   setSelectedVehicle('bike');
                   setIsVehicleModalOpen(false);
-                  showToast('🛵 Kendaraan dipilih: Bike (Max 20kg)');
+                  showToast('🛵 Kendaraan dipilih: Motor Kurir (Maks. 20kg)');
                 }}
               >
                 <div className="dd-vehicle-left">
                   <BikeOptionIcon size={42} />
                   <div>
-                    <div className="dd-vehicle-title">Bike (Motor Kurir)</div>
-                    <div className="dd-vehicle-desc">For small items, max 20kg</div>
+                    <div className="dd-vehicle-title">Motor Kurir</div>
+                    <div className="dd-vehicle-desc">Untuk barang kecil, maks. 20 kg</div>
                   </div>
                 </div>
                 <div className="dd-vehicle-price">
@@ -1765,14 +1765,14 @@ export default function DeliveryDetailsPage({
                 onClick={() => {
                   setSelectedVehicle('car');
                   setIsVehicleModalOpen(false);
-                  showToast('🚗 Kendaraan dipilih: Car Cargo (Max 50kg)');
+                  showToast('🚗 Kendaraan dipilih: Mobil Kargo (Maks. 50kg)');
                 }}
               >
                 <div className="dd-vehicle-left">
                   <CarOptionIcon size={42} />
                   <div>
-                    <div className="dd-vehicle-title">Car Cargo (Mobil)</div>
-                    <div className="dd-vehicle-desc">For large items, max 50kg</div>
+                    <div className="dd-vehicle-title">Mobil Kargo</div>
+                    <div className="dd-vehicle-desc">Untuk barang besar, maks. 50 kg</div>
                   </div>
                 </div>
                 <div className="dd-vehicle-price">
@@ -1797,7 +1797,7 @@ export default function DeliveryDetailsPage({
             <div className="dd-modal-header">
               <div className="dd-modal-title-wrap">
                 <ShieldCheck size={20} color="#FF337F" />
-                <h3 className="dd-modal-title">Review Order</h3>
+                <h3 className="dd-modal-title">Tinjau Pesanan</h3>
               </div>
               <button
                 type="button"
@@ -1832,7 +1832,7 @@ export default function DeliveryDetailsPage({
                 </div>
                 <div className="dd-review-item">
                   <span className="label">Kendaraan:</span>
-                  <span className="val">{selectedVehicle === 'car' ? 'Car Cargo (50kg)' : 'Bike (20kg)'}</span>
+                  <span className="val">{selectedVehicle === 'car' ? 'Mobil Kargo (50kg)' : 'Motor Kurir (20kg)'}</span>
                 </div>
                 <div className="dd-review-item total">
                   <span className="label">Total Pembayaran:</span>
@@ -1865,7 +1865,7 @@ export default function DeliveryDetailsPage({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="dd-speed-title">
-              How'd you like it delivered?
+              Pilih Kecepatan Pengiriman
             </div>
 
             <div className="dd-speed-options-list">
@@ -1879,11 +1879,11 @@ export default function DeliveryDetailsPage({
                 </div>
                 <div className="dd-speed-text-col">
                   <div className="dd-speed-row-top">
-                    <span className="dd-speed-name">Instant</span>
+                    <span className="dd-speed-name">Instan</span>
                     <span className="dd-speed-price">Rp{baseFare.toLocaleString('id-ID')}</span>
                   </div>
                   <div className="dd-speed-desc">
-                    Picked up immediately, arrives within 1 hour
+                    Langsung dijemput kurir, tiba dalam 1 jam
                   </div>
                 </div>
               </div>
@@ -1898,11 +1898,11 @@ export default function DeliveryDetailsPage({
                 </div>
                 <div className="dd-speed-text-col">
                   <div className="dd-speed-row-top">
-                    <span className="dd-speed-name">Instant - Hemat</span>
+                    <span className="dd-speed-name">Instan - Hemat</span>
                     <span className="dd-speed-price">Rp{Math.max(15000, Math.round((baseFare * 0.9) / 100) * 100).toLocaleString('id-ID')}</span>
                   </div>
                   <div className="dd-speed-desc">
-                    Arrives in 2–3 hours. Efficient routes, saves fuel
+                    Tiba dalam 2–3 jam. Rute hemat dan efisien
                   </div>
                 </div>
               </div>
@@ -1921,7 +1921,7 @@ export default function DeliveryDetailsPage({
                     <span className="dd-speed-price muted">-</span>
                   </div>
                   <div className="dd-speed-desc text-danger">
-                    Unavailable in selected location.
+                    Belum tersedia di lokasi yang dipilih.
                   </div>
                 </div>
               </div>
@@ -1945,12 +1945,12 @@ export default function DeliveryDetailsPage({
                   setIsDeliverySpeedModalOpen(false);
                   showToast(
                     tempDeliverySpeed === 'hemat'
-                      ? '⚡ Opsi dipilih: Instant - Hemat (Arrives in 2-3 hours)'
-                      : '⚡ Opsi dipilih: Instant (Picked up immediately)'
+                      ? '⚡ Opsi dipilih: Instan - Hemat (Tiba dalam 2-3 jam)'
+                      : '⚡ Opsi dipilih: Instan (Langsung dijemput kurir)'
                   );
                 }}
               >
-                Next
+                Lanjut
               </button>
             </div>
           </div>

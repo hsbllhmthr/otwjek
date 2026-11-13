@@ -70,24 +70,24 @@ export default function PackageDetailsPage({
   const [transactionId] = useState(() => 'TRX' + Math.floor(1000000000 + Math.random() * 9000000000));
   const [bookingId] = useState(() => 'BKG' + Math.floor(100000 + Math.random() * 900000));
 
-  // Current dynamic date & time
+  // Current dynamic date & time in Indonesian
   const now = new Date();
-  const dateFormatted = now.toLocaleDateString('en-US', {
-    month: 'short',
+  const dateFormatted = now.toLocaleDateString('id-ID', {
     day: 'numeric',
+    month: 'short',
     year: 'numeric'
   });
-  const timeFormatted = now.toLocaleTimeString('en-US', {
+  const timeFormatted = now.toLocaleTimeString('id-ID', {
     hour: '2-digit',
-    minute: '2-digit',
-    hour12: true
-  });
+    minute: '2-digit'
+  }).replace('.', ':');
 
-  const scheduleDateFormatted = now.toLocaleDateString('en-US', {
+  const scheduleDateFormatted = now.toLocaleDateString('id-ID', {
     weekday: 'long',
+    day: 'numeric',
     month: 'short',
-    day: 'numeric'
-  }) + ` - ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
+    year: 'numeric'
+  }) + ` · ${timeFormatted}`;
 
   const currentPrice = fare || 30500;
   const platformFee = PRICING_CONFIG.platformFee || 2000;
@@ -97,10 +97,10 @@ export default function PackageDetailsPage({
 
   const isCar = selectedVehicle === 'car';
   const vehicleName = isCar
-    ? `SheSend Car Cargo${deliverySpeed === 'hemat' ? ' (Hemat)' : ''}`
-    : `SheSend Instant Bike${deliverySpeed === 'hemat' ? ' (Hemat)' : ''}`;
+    ? `Mobil Kargo${deliverySpeed === 'hemat' ? ' (Hemat)' : ''}`
+    : `Motor Kurir${deliverySpeed === 'hemat' ? ' (Hemat)' : ''}`;
 
-  const etaLabel = deliverySpeed === 'hemat' ? '2-3 hours' : '30-45 mins';
+  const etaLabel = deliverySpeed === 'hemat' ? '2-3 jam' : '30-45 mnt';
   const weightTierLabels = {
     light: 'Ringan (< 2 kg)',
     medium: 'Sedang (2 - 5 kg)',
@@ -214,18 +214,18 @@ export default function PackageDetailsPage({
           type="button"
           className="btn-header-back"
           onClick={onBack}
-          aria-label="Back"
+          aria-label="Kembali"
         >
           <ArrowLeft size={21} color="#1C1C1E" />
         </button>
 
-        <h1 className="header-title">Delivery Details</h1>
+        <h1 className="header-title">Rincian Pengiriman Paket</h1>
 
         <button
           type="button"
           className="btn-header-more"
           onClick={handleShareToWhatsApp}
-          title="Share to WhatsApp"
+          title="Bagikan ke WhatsApp"
         >
           <MoreVertical size={20} color="#1C1C1E" />
         </button>
@@ -235,14 +235,14 @@ export default function PackageDetailsPage({
       <div className="ride-details-content">
         {/* Card 1: Your Scheduled Delivery */}
         <section className="details-card card-schedule">
-          <h2 className="schedule-title">Your Scheduled Delivery</h2>
+          <h2 className="schedule-title">Jadwal Pengiriman Anda</h2>
           <div className="schedule-subtitle">{scheduleDateFormatted}</div>
 
           <div className="notify-banner">
             <div className="notify-icon-circle">
               <Info size={14} color="#00B14F" />
             </div>
-            <span>We'll notify you when a courier's found</span>
+            <span>Kami akan memberi tahu Anda setelah kurir ditemukan</span>
           </div>
         </section>
 
@@ -391,7 +391,7 @@ export default function PackageDetailsPage({
             <span className="table-label">Perlindungan / Garansi</span>
             <span className="table-value" style={{ color: '#059669', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <ShieldCheck size={14} color="#059669" />
-              <span>{itemInfo?.guarantee || 'Basic Protection (Rp1.000.000)'}</span>
+              <span>{itemInfo?.guarantee || 'Proteksi Dasar (Rp1.000.000)'}</span>
             </span>
           </div>
 
@@ -420,34 +420,34 @@ export default function PackageDetailsPage({
           <div className="table-row">
             <span className="table-label">Status</span>
             <span className="status-badge-scheduled">
-              Scheduled (Siap Dijemput)
+              Terjadwal (Siap Dijemput)
             </span>
           </div>
 
           <div className="table-row">
-            <span className="table-label">Payment</span>
+            <span className="table-label">Metode Pembayaran</span>
             <span className="table-value">
-              {paymentMethod === 'qris' ? 'QRIS SheSend' : 'SheSend Cash (Tunai)'}
+              {paymentMethod === 'qris' ? 'QRIS' : 'Tunai'}
             </span>
           </div>
 
           <div className="table-row">
-            <span className="table-label">Date</span>
+            <span className="table-label">Tanggal</span>
             <span className="table-value">{dateFormatted}</span>
           </div>
 
           <div className="table-row">
-            <span className="table-label">Time</span>
+            <span className="table-label">Waktu</span>
             <span className="table-value">{timeFormatted}</span>
           </div>
 
           <div className="table-row">
-            <span className="table-label">Transaction ID</span>
+            <span className="table-label">ID Transaksi</span>
             <button
               type="button"
               className="btn-copy-code"
               onClick={() => handleCopy(transactionId, 'trx')}
-              title="Copy Transaction ID"
+              title="Salin ID Transaksi"
             >
               <span className="code-text">{transactionId}</span>
               {copiedField === 'trx' ? (
@@ -459,12 +459,12 @@ export default function PackageDetailsPage({
           </div>
 
           <div className="table-row">
-            <span className="table-label">Booking ID</span>
+            <span className="table-label">ID Pesanan</span>
             <button
               type="button"
               className="btn-copy-code"
               onClick={() => handleCopy(bookingId, 'bkg')}
-              title="Copy Booking ID"
+              title="Salin ID Pesanan"
             >
               <span className="code-text">{bookingId}</span>
               {copiedField === 'bkg' ? (
@@ -484,7 +484,7 @@ export default function PackageDetailsPage({
           </div>
 
           <div className="table-row">
-            <span className="table-label">Biaya Admin Platform</span>
+            <span className="table-label">Biaya Layanan & Aplikasi</span>
             <span className="table-value">{formatRupiah(platformFee)}</span>
           </div>
 
@@ -498,7 +498,7 @@ export default function PackageDetailsPage({
           <div className="fare-break-divider" />
 
           <div className="table-row total-row">
-            <span className="total-label">Total Pembayaran (Total Paid)</span>
+            <span className="total-label">Total Pembayaran</span>
             <span className="total-amount">{formatRupiah(currentPrice)}</span>
           </div>
         </section>

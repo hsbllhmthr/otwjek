@@ -97,8 +97,17 @@ export default function LoginPage({ isDriver = false, onBack, onSuccess, onGoToS
         }
       }
 
-      dbService.session.setCurrentUser(existingUser);
-      if (onSuccess) onSuccess(existingUser);
+      if (isDriver) {
+        dbService.session.setDriverUser(existingUser);
+        if (onSuccess) onSuccess(existingUser);
+      } else {
+        const customerObj = {
+          ...existingUser,
+          role: 'customer'
+        };
+        dbService.session.setCustomerUser(customerObj);
+        if (onSuccess) onSuccess(customerObj);
+      }
     }, 450);
   };
 

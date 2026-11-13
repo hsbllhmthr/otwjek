@@ -25,7 +25,9 @@ import LoginPage from './components/LoginPage.jsx';
 import PersonalInfoPage from './components/PersonalInfoPage.jsx';
 import AdminLoginPage from './components/AdminLoginPage.jsx';
 import AdminVerificationDashboard from './components/AdminVerificationDashboard.jsx';
+import PwaInstallPrompt from './components/PwaInstallPrompt.jsx';
 import dbService from './services/dbService.js';
+import { syncPortalDocumentMeta } from './utils/pwaPortal.js';
 
 import {
   ChevronLeft,
@@ -65,6 +67,11 @@ export default function App() {
 
   const [isAdminRoute, setIsAdminRoute] = useState(checkIsAdminPath);
   const [isDriverRoute, setIsDriverRoute] = useState(checkIsDriverPath);
+  const activePortal = isAdminRoute ? 'admin' : isDriverRoute ? 'driver' : 'customer';
+
+  useEffect(() => {
+    syncPortalDocumentMeta(activePortal);
+  }, [activePortal]);
 
   useEffect(() => {
     const handleUrlChange = () => {
@@ -74,12 +81,18 @@ export default function App() {
       setIsDriverRoute(driverPath);
       if (driverPath) {
         setRegistrationRole('driver');
-        const sessionUser = dbService.session.getCurrentUser();
-        if (!sessionUser || sessionUser.role !== 'driver') {
+        const driverUser = dbService.session.getDriverUser();
+        setCurrentUser(driverUser);
+        if (!driverUser) {
           setCurrentView('welcome');
         }
       } else if (!adminPath) {
         setRegistrationRole('user');
+        const customerUser = dbService.session.getCustomerUser();
+        setCurrentUser(customerUser);
+        if (!customerUser) {
+          setCurrentView('welcome');
+        }
       }
     };
     window.addEventListener('popstate', handleUrlChange);
@@ -95,27 +108,41 @@ export default function App() {
     setIsAdminRoute(false);
     setIsDriverRoute(false);
     setRegistrationRole('user');
-    setCurrentView(targetView);
+    const customerUser = dbService.session.getCustomerUser();
+    setCurrentUser(customerUser);
+    setCurrentView(customerUser ? targetView : 'welcome');
   };
 
   const [currentView, setCurrentView] = useState(() => {
     const isDriverUrl = checkIsDriverPath();
-    const sessionUser = dbService.session.getCurrentUser();
+    const sessionUser = isDriverUrl
+      ? dbService.session.getDriverUser()
+      : dbService.session.getCustomerUser();
     const hasSession = !!sessionUser;
+
     // Jika mengakses rute /driver tetapi belum login sebagai mitra driver, tampilkan layar selamat datang
     if (isDriverUrl && (!sessionUser || sessionUser.role !== 'driver')) {
       return 'welcome';
     }
-    // Ambil view terakhir dari sessionStorage
-    const savedView = sessionStorage.getItem('otwjek_current_view');
+
+    // Ambil view terakhir khusus portal ini dari sessionStorage
+    const viewKey = isDriverUrl ? 'otwjek_driver_current_view' : 'otwjek_customer_current_view';
+    const savedView = sessionStorage.getItem(viewKey);
+
+    // Jika belum login di portal ini, hanya izinkan view autentikasi publik
+    if (!hasSession) {
+      if (savedView && ['welcome', 'login', 'signup', 'personal-info'].includes(savedView)) {
+        return savedView;
+      }
+      return 'welcome';
+    }
+
     // Jika view tersimpan valid dan bukan transient, kembalikan view itu
     if (savedView && !TRANSIENT_VIEWS.has(savedView)) {
       return savedView;
     }
     // Jika ada sesi aktif tapi tidak ada view tersimpan, langsung ke home
-    if (hasSession) return 'home';
-    // Default: tampilkan welcome
-    return 'welcome';
+    return 'home';
   }); // 'welcome' | 'home' | 'ride' | 'food' | 'activity' | 'message' | 'account'
   const [activeTab, setActiveTab] = useState('ride'); // 'ride' | 'send'
   const [timeMode, setTimeMode] = useState('now'); // 'now' | 'later'
@@ -160,8 +187,45 @@ export default function App() {
   const [activePackageBooking, setActivePackageBooking] = useState(null);
   const [registeredUserData, setRegisteredUserData] = useState(null);
   const [registrationRole, setRegistrationRole] = useState(() => (checkIsDriverPath() ? 'driver' : 'user')); // 'user' | 'driver'
-  const [currentUser, setCurrentUser] = useState(() => dbService.session.getCurrentUser());
+  const [currentUser, setCurrentUser] = useState(() => {
+    const isDriverUrl = checkIsDriverPath();
+    return isDriverUrl ? dbService.session.getDriverUser() : dbService.session.getCustomerUser();
+  });
   const [loggedAdmin, setLoggedAdmin] = useState(() => dbService.admin.getCurrentAdmin());
+
+  // Sinkronisasi sesi antar tab dan ketika event perubahan sesi ditembakkan
+  useEffect(() => {
+    const syncSession = () => {
+      const isDriverUrl = checkIsDriverPath();
+      const updatedUser = isDriverUrl
+        ? dbService.session.getDriverUser()
+        : dbService.session.getCustomerUser();
+      setCurrentUser(updatedUser);
+      if (!updatedUser) {
+        setCurrentView((prev) => (['welcome', 'login', 'signup'].includes(prev) ? prev : 'welcome'));
+      }
+    };
+
+    const handleStorage = (e) => {
+      if (!e.key) {
+        syncSession();
+        return;
+      }
+      const isDriverUrl = checkIsDriverPath();
+      if (isDriverUrl && (e.key === 'otwjek_db_driver_session' || e.key === 'otwjek_db_current_session')) {
+        syncSession();
+      } else if (!isDriverUrl && (e.key === 'otwjek_db_customer_session' || e.key === 'otwjek_db_current_session')) {
+        syncSession();
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('otwjek_session_change', syncSession);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('otwjek_session_change', syncSession);
+    };
+  }, []);
 
   // Routing metrics
   const [distanceKm, setDistanceKm] = useState(3.8);
@@ -181,12 +245,13 @@ export default function App() {
   const [isSearchingPanel, setIsSearchingPanel] = useState(false);
   const panelDebounceRef = useRef(null);
 
-  // Simpan view saat ini ke sessionStorage agar tidak hilang saat refresh
+  // Simpan view saat ini ke sessionStorage sesuai portal agar tidak tercampur antar peran
   useEffect(() => {
     if (!TRANSIENT_VIEWS.has(currentView)) {
-      sessionStorage.setItem('otwjek_current_view', currentView);
+      const viewKey = isDriverRoute ? 'otwjek_driver_current_view' : 'otwjek_customer_current_view';
+      sessionStorage.setItem(viewKey, currentView);
     }
-  }, [currentView]);
+  }, [currentView, isDriverRoute]);
 
   const handleLocationActivated = (locData) => {
     setIsLocationTrackingActive(true);
@@ -821,8 +886,9 @@ export default function App() {
     }
   };
 
-  // RUTE KHUSUS /admin (Terpisah sepenuhnya dari aplikasi utama)
-  if (isAdminRoute) {
+  const renderPortalContent = () => {
+    // RUTE KHUSUS /admin (Terpisah sepenuhnya dari aplikasi utama)
+    if (isAdminRoute) {
     if (loggedAdmin) {
       return (
         <AdminVerificationDashboard
@@ -847,7 +913,7 @@ export default function App() {
   }
 
   if (currentView === 'welcome') {
-    const isDriverPortal = isDriverRoute || registrationRole === 'driver';
+    const isDriverPortal = isDriverRoute;
     return (
       <div className="app-viewport-wrapper">
         <div className="bolt-app-shell">
@@ -869,7 +935,7 @@ export default function App() {
   }
 
   if (currentView === 'login') {
-    const isDriverPortal = isDriverRoute || registrationRole === 'driver';
+    const isDriverPortal = isDriverRoute;
     return (
       <div className="app-viewport-wrapper">
         <div className="bolt-app-shell">
@@ -877,7 +943,14 @@ export default function App() {
             isDriver={isDriverPortal}
             onBack={() => setCurrentView('welcome')}
             onSuccess={(user) => {
-              if (user) setCurrentUser(user);
+              if (user) {
+                if (isDriverPortal) {
+                  dbService.session.setDriverUser(user);
+                } else {
+                  dbService.session.setCustomerUser(user);
+                }
+                setCurrentUser(user);
+              }
               setCurrentView('home');
             }}
             onGoToSignUp={() => {
@@ -891,7 +964,7 @@ export default function App() {
   }
 
   if (currentView === 'signup') {
-    const isDriverPortal = isDriverRoute || registrationRole === 'driver';
+    const isDriverPortal = isDriverRoute;
     return (
       <div className="app-viewport-wrapper">
         <div className="bolt-app-shell">
@@ -910,7 +983,11 @@ export default function App() {
                 savedUser = dbService.users.create(fullUserData);
               }
               setRegisteredUserData(savedUser);
-              dbService.session.setCurrentUser(savedUser);
+              if (isDriverPortal) {
+                dbService.session.setDriverUser(savedUser);
+              } else {
+                dbService.session.setCustomerUser(savedUser);
+              }
               setCurrentUser(savedUser);
               setCurrentView('personal-info');
             }}
@@ -922,7 +999,7 @@ export default function App() {
   }
 
   if (currentView === 'personal-info') {
-    const isDriverPortal = isDriverRoute || registrationRole === 'driver';
+    const isDriverPortal = isDriverRoute;
     return (
       <div className="app-viewport-wrapper">
         <div className="bolt-app-shell">
@@ -938,7 +1015,7 @@ export default function App() {
                   profileData.vehicleData || {},
                   profileData.documents
                 );
-                dbService.session.setCurrentUser(res.user);
+                dbService.session.setDriverUser(res.user);
                 setCurrentUser(res.user);
               } else {
                 let existing = dbService.users.findByPhone(merged.phone);
@@ -948,7 +1025,7 @@ export default function App() {
                 } else {
                   savedUser = dbService.users.create({ ...merged, role: 'customer' });
                 }
-                dbService.session.setCurrentUser(savedUser);
+                dbService.session.setCustomerUser(savedUser);
                 setCurrentUser(savedUser);
               }
               setCurrentView('home');
@@ -960,7 +1037,7 @@ export default function App() {
   }
 
   if (currentView === 'home') {
-    const isDriverSide = isDriverRoute || currentUser?.role === 'driver';
+    const isDriverSide = isDriverRoute;
     return (
       <div className="app-viewport-wrapper">
         <div className="bolt-app-shell">
@@ -1184,7 +1261,7 @@ export default function App() {
 
 
   if (currentView === 'activity') {
-    const isDriverSide = isDriverRoute || currentUser?.role === 'driver';
+    const isDriverSide = isDriverRoute;
     return (
       <div className="app-viewport-wrapper">
         <div className="bolt-app-shell">
@@ -1205,7 +1282,7 @@ export default function App() {
   }
 
   if (currentView === 'message') {
-    const isDriverSide = isDriverRoute || currentUser?.role === 'driver';
+    const isDriverSide = isDriverRoute;
     return (
       <div className="app-viewport-wrapper">
         <div className="bolt-app-shell">
@@ -1222,7 +1299,7 @@ export default function App() {
   }
 
   if (currentView === 'payment') {
-    const isDriverSide = isDriverRoute || currentUser?.role === 'driver';
+    const isDriverSide = isDriverRoute;
     return (
       <div className="app-viewport-wrapper">
         <div className="bolt-app-shell">
@@ -1239,27 +1316,36 @@ export default function App() {
   }
 
   if (currentView === 'account') {
-    const isDriverSide = isDriverRoute || currentUser?.role === 'driver';
+    const isDriverSide = isDriverRoute;
     return (
       <div className="app-viewport-wrapper">
         <div className="bolt-app-shell">
           <AccountView
             user={currentUser}
+            isDriver={isDriverSide}
             onBack={() => setCurrentView('home')}
             onLogout={() => {
-              const wasDriver = isDriverRoute || currentUser?.role === 'driver';
-              dbService.session.logout();
-              setCurrentUser(null);
-              if (wasDriver) {
+              if (isDriverSide) {
+                dbService.session.clearDriverSession();
+                sessionStorage.removeItem('otwjek_driver_current_view');
+                setCurrentUser(null);
+                setRegistrationRole('driver');
                 if (!checkIsDriverPath()) {
                   window.history.pushState({}, '', '/driver');
                 }
                 setIsDriverRoute(true);
-                setRegistrationRole('driver');
+                setCurrentView('welcome');
               } else {
+                dbService.session.clearCustomerSession();
+                sessionStorage.removeItem('otwjek_customer_current_view');
+                setCurrentUser(null);
                 setRegistrationRole('user');
+                if (checkIsDriverPath()) {
+                  window.history.pushState({}, '', '/');
+                }
+                setIsDriverRoute(false);
+                setCurrentView('welcome');
               }
-              setCurrentView('welcome');
             }}
           />
           <BottomNavBar
@@ -1819,5 +1905,13 @@ export default function App() {
         onSelectDriver={(driver) => setSelectedDriver(driver)}
       />
     </div>
+    );
+  };
+
+  return (
+    <>
+      {renderPortalContent()}
+      <PwaInstallPrompt portal={activePortal} />
+    </>
   );
 }

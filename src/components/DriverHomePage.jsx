@@ -62,8 +62,18 @@ function formatDriverBookingToOrder(b) {
     : 'Hari ini';
 
   const fare = Number(b.fare_amount || 15000);
-  const deliveryFee = Number(b.delivery_fee || Math.round((fare * 0.85) / 100) * 100);
-  const totalEarnings = Number(b.total_earnings || deliveryFee);
+  const deliveryFee =
+    b.delivery_fee !== undefined && b.delivery_fee !== null
+      ? Number(b.delivery_fee)
+      : b.booking_status === 'cancelled'
+      ? 0
+      : Math.round((fare * 0.85) / 100) * 100;
+  const totalEarnings =
+    b.total_earnings !== undefined && b.total_earnings !== null
+      ? Number(b.total_earnings)
+      : deliveryFee;
+  const driverPlatformFee =
+    b.booking_status === 'cancelled' ? 0 : Math.max(0, fare - totalEarnings);
 
   const isQris = String(b.payment_method || 'cash').toLowerCase() === 'qris';
   const cashVal = isQris
@@ -122,6 +132,7 @@ function formatDriverBookingToOrder(b) {
     formattedPrice: formatRupiah(fare),
     deliveryFeeAmount: deliveryFee,
     totalEarningsAmount: totalEarnings,
+    driverPlatformFee,
     deliveryFee: formatRupiah(deliveryFee),
     totalEarnings: formatRupiah(totalEarnings),
     cashCollected: cashVal < 0 ? `-${formatRupiah(Math.abs(cashVal))}` : formatRupiah(cashVal),
@@ -256,6 +267,31 @@ export default function DriverHomePage({ currentUser, onNavigate }) {
 
   const activeUser = currentUser || dbService.session.getCurrentUser();
   const verificationStatus = driverProfile?.verification_status || 'pending';
+  const isApprovedDriver = verificationStatus === 'approved';
+
+  const isDriverOnline = useMemo(() => {
+    if (!isApprovedDriver) return false;
+    if (driverProfile && typeof driverProfile.is_online === 'boolean') {
+      return driverProfile.is_online;
+    }
+    if (activeUser?.driver && typeof activeUser.driver.is_online === 'boolean') {
+      return activeUser.driver.is_online;
+    }
+    return true;
+  }, [isApprovedDriver, driverProfile, activeUser]);
+
+  const handleToggleOnlineStatus = useCallback(
+    (targetOnline) => {
+      if (!isApprovedDriver) return;
+      const nextState = typeof targetOnline === 'boolean' ? targetOnline : !isDriverOnline;
+      const targetDriverId = driverProfile?.id || activeUser?.driver?.id;
+      if (targetDriverId) {
+        dbService.drivers.setOnlineStatus(targetDriverId, nextState);
+        loadDriverData();
+      }
+    },
+    [isApprovedDriver, isDriverOnline, driverProfile, activeUser, loadDriverData]
+  );
 
   const driverDisplayName = useMemo(() => {
     const rawName =
@@ -648,6 +684,56 @@ export default function DriverHomePage({ currentUser, onNavigate }) {
               </div>
             </div>
           </section>
+
+          {/* Quick Operational Status Toggle (Siap Terima Order vs Sedang Istirahat) */}
+          <div
+            className={`driver-home-status-card ${isDriverOnline ? 'is-online' : 'is-offline'} ${!isApprovedDriver ? 'is-locked' : ''}`}
+            onClick={() => isApprovedDriver && handleToggleOnlineStatus(!isDriverOnline)}
+            role="button"
+            tabIndex={isApprovedDriver ? 0 : -1}
+            aria-disabled={!isApprovedDriver}
+            onKeyDown={(e) => {
+              if (!isApprovedDriver) return;
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleToggleOnlineStatus(!isDriverOnline);
+              }
+            }}
+          >
+            <div className="driver-home-status-left">
+              <span className={`driver-home-status-dot ${isDriverOnline ? 'online' : 'offline'}`} />
+              <div className="driver-home-status-text">
+                <span className="driver-home-status-title">
+                  {!isApprovedDriver
+                    ? 'Status: Belum Terverifikasi'
+                    : isDriverOnline
+                    ? 'Siap Terima Order (Aktif)'
+                    : 'Sedang Istirahat (Off / Tidak Aktif)'}
+                </span>
+                <span className="driver-home-status-sub">
+                  {!isApprovedDriver
+                    ? 'Menunggu persetujuan Admin untuk mulai menerima order'
+                    : isDriverOnline
+                    ? 'Online · Admin dapat menugaskan order kepada Anda'
+                    : 'Offline · Admin tidak dapat menugaskan order saat Anda istirahat'}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isDriverOnline}
+              aria-label="Ubah status aktif atau istirahat"
+              disabled={!isApprovedDriver}
+              className={`driver-home-toggle ${isDriverOnline ? 'active' : ''}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isApprovedDriver) handleToggleOnlineStatus(!isDriverOnline);
+              }}
+            >
+              <span className="driver-home-toggle-thumb" />
+            </button>
+          </div>
 
           {/* Verification Status Banner (if Pending or Rejected) */}
           {!dismissedVerifyBanner && verificationStatus === 'pending' && (

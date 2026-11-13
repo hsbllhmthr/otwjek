@@ -3712,7 +3712,7 @@
   align-items: center;
   gap: 10px;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-  z-index: 999;
+  z-index: 100000;
   font-size: 13.5px;
   font-weight: 600;
   animation: toastSlideUp 0.25s ease-out;
@@ -4292,4 +4292,69 @@
   background-color: #DC2626;
   transform: translateY(-1px);
   box-shadow: 0 3px 6px rgba(238, 67, 53, 0.3);
+}
+
+/* Offline / Istirahat Driver Card & Disabled Assignment Buttons */
+.assign-driver-card.is-offline {
+  background-color: #F8FAFC;
+  border-color: #E2E8F0;
+  opacity: 0.72;
+}
+
+.assign-driver-card.is-offline:hover {
+  background-color: #F8FAFC;
+  border-color: #E2E8F0;
+  box-shadow: none;
+}
+
+.assign-driver-offline-hint {
+  font-size: 11px;
+  font-weight: 600;
+  color: #B45309;
+  margin-top: 2px;
+}
+
+.assign-offline-notice {
+  padding: 9px 12px;
+  border-radius: 10px;
+  background-color: #FFFBEB;
+  border: 1px solid #FDE68A;
+  color: #92400E;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.assign-error-banner {
+  padding: 9px 12px;
+  border-radius: 10px;
+  background-color: #FEF2F2;
+  border: 1px solid #FECACA;
+  color: #B91C1C;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.btn-assign-icon-primary:disabled,
+.btn-assign-icon-secondary:disabled,
+.btn-assign-icon-wa:disabled,
+.btn-assign-icon-wa.outline:disabled {
+  background-color: #E2E8F0;
+  color: #94A3B8;
+  border-color: #CBD5E1;
+  box-shadow: none;
+  cursor: not-allowed;
+  transform: none;
+  opacity: 0.65;
+}
+
+.btn-assign-icon-primary:disabled:hover,
+.btn-assign-icon-secondary:disabled:hover,
+.btn-assign-icon-wa:disabled:hover,
+.btn-assign-icon-wa.outline:disabled:hover {
+  background-color: #E2E8F0;
+  color: #94A3B8;
+  border-color: #CBD5E1;
+  box-shadow: none;
+  transform: none;
 }

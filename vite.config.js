@@ -1,14 +1,53 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Middleware dev & preview agar /driver dan /admin langsung menyajikan HTML
+ * dengan <link rel="manifest"> masing-masing tanpa redirect (200 OK),
+ * sehingga browser mengenali Customer (/), Driver (/driver), dan Admin (/admin)
+ * sebagai 3 PWA mini app yang terpisah di origin yang sama.
+ */
+function multiPortalPwaRoutingPlugin() {
+  const rewritePortalUrl = (req, _res, next) => {
+    const rawUrl = req.url || '/';
+    const qIdx = rawUrl.indexOf('?');
+    const pathname = (qIdx >= 0 ? rawUrl.slice(0, qIdx) : rawUrl).toLowerCase();
+    const search = qIdx >= 0 ? rawUrl.slice(qIdx) : '';
+
+    if (pathname === '/driver' || pathname === '/driver/') {
+      req.url = `/driver/index.html${search}`;
+    } else if (pathname === '/admin' || pathname === '/admin/') {
+      req.url = `/admin/index.html${search}`;
+    }
+    next();
+  };
+
+  return {
+    name: 'otwjek-multi-portal-pwa-routing',
+    configureServer(server) {
+      server.middlewares.use(rewritePortalUrl);
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(rewritePortalUrl);
+    }
+  };
+}
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
+    multiPortalPwaRoutingPlugin(),
     react(),
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
+      // Gunakan manifest terpisah per portal di public/ (manifest.webmanifest, manifest-driver.webmanifest, manifest-admin.webmanifest)
+      manifest: false,
       includeAssets: [
         'favicon.ico',
         'favicon.png',
@@ -16,67 +55,15 @@ export default defineConfig({
         'pwa-192x192.png',
         'pwa-512x512.png',
         'pwa-maskable-512x512.png',
-        'logo.png'
+        'logo.png',
+        'manifest.webmanifest',
+        'manifest-driver.webmanifest',
+        'manifest-admin.webmanifest'
       ],
-      manifest: {
-        name: 'OTWJek - Transportasi Online Khusus Wanita',
-        short_name: 'OTWJek',
-        description: 'Layanan transportasi, antar paket, dan pesan kuliner terpercaya ramah wanita di Mamminasata (Makassar, Gowa, Maros, Takalar).',
-        theme_color: '#FF337F',
-        background_color: '#FFFFFF',
-        display: 'standalone',
-        orientation: 'portrait',
-        scope: '/',
-        start_url: '/',
-        lang: 'id',
-        categories: ['travel', 'navigation', 'transportation', 'lifestyle'],
-        icons: [
-          {
-            src: '/pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png',
-            purpose: 'any'
-          },
-          {
-            src: '/pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any'
-          },
-          {
-            src: '/pwa-maskable-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'maskable'
-          }
-        ],
-        shortcuts: [
-          {
-            name: 'Pesan SheRide Motor',
-            short_name: 'SheRide',
-            description: 'Pesan ojek motor ramah wanita',
-            url: '/?service=where-to&type=bike',
-            icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }]
-          },
-          {
-            name: 'Pesan SheCar Mobil',
-            short_name: 'SheCar',
-            description: 'Pesan mobil sejuk ramah wanita',
-            url: '/?service=where-to&type=car',
-            icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }]
-          },
-          {
-            name: 'Kirim Paket SheSend',
-            short_name: 'SheSend',
-            description: 'Kirim barang & dokumen cepat dan aman',
-            url: '/?service=send-package',
-            icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }]
-          }
-        ]
-      },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
         maximumFileSizeToCacheInBytes: 3000000,
+        navigateFallback: null,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -123,5 +110,14 @@ export default defineConfig({
         ]
       }
     })
-  ]
+  ],
+  build: {
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        driver: resolve(__dirname, 'driver/index.html'),
+        admin: resolve(__dirname, 'admin/index.html')
+      }
+    }
+  }
 });

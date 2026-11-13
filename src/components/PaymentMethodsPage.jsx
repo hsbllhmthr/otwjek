@@ -35,7 +35,7 @@ export default function PaymentMethodsPage({
   const handleSelect = (method) => {
     setActiveMethod(method);
     if (method === 'cash') {
-      showToast('💵 Metode pembayaran: Cash');
+      showToast('💵 Metode pembayaran: Tunai (Cash)');
     } else if (method === 'qris') {
       showToast('📱 Metode pembayaran: QRIS');
     }
@@ -66,14 +66,14 @@ export default function PaymentMethodsPage({
         >
           <ArrowLeft size={22} color="#111827" strokeWidth={2.4} />
         </button>
-        <h1 className="payment-header-title">Payment Methods</h1>
+        <h1 className="payment-header-title">Metode Pembayaran</h1>
       </header>
 
       {/* 2. Scrollable Body Content */}
       <div className="payment-scroll-body">
         {/* Cashless Promo Card with QRIS inside */}
         <div className="payment-promo-card">
-          <div className="payment-promo-heading">Enjoy easier, cashless payments</div>
+          <div className="payment-promo-heading">Nikmati kemudahan pembayaran non-tunai</div>
 
           <div
             className="payment-qris-card"
@@ -88,7 +88,7 @@ export default function PaymentMethodsPage({
               </div>
               <div className="payment-qris-details">
                 <div className="payment-qris-title">QRIS</div>
-                <div className="payment-qris-sub">Scan the driver's QR to pay</div>
+                <div className="payment-qris-sub">Pindai kode QR pengemudi untuk membayar</div>
               </div>
             </div>
             <RadioButton selected={activeMethod === 'qris'} />
@@ -97,8 +97,8 @@ export default function PaymentMethodsPage({
 
         {/* Section: Linked Methods */}
         <div className="payment-section">
-          <div className="payment-section-title">Linked Methods</div>
-          <div className="payment-section-sub">Swipe left to set your default</div>
+          <div className="payment-section-title">Metode Pembayaran Tersedia</div>
+          <div className="payment-section-sub">Pilih metode pembayaran utama Anda</div>
 
           <div
             className="payment-method-row"
@@ -110,7 +110,7 @@ export default function PaymentMethodsPage({
               <div className="payment-icon-circle bg-mint">
                 <Banknote size={20} color="#FF337F" />
               </div>
-              <span className="payment-method-name">Cash</span>
+              <span className="payment-method-name">Tunai (Cash)</span>
             </div>
             <RadioButton selected={activeMethod === 'cash'} />
           </div>

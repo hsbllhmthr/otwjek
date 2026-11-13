@@ -21,8 +21,26 @@ const STORAGE_KEYS = {
   BOOKINGS: 'otwjek_db_ride_bookings',
   DELIVERIES: 'otwjek_db_package_deliveries',
   CURRENT_USER: 'otwjek_db_current_session',
+  CUSTOMER_USER: 'otwjek_db_customer_session',
+  DRIVER_USER: 'otwjek_db_driver_session',
   ADMIN_SESSION: 'otwjek_db_admin_session'
 };
+
+/**
+ * Deteksi konteks portal aktif berdasarkan URL saat ini: 'driver' | 'admin' | 'customer'
+ */
+export function detectPortal() {
+  if (typeof window === 'undefined') return 'customer';
+  const p = window.location.pathname.toLowerCase();
+  const h = window.location.hash.toLowerCase();
+  if (p === '/driver' || p.startsWith('/driver/') || h === '#/driver' || h.startsWith('#/driver/')) {
+    return 'driver';
+  }
+  if (p === '/admin' || p.startsWith('/admin/') || h === '#/admin' || h.startsWith('#/admin/')) {
+    return 'admin';
+  }
+  return 'customer';
+}
 
 // Kredensial admin default dibaca dari .env / .env.local (dengan fallback default jika belum diset)
 const ADMIN_EMAIL = (import.meta?.env?.VITE_ADMIN_EMAIL || 'admin@otwjek.com').trim().toLowerCase();
@@ -79,11 +97,17 @@ function setStoredArray(key, array) {
   try {
     localStorage.setItem(key, JSON.stringify(array));
     if (typeof window !== 'undefined') {
+      const detail = { key, timestamp: Date.now(), length: array.length };
       window.dispatchEvent(
-        new CustomEvent('otwjek_db_change', {
-          detail: { key, timestamp: Date.now(), length: array.length }
-        })
+        new CustomEvent('otwjek_db_change', { detail })
       );
+      try {
+        if (typeof BroadcastChannel !== 'undefined') {
+          const bc = new BroadcastChannel('otwjek_broadcast');
+          bc.postMessage(detail);
+          bc.close();
+        }
+      } catch (_) {}
     }
   } catch (err) {
     console.error(`Error writing ${key} to storage:`, err);
@@ -140,6 +164,8 @@ export function clearEntireDatabase() {
         localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
       }
     }
+    localStorage.removeItem(STORAGE_KEYS.CUSTOMER_USER);
+    localStorage.removeItem(STORAGE_KEYS.DRIVER_USER);
   } catch (_) {}
 
   // 7. Tandai versi purge
@@ -290,19 +316,41 @@ export const dbService = {
     };
     window.addEventListener('otwjek_db_change', handleEvent);
     window.addEventListener('storage', handleEvent);
+
+    let bc = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        bc = new BroadcastChannel('otwjek_broadcast');
+        bc.onmessage = (event) => {
+          callback(event.data || {});
+        };
+      }
+    } catch (_) {}
+
     return () => {
       window.removeEventListener('otwjek_db_change', handleEvent);
       window.removeEventListener('storage', handleEvent);
+      if (bc) {
+        try {
+          bc.close();
+        } catch (_) {}
+      }
     };
   },
 
   notifyChange(key = 'all') {
     if (typeof window !== 'undefined') {
+      const detail = { key, timestamp: Date.now() };
       window.dispatchEvent(
-        new CustomEvent('otwjek_db_change', {
-          detail: { key, timestamp: Date.now() }
-        })
+        new CustomEvent('otwjek_db_change', { detail })
       );
+      try {
+        if (typeof BroadcastChannel !== 'undefined') {
+          const bc = new BroadcastChannel('otwjek_broadcast');
+          bc.postMessage(detail);
+          bc.close();
+        }
+      } catch (_) {}
     }
   },
 
@@ -421,10 +469,14 @@ export const dbService = {
       setStoredArray(STORAGE_KEYS.USERS, users);
       dbService.notifyChange('users');
 
-      // Sinkronisasi dengan sesi aktif jika user yang diubah adalah currentUser
-      const currentUser = dbService.session.getCurrentUser();
-      if (currentUser && (currentUser.id === id || normalizePhone(currentUser.phone) === normalizePhone(updated.phone))) {
-        dbService.session.setCurrentUser({ ...currentUser, ...updated });
+      // Sinkronisasi dengan sesi aktif jika user yang diubah adalah sesi yang sedang tersimpan
+      const custUser = dbService.session.getCustomerUser();
+      if (custUser && (custUser.id === id || normalizePhone(custUser.phone) === normalizePhone(updated.phone))) {
+        dbService.session.setCustomerUser({ ...custUser, ...updated });
+      }
+      const drvUser = dbService.session.getDriverUser();
+      if (drvUser && (drvUser.id === id || normalizePhone(drvUser.phone) === normalizePhone(updated.phone))) {
+        dbService.session.setDriverUser({ ...drvUser, ...updated });
       }
 
       return updated;
@@ -530,12 +582,15 @@ export const dbService = {
         avatar: incomingAvatar,
         
         // Data Kendaraan Mandiri
-        vehicleType: vehicleData.vehicleType || 'motor', // 'motor' | 'mobil'
+        vehicleType: vehicleData.vehicleType || 'motor', // 'motor' | 'mobil' | 'both'
+        activeVehicleType: vehicleData.activeVehicleType || (vehicleData.vehicleType === 'mobil' ? 'mobil' : 'motor'),
         vehicleBrand: vehicleData.vehicleBrand || '',
         vehicleModel: vehicleData.vehicleModel || `${vehicleData.vehicleBrand || ''} ${vehicleData.vehicleModelName || ''}`.trim(),
         vehicleColor: vehicleData.vehicleColor || '',
         plateNumber: (vehicleData.plateNumber || '').toUpperCase().trim(),
         operationalArea: vehicleData.operationalArea || 'Makassar dan sekitarnya',
+        motorData: vehicleData.motorData || null,
+        carData: vehicleData.carData || null,
 
         // Legalitas & Identitas Mandiri
         nik: vehicleData.nik || '',
@@ -581,10 +636,10 @@ export const dbService = {
 
       setStoredArray(STORAGE_KEYS.DRIVERS, drivers);
 
-      // 3. Simpan berkas dokumen (KTP, SIM, STNK)
+      // 3. Simpan berkas dokumen (KTP, SIM C, SIM A, STNK Motor, STNK Mobil)
       if (documents && Object.keys(documents).length > 0) {
         const storedDocs = getStoredArray(STORAGE_KEYS.DRIVER_DOCS, []);
-        ['ktp', 'sim', 'stnk'].forEach((docType) => {
+        ['ktp', 'sim', 'simA', 'stnk', 'stnkCar'].forEach((docType) => {
           if (documents[docType]) {
             const docObj = documents[docType];
             const existingDocIdx = storedDocs.findIndex(
@@ -623,7 +678,14 @@ export const dbService = {
      */
     updateDriver(driverId, updateData = {}, documents = {}, reviewerName = 'Admin OTWJek') {
       const drivers = this.getAll();
-      const idx = drivers.findIndex((d) => d.id === driverId);
+      const targetPhone = normalizePhone(driverId);
+      const idx = drivers.findIndex((d) => {
+        if (!d) return false;
+        if (d.id === driverId || d.user_id === driverId) return true;
+        if (targetPhone && normalizePhone(d.phone) === targetPhone) return true;
+        if (typeof driverId === 'string' && d.name && d.name.toLowerCase().trim() === driverId.toLowerCase().trim()) return true;
+        return false;
+      });
       if (idx === -1) return null;
 
       // Persiapkan status & badge jika ada perubahan verification_status
@@ -640,6 +702,7 @@ export const dbService = {
       } else if (updateData.verification_status === 'rejected') {
         extraStatusFields = {
           verification_status: 'rejected',
+          is_online: false,
           status: updateData.status || 'Verifikasi Ditolak',
           rejection_reason: updateData.rejection_reason || 'Dokumen belum lengkap atau tidak sesuai.',
           reviewed_by: reviewerName,
@@ -648,6 +711,7 @@ export const dbService = {
       } else if (updateData.verification_status === 'pending') {
         extraStatusFields = {
           verification_status: 'pending',
+          is_online: false,
           status: updateData.status || 'Menunggu Verifikasi',
           rejection_reason: null
         };
@@ -677,10 +741,10 @@ export const dbService = {
         }
       }
 
-      // Sinkronisasi dokumen (KTP, SIM, STNK) jika diunggah atau diupdate
+      // Sinkronisasi dokumen (KTP, SIM C, SIM A, STNK Motor, STNK Mobil) jika diunggah atau diupdate
       if (documents && Object.keys(documents).length > 0) {
         const storedDocs = getStoredArray(STORAGE_KEYS.DRIVER_DOCS, []);
-        ['ktp', 'sim', 'stnk'].forEach((docType) => {
+        ['ktp', 'sim', 'simA', 'stnk', 'stnkCar'].forEach((docType) => {
           if (documents[docType]) {
             const docVal = documents[docType];
             const docUrl = typeof docVal === 'string' ? docVal : docVal.url;
@@ -713,18 +777,91 @@ export const dbService = {
       }
 
       // Sinkronisasi session lokal jika sedang login sebagai driver tersebut
-      const sessionUser = dbService.session.getCurrentUser();
+      const sessionUser = dbService.session.getDriverUser();
       if (sessionUser && (sessionUser.id === drivers[idx].user_id || sessionUser.driver?.id === driverId)) {
         sessionUser.driver = drivers[idx];
         sessionUser.vehicleData = {
           ...(sessionUser.vehicleData || {}),
           ...updateData
         };
-        dbService.session.setCurrentUser(sessionUser);
+        dbService.session.setDriverUser(sessionUser);
       }
 
       dbService.notifyChange('drivers');
       return drivers[idx];
+    },
+
+    /**
+     * Mengganti Armada Aktif Driver (Motor <-> Mobil)
+     * Digunakan ketika driver mendaftarkan kedua kendaraan (both)
+     */
+    switchActiveVehicle(driverId, targetType = 'motor') {
+      const drivers = this.getAll();
+      const targetPhone = normalizePhone(driverId);
+      const idx = drivers.findIndex((d) => {
+        if (!d) return false;
+        if (d.id === driverId || d.user_id === driverId) return true;
+        if (targetPhone && normalizePhone(d.phone) === targetPhone) return true;
+        if (typeof driverId === 'string' && d.name && d.name.toLowerCase().trim() === driverId.toLowerCase().trim()) return true;
+        return false;
+      });
+      if (idx === -1) return null;
+      const driver = { ...drivers[idx] };
+      const newActive = targetType === 'mobil' ? 'mobil' : 'motor';
+      driver.activeVehicleType = newActive;
+
+      // Jika berpindah armada, pastikan vehicleType diset 'both' jika belum
+      if (driver.vehicleType !== 'both') {
+        driver.vehicleType = 'both';
+      }
+
+      // Update vehicleModel, vehicleColor, plateNumber agar sinkron dengan armada aktif
+      if (newActive === 'mobil') {
+        if (driver.carData) {
+          if (driver.carData.model) driver.vehicleModel = driver.carData.model;
+          if (driver.carData.color) driver.vehicleColor = driver.carData.color;
+          if (driver.carData.plateNumber) driver.plateNumber = driver.carData.plateNumber;
+        }
+      } else if (newActive === 'motor') {
+        if (driver.motorData) {
+          if (driver.motorData.model) driver.vehicleModel = driver.motorData.model;
+          if (driver.motorData.color) driver.vehicleColor = driver.motorData.color;
+          if (driver.motorData.plateNumber) driver.plateNumber = driver.motorData.plateNumber;
+        }
+      }
+
+      driver.updated_at = new Date().toISOString();
+      drivers[idx] = driver;
+      setStoredArray(STORAGE_KEYS.DRIVERS, drivers);
+
+      // Sinkronkan sesi aktif jika driver tersebut sedang login
+      const currentSession = dbService.session.getDriverUser();
+      const sessionPhone = currentSession ? normalizePhone(currentSession.phone) : null;
+      if (
+        currentSession &&
+        (currentSession.driver?.id === driver.id ||
+          currentSession.id === driver.user_id ||
+          (targetPhone && sessionPhone === targetPhone) ||
+          (driver.phone && sessionPhone === normalizePhone(driver.phone)))
+      ) {
+        currentSession.driver = driver;
+        if (!currentSession.vehicleData) currentSession.vehicleData = {};
+        currentSession.vehicleData.activeVehicleType = newActive;
+        currentSession.vehicleData.vehicleType = driver.vehicleType;
+        if (newActive === 'mobil' && driver.carData) {
+          if (driver.carData.model) currentSession.vehicleData.vehicleModel = driver.carData.model;
+          if (driver.carData.color) currentSession.vehicleData.vehicleColor = driver.carData.color;
+          if (driver.carData.plateNumber) currentSession.vehicleData.plateNumber = driver.carData.plateNumber;
+        } else if (newActive === 'motor' && driver.motorData) {
+          if (driver.motorData.model) currentSession.vehicleData.vehicleModel = driver.motorData.model;
+          if (driver.motorData.color) currentSession.vehicleData.vehicleColor = driver.motorData.color;
+          if (driver.motorData.plateNumber) currentSession.vehicleData.plateNumber = driver.motorData.plateNumber;
+        }
+        dbService.session.setDriverUser(currentSession);
+      }
+
+      dbService.notifyChange('drivers');
+      return driver;
     },
 
     /**
@@ -766,10 +903,10 @@ export const dbService = {
       setStoredArray(STORAGE_KEYS.DRIVER_DOCS, updatedDocs);
 
       // Update session jika sedang login
-      const sessionUser = dbService.session.getCurrentUser();
-      if (sessionUser && sessionUser.id === drivers[idx].user_id) {
+      const sessionUser = dbService.session.getDriverUser();
+      if (sessionUser && (sessionUser.id === drivers[idx].user_id || sessionUser.driver?.id === drivers[idx].id)) {
         sessionUser.driver = drivers[idx];
-        dbService.session.setCurrentUser(sessionUser);
+        dbService.session.setDriverUser(sessionUser);
       }
 
       dbService.notifyChange('drivers');
@@ -787,6 +924,7 @@ export const dbService = {
       drivers[idx] = {
         ...drivers[idx],
         verification_status: 'rejected',
+        is_online: false,
         status: 'Verifikasi Ditolak',
         rejection_reason: reason,
         reviewed_by: reviewerName,
@@ -812,10 +950,10 @@ export const dbService = {
       setStoredArray(STORAGE_KEYS.DRIVER_DOCS, updatedDocs);
 
       // Update session jika sedang login
-      const sessionUser = dbService.session.getCurrentUser();
-      if (sessionUser && sessionUser.id === drivers[idx].user_id) {
+      const sessionUser = dbService.session.getDriverUser();
+      if (sessionUser && (sessionUser.id === drivers[idx].user_id || sessionUser.driver?.id === drivers[idx].id)) {
         sessionUser.driver = drivers[idx];
-        dbService.session.setCurrentUser(sessionUser);
+        dbService.session.setDriverUser(sessionUser);
       }
 
       dbService.notifyChange('drivers');
@@ -834,6 +972,7 @@ export const dbService = {
         ...drivers[idx],
         ...updatedVehicleData,
         verification_status: 'pending',
+        is_online: false,
         status: 'Menunggu Verifikasi',
         rejection_reason: null,
         resubmitted_at: new Date().toISOString()
@@ -899,8 +1038,9 @@ export const dbService = {
       const idx = drivers.findIndex((d) => d.id === driverId);
       if (idx === -1) return null;
 
-      const nextOnline = Boolean(isOnline);
       const isApproved = drivers[idx].verification_status === 'approved';
+      // Driver yang belum disetujui admin tidak dapat mengaktifkan status siap terima order
+      const nextOnline = isApproved ? Boolean(isOnline) : false;
       const nextStatusLabel = isApproved
         ? nextOnline
           ? 'Siap Terima Order'
@@ -918,13 +1058,17 @@ export const dbService = {
       setStoredArray(STORAGE_KEYS.DRIVERS, drivers);
 
       // Sinkronisasi session lokal jika sedang login sebagai driver tersebut
-      const sessionUser = dbService.session.getCurrentUser();
+      const sessionUser = dbService.session.getDriverUser();
+      const isMatchingPhone =
+        sessionUser?.phone &&
+        drivers[idx].phone &&
+        normalizePhone(sessionUser.phone) === normalizePhone(drivers[idx].phone);
       if (
         sessionUser &&
-        (sessionUser.id === drivers[idx].user_id || sessionUser.driver?.id === driverId)
+        (sessionUser.id === drivers[idx].user_id || sessionUser.driver?.id === driverId || isMatchingPhone)
       ) {
         sessionUser.driver = drivers[idx];
-        dbService.session.setCurrentUser(sessionUser);
+        dbService.session.setDriverUser(sessionUser);
       }
 
       dbService.notifyChange('drivers');
@@ -1216,9 +1360,25 @@ export const dbService = {
 
     /**
      * Admin Menugaskan Akun Driver pada Pesanan Pelanggan (Order Dispatch)
+     * Menolak penugasan apabila driver sedang istirahat (off/tidak aktif) atau belum disetujui.
      */
     assignDriver(bookingId, driver, reviewerName = 'Admin OTWJek') {
       if (!bookingId || !driver) return null;
+
+      // Verifikasi status terbaru driver langsung dari storage agar tidak menerima kondisi stale
+      const storedDrivers = getStoredArray(STORAGE_KEYS.DRIVERS, []);
+      const liveDriver =
+        storedDrivers.find((d) => d && driver.id && d.id === driver.id) || driver;
+      const isDriverApproved = liveDriver.verification_status
+        ? liveDriver.verification_status === 'approved'
+        : true;
+      const isDriverOnline =
+        typeof liveDriver.is_online === 'boolean' ? liveDriver.is_online : isDriverApproved;
+
+      if (!isDriverApproved || !isDriverOnline) {
+        return null;
+      }
+
       const bookings = getStoredArray(STORAGE_KEYS.BOOKINGS, []);
       const idx = bookings.findIndex((b) => b && b.id === bookingId);
       if (idx === -1) return null;
@@ -1226,10 +1386,30 @@ export const dbService = {
       const existing = bookings[idx];
       const prevDriverId = existing.driver_id;
 
-      const vehicleModelStr =
+      const isBoth = driver.vehicleType === 'both';
+      const effectiveVehType = isBoth
+        ? (driver.activeVehicleType || (existing.service_type === 'mobil' ? 'mobil' : 'motor'))
+        : (driver.vehicleType || existing.service_type || 'motor');
+
+      let activePlate = driver.plateNumber || 'DD - MKS';
+      let activeModel =
         driver.vehicleModel ||
         `${driver.vehicleBrand || ''} ${driver.vehicleColor ? `(${driver.vehicleColor})` : ''}`.trim() ||
-        (driver.vehicleType === 'mobil' ? 'Mobil Mitra Resmi' : 'Motor Mitra Resmi');
+        (effectiveVehType === 'mobil' ? 'Mobil Mitra Resmi' : 'Motor Mitra Resmi');
+
+      if (isBoth) {
+        if (effectiveVehType === 'mobil' && driver.carData) {
+          if (driver.carData.plateNumber) activePlate = driver.carData.plateNumber;
+          if (driver.carData.model) {
+            activeModel = `${driver.carData.model} ${driver.carData.color ? `(${driver.carData.color})` : ''}`.trim();
+          }
+        } else if (effectiveVehType === 'motor' && driver.motorData) {
+          if (driver.motorData.plateNumber) activePlate = driver.motorData.plateNumber;
+          if (driver.motorData.model) {
+            activeModel = `${driver.motorData.model} ${driver.motorData.color ? `(${driver.motorData.color})` : ''}`.trim();
+          }
+        }
+      }
 
       const assignedDriverObj = {
         id: driver.id,
@@ -1241,9 +1421,9 @@ export const dbService = {
             ? `${driver.tripsCount + 1}+ perjalanan`
             : driver.tripsCount
           : 'Mitra Resmi 🌸',
-        vehicleType: driver.vehicleType || existing.service_type || 'motor',
-        vehicleModel: vehicleModelStr,
-        plateNumber: driver.plateNumber || 'DD - MKS',
+        vehicleType: effectiveVehType,
+        vehicleModel: activeModel,
+        plateNumber: activePlate,
         phone: driver.phone || '085255655084',
         avatar: driver.avatar || null
       };
@@ -1658,25 +1838,189 @@ export const dbService = {
     return true;
   },
 
-  // Sesi Pengguna Biasa / Driver
+  // Sesi Pengguna Biasa / Driver dengan isolasi multi-tab per peran (Customer vs Driver)
   session: {
-    setCurrentUser(user) {
+    getCustomerUser() {
       try {
-        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
-      } catch (e) {
-        console.error(e);
-      }
-    },
-    getCurrentUser() {
-      try {
-        const data = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-        return data ? JSON.parse(data) : null;
+        const data = localStorage.getItem(STORAGE_KEYS.CUSTOMER_USER);
+        if (data) {
+          const u = JSON.parse(data);
+          if (u && u.role !== 'driver') return u;
+          if (u) return { ...u, role: 'customer' };
+        }
+        // Fallback ke CURRENT_USER hanya jika BUKAN akun driver
+        const legacyData = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+        if (legacyData) {
+          const legacy = JSON.parse(legacyData);
+          if (legacy && legacy.role !== 'driver') {
+            return legacy;
+          }
+        }
+        return null;
       } catch (e) {
         return null;
       }
     },
-    logout() {
-      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+
+    getDriverUser() {
+      try {
+        const data = localStorage.getItem(STORAGE_KEYS.DRIVER_USER);
+        if (data) {
+          const u = JSON.parse(data);
+          if (u) return u;
+        }
+        // Fallback ke CURRENT_USER jika akun driver
+        const legacyData = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+        if (legacyData) {
+          const legacy = JSON.parse(legacyData);
+          if (legacy && legacy.role === 'driver') {
+            return legacy;
+          }
+        }
+        return null;
+      } catch (e) {
+        return null;
+      }
+    },
+
+    getCurrentUser(portal = null) {
+      const resolvedPortal = portal || detectPortal();
+      if (resolvedPortal === 'driver') {
+        return this.getDriverUser();
+      }
+      if (resolvedPortal === 'customer') {
+        return this.getCustomerUser();
+      }
+      return this.getCustomerUser() || this.getDriverUser();
+    },
+
+    setCustomerUser(user) {
+      try {
+        if (!user) {
+          this.clearCustomerSession();
+          return;
+        }
+        const customerData = { ...user };
+        if (customerData.role === 'driver') {
+          customerData.role = 'customer';
+        }
+        localStorage.setItem(STORAGE_KEYS.CUSTOMER_USER, JSON.stringify(customerData));
+        if (detectPortal() !== 'driver') {
+          localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(customerData));
+        }
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('otwjek_session_change', {
+              detail: { role: 'customer', user: customerData, timestamp: Date.now() }
+            })
+          );
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    },
+
+    setDriverUser(user) {
+      try {
+        if (!user) {
+          this.clearDriverSession();
+          return;
+        }
+        const driverData = { ...user, role: 'driver' };
+        localStorage.setItem(STORAGE_KEYS.DRIVER_USER, JSON.stringify(driverData));
+        if (detectPortal() === 'driver') {
+          localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(driverData));
+        }
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('otwjek_session_change', {
+              detail: { role: 'driver', user: driverData, timestamp: Date.now() }
+            })
+          );
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    },
+
+    setCurrentUser(user, targetPortal = null) {
+      if (!user) {
+        this.logout(targetPortal);
+        return;
+      }
+      const isDriverTarget =
+        targetPortal === 'driver' ||
+        user?.role === 'driver' ||
+        (targetPortal !== 'customer' && detectPortal() === 'driver');
+      if (isDriverTarget) {
+        this.setDriverUser(user);
+      } else {
+        this.setCustomerUser(user);
+      }
+    },
+
+    clearCustomerSession() {
+      try {
+        localStorage.removeItem(STORAGE_KEYS.CUSTOMER_USER);
+        const current = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+        if (current) {
+          const u = JSON.parse(current);
+          if (u?.role !== 'driver') {
+            localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+          }
+        }
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('otwjek_session_change', {
+              detail: { role: 'customer', user: null, timestamp: Date.now() }
+            })
+          );
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    },
+
+    clearDriverSession() {
+      try {
+        localStorage.removeItem(STORAGE_KEYS.DRIVER_USER);
+        const current = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+        if (current) {
+          const u = JSON.parse(current);
+          if (u?.role === 'driver') {
+            localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+          }
+        }
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('otwjek_session_change', {
+              detail: { role: 'driver', user: null, timestamp: Date.now() }
+            })
+          );
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    },
+
+    logout(portal = null) {
+      const resolvedPortal = portal || detectPortal();
+      if (resolvedPortal === 'driver') {
+        this.clearDriverSession();
+      } else if (resolvedPortal === 'customer') {
+        this.clearCustomerSession();
+      } else {
+        this.clearCustomerSession();
+        this.clearDriverSession();
+        localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('otwjek_session_change', {
+              detail: { role: 'all', user: null, timestamp: Date.now() }
+            })
+          );
+        }
+      }
     }
   }
 };

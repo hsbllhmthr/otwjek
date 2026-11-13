@@ -773,6 +773,16 @@
   border-color: #F1F5F9;
 }
 
+.driver-online-switch-card.is-locked {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.driver-toggle-switch:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .driver-online-left {
   display: flex;
   align-items: center;

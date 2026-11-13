@@ -44,6 +44,20 @@ import driverPlaceholder from '../assets/driver_placeholder.svg';
 import otwjekLogo from '../assets/otwjek_logo.png';
 import { compressImageFile } from '../utils/imageCompressor.js';
 
+export const isDriverUsingCar = (driver) => {
+  if (!driver) return false;
+  const active = String(driver.activeVehicleType || '').toLowerCase().trim();
+  if (active === 'mobil' || active === 'car') return true;
+  if (active === 'motor') return false;
+  const base = String(driver.vehicleType || '').toLowerCase().trim();
+  if (base === 'mobil' || base === 'car') return true;
+  return false;
+};
+
+export const getDriverEffectiveType = (driver) => {
+  return isDriverUsingCar(driver) ? 'mobil' : 'motor';
+};
+
 export default function AdminVerificationDashboard({ admin, onLogout, onGoToCustomerApp }) {
   // Navigation Section: 'overview' | 'drivers' | 'customers'
   const [mainSection, setMainSection] = useState('overview');
@@ -115,6 +129,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
   const [assignModalOrder, setAssignModalOrder] = useState(null);
   const [assignDriverSearch, setAssignDriverSearch] = useState('');
   const [assignVehicleFilter, setAssignVehicleFilter] = useState('recommended'); // 'recommended' | 'all'
+  const [assignErrorMessage, setAssignErrorMessage] = useState(null);
 
   // =========================================================================
   // DATA LOADERS & REALTIME SUBSCRIPTION
@@ -129,26 +144,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
 
   const loadDrivers = () => {
     const all = dbService.drivers.getAll();
-    setDrivers((prev) => {
-      if (prev.length !== all.length) return [...all];
-      const hasChanged = all.some((d, idx) => {
-        const p = prev[idx];
-        return (
-          !p ||
-          p.id !== d.id ||
-          p.verification_status !== d.verification_status ||
-          p.status !== d.status ||
-          p.is_online !== d.is_online ||
-          p.online_updated_at !== d.online_updated_at ||
-          p.name !== d.name ||
-          p.phone !== d.phone ||
-          p.avatar !== d.avatar ||
-          p.plateNumber !== d.plateNumber ||
-          p.operationalArea !== d.operationalArea
-        );
-      });
-      return hasChanged ? [...all] : prev;
-    });
+    setDrivers([...all]);
   };
 
   const loadCustomers = () => {
@@ -300,7 +296,10 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
 
     // Filter Layanan
     if (overviewDriverServiceFilter !== 'all') {
-      result = result.filter((d) => (d.vehicleType || 'motor') === overviewDriverServiceFilter);
+      result = result.filter((d) => {
+        const vType = getDriverEffectiveType(d);
+        return vType === overviewDriverServiceFilter;
+      });
     }
 
     // Sorting
@@ -463,7 +462,10 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
     }
 
     if (driverServiceFilter && driverServiceFilter !== 'all') {
-      result = result.filter((d) => (d.vehicleType || 'motor') === driverServiceFilter);
+      result = result.filter((d) => {
+        const vType = getDriverEffectiveType(d);
+        return vType === driverServiceFilter;
+      });
     }
 
     if (driverDocFilter && driverDocFilter !== 'all') {
@@ -860,17 +862,44 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
 
   const handleAssignDriverToOrder = (booking, driver, sendWa = false) => {
     if (!booking || !driver) return;
+    const liveDriver =
+      dbService.drivers.getDriverById(driver.id) ||
+      drivers.find((d) => d.id === driver.id) ||
+      driver;
+    const isApproved = liveDriver.verification_status === 'approved';
+    const isDrvOnline =
+      typeof liveDriver.is_online === 'boolean' ? liveDriver.is_online : isApproved;
+
+    if (!isApproved || !isDrvOnline) {
+      loadDrivers();
+      const errMsg = `Driver ${liveDriver.name || driver.name} sedang istirahat / off tidak aktif dan tidak dapat ditugaskan.`;
+      setAssignErrorMessage(errMsg);
+      setToastMessage(errMsg);
+      setTimeout(() => setToastMessage(null), 4000);
+      return;
+    }
+
     const reviewerName = admin?.name || 'Admin OTWJEK';
-    const updated = dbService.bookings.assignDriver(booking.id, driver, reviewerName);
+    const updated = dbService.bookings.assignDriver(booking.id, liveDriver, reviewerName);
+    if (!updated) {
+      loadDrivers();
+      const errMsg = `Penugasan dibatalkan: driver ${liveDriver.name || driver.name} sedang istirahat atau belum aktif.`;
+      setAssignErrorMessage(errMsg);
+      setToastMessage(errMsg);
+      setTimeout(() => setToastMessage(null), 4000);
+      return;
+    }
+
     loadBookings();
     loadDrivers();
+    setAssignErrorMessage(null);
     setAssignModalOrder(null);
     setAssignDriverSearch('');
-    setToastMessage(`Driver ${driver.name} berhasil ditugaskan untuk pesanan ${booking.order_code || booking.booking_code}!`);
+    setToastMessage(`Driver ${liveDriver.name} berhasil ditugaskan untuk pesanan ${booking.order_code || booking.booking_code}!`);
     setTimeout(() => setToastMessage(null), 4000);
 
     if (sendWa && updated) {
-      const waUrl = buildDriverTaskWhatsAppUrl(updated, driver);
+      const waUrl = buildDriverTaskWhatsAppUrl(updated, liveDriver);
       window.open(waUrl, '_blank');
     }
   };
@@ -918,7 +947,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
     const docs = getDriverDocs(driver.id) || [];
     const ktpDoc = docs.find((d) => d.document_type === 'ktp');
     const simDoc = docs.find((d) => d.document_type === 'sim');
+    const simADoc = docs.find((d) => d.document_type === 'simA');
     const stnkDoc = docs.find((d) => d.document_type === 'stnk');
+    const stnkCarDoc = docs.find((d) => d.document_type === 'stnkCar');
 
     setEditingDriver(driver);
     setEditDriverForm({
@@ -930,12 +961,18 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
       bio: driver.bio || '',
 
       vehicleType: driver.vehicleType || 'motor',
+      activeVehicleType: driver.activeVehicleType || (driver.vehicleType === 'mobil' ? 'mobil' : 'motor'),
       vehicleBrand: driver.vehicleBrand || '',
       vehicleModel: driver.vehicleModel || '',
       plateNumber: driver.plateNumber || '',
       vehicleColor: driver.vehicleColor || '',
       operationalArea: driver.operationalArea || 'Makassar dan sekitarnya',
       badge: driver.badge || (driver.verification_status === 'approved' ? 'Mitra Resmi 🌸' : 'Calon Mitra 🌸'),
+
+      motorModel: driver.motorData?.model || (driver.vehicleType === 'motor' ? driver.vehicleModel : ''),
+      motorPlate: driver.motorData?.plateNumber || (driver.vehicleType === 'motor' ? driver.plateNumber : ''),
+      carModel: driver.carData?.model || (driver.vehicleType === 'mobil' ? driver.vehicleModel : ''),
+      carPlate: driver.carData?.plateNumber || (driver.vehicleType === 'mobil' ? driver.plateNumber : ''),
 
       simNumber: driver.simNumber || driver.simCNumber || driver.simANumber || '',
       simExpiry: driver.simExpiry || '',
@@ -950,7 +987,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
       // Dokumen
       ktpUrl: ktpDoc?.document_url || '',
       simUrl: simDoc?.document_url || '',
-      stnkUrl: stnkDoc?.document_url || ''
+      simAUrl: simADoc?.document_url || '',
+      stnkUrl: stnkDoc?.document_url || '',
+      stnkCarUrl: stnkCarDoc?.document_url || ''
     });
     setEditDriverActiveTab(initialTab);
   };
@@ -973,7 +1012,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
       const base64 = await compressImageFile(file, 1000, 1000, 0.75);
       if (docType === 'ktp') setEditDriverForm((prev) => ({ ...prev, ktpUrl: base64 }));
       if (docType === 'sim') setEditDriverForm((prev) => ({ ...prev, simUrl: base64 }));
+      if (docType === 'simA') setEditDriverForm((prev) => ({ ...prev, simAUrl: base64 }));
       if (docType === 'stnk') setEditDriverForm((prev) => ({ ...prev, stnkUrl: base64 }));
+      if (docType === 'stnkCar') setEditDriverForm((prev) => ({ ...prev, stnkCarUrl: base64 }));
     } catch (err) {
       alert('Gagal membaca gambar berkas: ' + err.message);
     }
@@ -1000,6 +1041,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
       bio: editDriverForm.bio.trim(),
 
       vehicleType: editDriverForm.vehicleType,
+      activeVehicleType: editDriverForm.activeVehicleType || (editDriverForm.vehicleType === 'mobil' ? 'mobil' : 'motor'),
       vehicleBrand: editDriverForm.vehicleBrand.trim(),
       vehicleModel: editDriverForm.vehicleModel.trim(),
       plateNumber: editDriverForm.plateNumber.toUpperCase().trim(),
@@ -1025,8 +1067,14 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
     if (editDriverForm.simUrl) {
       docUpdates.sim = { url: editDriverForm.simUrl, name: 'sim_document.jpg', verification_status: targetVerificationStatus === 'approved' ? 'approved' : 'pending' };
     }
+    if (editDriverForm.simAUrl) {
+      docUpdates.simA = { url: editDriverForm.simAUrl, name: 'simA_document.jpg', verification_status: targetVerificationStatus === 'approved' ? 'approved' : 'pending' };
+    }
     if (editDriverForm.stnkUrl) {
       docUpdates.stnk = { url: editDriverForm.stnkUrl, name: 'stnk_document.jpg', verification_status: targetVerificationStatus === 'approved' ? 'approved' : 'pending' };
+    }
+    if (editDriverForm.stnkCarUrl) {
+      docUpdates.stnkCar = { url: editDriverForm.stnkCarUrl, name: 'stnkCar_document.jpg', verification_status: targetVerificationStatus === 'approved' ? 'approved' : 'pending' };
     }
 
     setTimeout(() => {
@@ -1853,11 +1901,30 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 </td>
                                 <td className="tailadmin-td service-td">
                                   <div className="table-cell-meta">
-                                    <span className="table-primary-text">
-                                      {d.vehicleType === 'mobil' ? 'SheCar (Mobil)' : 'SheRide (Motor)'}
+                                    <span className="table-primary-text" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                      {d.vehicleType === 'both' || (d.motorData && d.carData) || (d.activeVehicleType && d.vehicleType && d.activeVehicleType !== d.vehicleType) ? (
+                                        <>
+                                          Multi-Armada
+                                          <span style={{
+                                            fontSize: 10.5,
+                                            padding: '1px 6px',
+                                            borderRadius: 6,
+                                            fontWeight: 700,
+                                            backgroundColor: isDriverUsingCar(d) ? '#EFF6FF' : '#FDF2F8',
+                                            color: isDriverUsingCar(d) ? '#1D4ED8' : '#DB2777',
+                                            border: isDriverUsingCar(d) ? '1px solid #BFDBFE' : '1px solid #FBCFE8'
+                                          }}>
+                                            Aktif: {isDriverUsingCar(d) ? 'Mobil' : 'Motor'}
+                                          </span>
+                                        </>
+                                      ) : isDriverUsingCar(d) ? (
+                                        'SheCar (Mobil)'
+                                      ) : (
+                                        'SheRide (Motor)'
+                                      )}
                                     </span>
                                     <span className="table-secondary-text">
-                                      {d.vehicleModel || (d.vehicleType === 'mobil' ? 'Mobil' : 'Motor')}
+                                      {d.vehicleModel || (isDriverUsingCar(d) ? 'Mobil' : 'Motor')}
                                       {d.plateNumber ? ` • ${d.plateNumber}` : ''}
                                       {d.vehicleColor ? ` (${d.vehicleColor})` : ''}
                                     </span>
@@ -2907,11 +2974,30 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                               </td>
                               <td className="tailadmin-td service-td">
                                 <div className="table-cell-meta">
-                                  <span className="table-primary-text">
-                                    {driver.vehicleType === 'mobil' ? 'SheCar (Mobil)' : 'SheRide (Motor)'}
+                                  <span className="table-primary-text" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                    {driver.vehicleType === 'both' || (driver.motorData && driver.carData) || (driver.activeVehicleType && driver.vehicleType && driver.activeVehicleType !== driver.vehicleType) ? (
+                                      <>
+                                        Multi-Armada
+                                        <span style={{
+                                          fontSize: 10.5,
+                                          padding: '1px 6px',
+                                          borderRadius: 6,
+                                          fontWeight: 700,
+                                          backgroundColor: isDriverUsingCar(driver) ? '#EFF6FF' : '#FDF2F8',
+                                          color: isDriverUsingCar(driver) ? '#1D4ED8' : '#DB2777',
+                                          border: isDriverUsingCar(driver) ? '1px solid #BFDBFE' : '1px solid #FBCFE8'
+                                        }}>
+                                          Aktif: {isDriverUsingCar(driver) ? 'Mobil' : 'Motor'}
+                                        </span>
+                                      </>
+                                    ) : isDriverUsingCar(driver) ? (
+                                      'SheCar (Mobil)'
+                                    ) : (
+                                      'SheRide (Motor)'
+                                    )}
                                   </span>
                                   <span className="table-secondary-text">
-                                    {driver.vehicleModel || (driver.vehicleType === 'mobil' ? 'Mobil' : 'Motor')}
+                                    {driver.vehicleModel || (isDriverUsingCar(driver) ? 'Mobil' : 'Motor')}
                                     {driver.plateNumber ? ` • ${driver.plateNumber}` : ''}
                                     {driver.vehicleColor ? ` (${driver.vehicleColor})` : ''}
                                   </span>
@@ -4335,6 +4421,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                         setAssignModalOrder(ord);
                                         setAssignDriverSearch('');
                                         setAssignVehicleFilter('recommended');
+                                        setAssignErrorMessage(null);
                                       }}
                                       style={{
                                         backgroundColor: isAssigned ? '#F1F5F9' : '#EE4335',
@@ -5142,38 +5229,96 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                       >
                         <option value="motor">SheRide (Sepeda Motor)</option>
                         <option value="mobil">SheCar (Mobil Penumpang)</option>
+                        <option value="both">Motor & Mobil (Multi-Armada)</option>
                       </select>
                     </div>
 
-                    <div className="minimal-field">
-                      <label>Merk Kendaraan</label>
-                      <input
-                        type="text"
-                        placeholder="Honda, Yamaha, Toyota..."
-                        value={editDriverForm.vehicleBrand}
-                        onChange={(e) => setEditDriverForm({ ...editDriverForm, vehicleBrand: e.target.value })}
-                      />
-                    </div>
+                    {editDriverForm.vehicleType === 'both' ? (
+                      <>
+                        <div className="minimal-field">
+                          <label>Armada Aktif Beroperasi</label>
+                          <select
+                            value={editDriverForm.activeVehicleType || 'motor'}
+                            onChange={(e) => setEditDriverForm({ ...editDriverForm, activeVehicleType: e.target.value })}
+                          >
+                            <option value="motor">Sepeda Motor (SheRide)</option>
+                            <option value="mobil">Mobil Penumpang (SheCar)</option>
+                          </select>
+                        </div>
 
-                    <div className="minimal-field">
-                      <label>Model & Tipe</label>
-                      <input
-                        type="text"
-                        placeholder="Scoopy, Fazzio, Calya..."
-                        value={editDriverForm.vehicleModel}
-                        onChange={(e) => setEditDriverForm({ ...editDriverForm, vehicleModel: e.target.value })}
-                      />
-                    </div>
+                        <div className="minimal-field">
+                          <label>Model Motor</label>
+                          <input
+                            type="text"
+                            placeholder="Scoopy, Beat, Vario..."
+                            value={editDriverForm.motorModel || ''}
+                            onChange={(e) => setEditDriverForm({ ...editDriverForm, motorModel: e.target.value })}
+                          />
+                        </div>
 
-                    <div className="minimal-field">
-                      <label>Plat Nomor</label>
-                      <input
-                        type="text"
-                        placeholder="DD 1234 XX"
-                        value={editDriverForm.plateNumber}
-                        onChange={(e) => setEditDriverForm({ ...editDriverForm, plateNumber: e.target.value.toUpperCase() })}
-                      />
-                    </div>
+                        <div className="minimal-field">
+                          <label>Plat Nomor Motor</label>
+                          <input
+                            type="text"
+                            placeholder="DD 1234 XX"
+                            value={editDriverForm.motorPlate || ''}
+                            onChange={(e) => setEditDriverForm({ ...editDriverForm, motorPlate: e.target.value.toUpperCase() })}
+                          />
+                        </div>
+
+                        <div className="minimal-field">
+                          <label>Model Mobil</label>
+                          <input
+                            type="text"
+                            placeholder="Avanza, Calya, Brio..."
+                            value={editDriverForm.carModel || ''}
+                            onChange={(e) => setEditDriverForm({ ...editDriverForm, carModel: e.target.value })}
+                          />
+                        </div>
+
+                        <div className="minimal-field">
+                          <label>Plat Nomor Mobil</label>
+                          <input
+                            type="text"
+                            placeholder="DD 5678 YY"
+                            value={editDriverForm.carPlate || ''}
+                            onChange={(e) => setEditDriverForm({ ...editDriverForm, carPlate: e.target.value.toUpperCase() })}
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="minimal-field">
+                          <label>Merk Kendaraan</label>
+                          <input
+                            type="text"
+                            placeholder="Honda, Yamaha, Toyota..."
+                            value={editDriverForm.vehicleBrand}
+                            onChange={(e) => setEditDriverForm({ ...editDriverForm, vehicleBrand: e.target.value })}
+                          />
+                        </div>
+
+                        <div className="minimal-field">
+                          <label>Model & Tipe</label>
+                          <input
+                            type="text"
+                            placeholder="Scoopy, Fazzio, Calya..."
+                            value={editDriverForm.vehicleModel}
+                            onChange={(e) => setEditDriverForm({ ...editDriverForm, vehicleModel: e.target.value })}
+                          />
+                        </div>
+
+                        <div className="minimal-field">
+                          <label>Plat Nomor</label>
+                          <input
+                            type="text"
+                            placeholder="DD 1234 XX"
+                            value={editDriverForm.plateNumber}
+                            onChange={(e) => setEditDriverForm({ ...editDriverForm, plateNumber: e.target.value.toUpperCase() })}
+                          />
+                        </div>
+                      </>
+                    )}
 
                     <div className="minimal-field">
                       <label>Warna Kendaraan</label>
@@ -5272,63 +5417,189 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                       </div>
                     </div>
 
-                    <div className="doc-row-minimal">
-                      <div className="doc-info-minimal">
-                        <span className="doc-name-minimal">Foto SIM Asli</span>
-                        <span className={`doc-status-badge ${editDriverForm.simUrl ? 'ready' : 'empty'}`}>
-                          {editDriverForm.simUrl ? 'Tersedia' : 'Belum Ada'}
-                        </span>
-                      </div>
-                      <div className="doc-actions-minimal">
-                        {editDriverForm.simUrl && (
-                          <button
-                            type="button"
-                            className="btn-doc-link-minimal"
-                            onClick={() => setPreviewDoc({ type: 'SIM', title: 'Foto SIM', url: editDriverForm.simUrl, driverName: editDriverForm.name })}
-                          >
-                            Lihat Foto
-                          </button>
-                        )}
-                        <label className="btn-doc-upload-minimal">
-                          <span>{editDriverForm.simUrl ? 'Ganti File' : 'Unggah File'}</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            style={{ display: 'none' }}
-                            onChange={(e) => handleDocFile('sim', e)}
-                          />
-                        </label>
-                      </div>
-                    </div>
+                    {editDriverForm.vehicleType === 'both' ? (
+                      <>
+                        {/* 2. Foto SIM C */}
+                        <div className="doc-row-minimal">
+                          <div className="doc-info-minimal">
+                            <span className="doc-name-minimal">Foto SIM C Asli (Motor)</span>
+                            <span className={`doc-status-badge ${editDriverForm.simUrl ? 'ready' : 'empty'}`}>
+                              {editDriverForm.simUrl ? 'Tersedia' : 'Belum Ada'}
+                            </span>
+                          </div>
+                          <div className="doc-actions-minimal">
+                            {editDriverForm.simUrl && (
+                              <button
+                                type="button"
+                                className="btn-doc-link-minimal"
+                                onClick={() => setPreviewDoc({ type: 'SIM C', title: 'Foto SIM C (Motor)', url: editDriverForm.simUrl, driverName: editDriverForm.name })}
+                              >
+                                Lihat Foto
+                              </button>
+                            )}
+                            <label className="btn-doc-upload-minimal">
+                              <span>{editDriverForm.simUrl ? 'Ganti File' : 'Unggah File'}</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                style={{ display: 'none' }}
+                                onChange={(e) => handleDocFile('sim', e)}
+                              />
+                            </label>
+                          </div>
+                        </div>
 
-                    <div className="doc-row-minimal">
-                      <div className="doc-info-minimal">
-                        <span className="doc-name-minimal">Foto STNK Kendaraan</span>
-                        <span className={`doc-status-badge ${editDriverForm.stnkUrl ? 'ready' : 'empty'}`}>
-                          {editDriverForm.stnkUrl ? 'Tersedia' : 'Belum Ada'}
-                        </span>
-                      </div>
-                      <div className="doc-actions-minimal">
-                        {editDriverForm.stnkUrl && (
-                          <button
-                            type="button"
-                            className="btn-doc-link-minimal"
-                            onClick={() => setPreviewDoc({ type: 'STNK', title: 'Foto STNK', url: editDriverForm.stnkUrl, driverName: editDriverForm.name })}
-                          >
-                            Lihat Foto
-                          </button>
-                        )}
-                        <label className="btn-doc-upload-minimal">
-                          <span>{editDriverForm.stnkUrl ? 'Ganti File' : 'Unggah File'}</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            style={{ display: 'none' }}
-                            onChange={(e) => handleDocFile('stnk', e)}
-                          />
-                        </label>
-                      </div>
-                    </div>
+                        {/* 3. Foto SIM A */}
+                        <div className="doc-row-minimal">
+                          <div className="doc-info-minimal">
+                            <span className="doc-name-minimal">Foto SIM A Asli (Mobil)</span>
+                            <span className={`doc-status-badge ${editDriverForm.simAUrl ? 'ready' : 'empty'}`}>
+                              {editDriverForm.simAUrl ? 'Tersedia' : 'Belum Ada'}
+                            </span>
+                          </div>
+                          <div className="doc-actions-minimal">
+                            {editDriverForm.simAUrl && (
+                              <button
+                                type="button"
+                                className="btn-doc-link-minimal"
+                                onClick={() => setPreviewDoc({ type: 'SIM A', title: 'Foto SIM A (Mobil)', url: editDriverForm.simAUrl, driverName: editDriverForm.name })}
+                              >
+                                Lihat Foto
+                              </button>
+                            )}
+                            <label className="btn-doc-upload-minimal">
+                              <span>{editDriverForm.simAUrl ? 'Ganti File' : 'Unggah File'}</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                style={{ display: 'none' }}
+                                onChange={(e) => handleDocFile('simA', e)}
+                              />
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* 4. Foto STNK Motor */}
+                        <div className="doc-row-minimal">
+                          <div className="doc-info-minimal">
+                            <span className="doc-name-minimal">Foto STNK Motor</span>
+                            <span className={`doc-status-badge ${editDriverForm.stnkUrl ? 'ready' : 'empty'}`}>
+                              {editDriverForm.stnkUrl ? 'Tersedia' : 'Belum Ada'}
+                            </span>
+                          </div>
+                          <div className="doc-actions-minimal">
+                            {editDriverForm.stnkUrl && (
+                              <button
+                                type="button"
+                                className="btn-doc-link-minimal"
+                                onClick={() => setPreviewDoc({ type: 'STNK Motor', title: 'Foto STNK Motor', url: editDriverForm.stnkUrl, driverName: editDriverForm.name })}
+                              >
+                                Lihat Foto
+                              </button>
+                            )}
+                            <label className="btn-doc-upload-minimal">
+                              <span>{editDriverForm.stnkUrl ? 'Ganti File' : 'Unggah File'}</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                style={{ display: 'none' }}
+                                onChange={(e) => handleDocFile('stnk', e)}
+                              />
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* 5. Foto STNK Mobil */}
+                        <div className="doc-row-minimal">
+                          <div className="doc-info-minimal">
+                            <span className="doc-name-minimal">Foto STNK Mobil</span>
+                            <span className={`doc-status-badge ${editDriverForm.stnkCarUrl ? 'ready' : 'empty'}`}>
+                              {editDriverForm.stnkCarUrl ? 'Tersedia' : 'Belum Ada'}
+                            </span>
+                          </div>
+                          <div className="doc-actions-minimal">
+                            {editDriverForm.stnkCarUrl && (
+                              <button
+                                type="button"
+                                className="btn-doc-link-minimal"
+                                onClick={() => setPreviewDoc({ type: 'STNK Mobil', title: 'Foto STNK Mobil', url: editDriverForm.stnkCarUrl, driverName: editDriverForm.name })}
+                              >
+                                Lihat Foto
+                              </button>
+                            )}
+                            <label className="btn-doc-upload-minimal">
+                              <span>{editDriverForm.stnkCarUrl ? 'Ganti File' : 'Unggah File'}</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                style={{ display: 'none' }}
+                                onChange={(e) => handleDocFile('stnkCar', e)}
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="doc-row-minimal">
+                          <div className="doc-info-minimal">
+                            <span className="doc-name-minimal">Foto {editDriverForm.vehicleType === 'mobil' ? 'SIM A' : 'SIM C'} Asli</span>
+                            <span className={`doc-status-badge ${editDriverForm.simUrl ? 'ready' : 'empty'}`}>
+                              {editDriverForm.simUrl ? 'Tersedia' : 'Belum Ada'}
+                            </span>
+                          </div>
+                          <div className="doc-actions-minimal">
+                            {editDriverForm.simUrl && (
+                              <button
+                                type="button"
+                                className="btn-doc-link-minimal"
+                                onClick={() => setPreviewDoc({ type: 'SIM', title: 'Foto SIM', url: editDriverForm.simUrl, driverName: editDriverForm.name })}
+                              >
+                                Lihat Foto
+                              </button>
+                            )}
+                            <label className="btn-doc-upload-minimal">
+                              <span>{editDriverForm.simUrl ? 'Ganti File' : 'Unggah File'}</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                style={{ display: 'none' }}
+                                onChange={(e) => handleDocFile('sim', e)}
+                              />
+                            </label>
+                          </div>
+                        </div>
+
+                        <div className="doc-row-minimal">
+                          <div className="doc-info-minimal">
+                            <span className="doc-name-minimal">Foto STNK Kendaraan</span>
+                            <span className={`doc-status-badge ${editDriverForm.stnkUrl ? 'ready' : 'empty'}`}>
+                              {editDriverForm.stnkUrl ? 'Tersedia' : 'Belum Ada'}
+                            </span>
+                          </div>
+                          <div className="doc-actions-minimal">
+                            {editDriverForm.stnkUrl && (
+                              <button
+                                type="button"
+                                className="btn-doc-link-minimal"
+                                onClick={() => setPreviewDoc({ type: 'STNK', title: 'Foto STNK', url: editDriverForm.stnkUrl, driverName: editDriverForm.name })}
+                              >
+                                Lihat Foto
+                              </button>
+                            )}
+                            <label className="btn-doc-upload-minimal">
+                              <span>{editDriverForm.stnkUrl ? 'Ganti File' : 'Unggah File'}</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                style={{ display: 'none' }}
+                                onChange={(e) => handleDocFile('stnk', e)}
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
@@ -5426,7 +5697,13 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
       {/* MODAL 8: PILIH & TUGASKAN MITRA DRIVER PADA PESANAN PELANGGAN     */}
       {/* ================================================================= */}
       {assignModalOrder && (
-        <div className="admin-modal-backdrop" onClick={() => setAssignModalOrder(null)}>
+        <div
+          className="admin-modal-backdrop"
+          onClick={() => {
+            setAssignModalOrder(null);
+            setAssignErrorMessage(null);
+          }}
+        >
           <div
             className="admin-modal-dialog assign-dialog-clean"
             onClick={(e) => e.stopPropagation()}
@@ -5444,7 +5721,10 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
               <button
                 type="button"
                 className="btn-close-dialog"
-                onClick={() => setAssignModalOrder(null)}
+                onClick={() => {
+                  setAssignModalOrder(null);
+                  setAssignErrorMessage(null);
+                }}
                 title="Tutup"
               >
                 <X size={18} />
@@ -5538,7 +5818,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                     onChange={(e) => setAssignVehicleFilter(e.target.value)}
                   >
                     <option value="recommended">Sesuai Armada</option>
-                    <option value="all">Semua Driver Aktif</option>
+                    <option value="all">Semua Armada</option>
                   </select>
                   <ChevronDown size={14} className="assign-select-icon" />
                 </div>
@@ -5553,16 +5833,12 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                   String(assignModalOrder.package_info?.vehicleType || '').toLowerCase().includes('mobil');
 
                 let candidateDrivers = approvedList.filter((d) => {
+                  const dIsCar = isDriverUsingCar(d);
                   if (assignVehicleFilter === 'recommended') {
-                    const dIsCar = (d.vehicleType || '').toLowerCase() === 'mobil';
                     return orderNeedsCar ? dIsCar : !dIsCar;
                   }
                   return true;
                 });
-
-                if (candidateDrivers.length === 0 && approvedList.length > 0 && assignVehicleFilter === 'recommended') {
-                  candidateDrivers = approvedList;
-                }
 
                 if (assignDriverSearch.trim()) {
                   const q = assignDriverSearch.toLowerCase().trim();
@@ -5609,15 +5885,24 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                 }
 
                 if (candidateDrivers.length === 0) {
+                  const expectedArmada = orderNeedsCar ? 'Mobil' : 'Motor';
                   return (
                     <div style={{ textAlign: 'center', padding: '24px 12px', color: '#64748B', fontSize: 13, backgroundColor: '#F8FAFC', borderRadius: 10 }}>
-                      Tidak ada driver aktif yang cocok dengan pencarian "{assignDriverSearch}".
+                      {assignDriverSearch.trim()
+                        ? `Tidak ada driver ${expectedArmada} aktif yang cocok dengan pencarian "${assignDriverSearch}".`
+                        : `Tidak ada mitra driver yang sedang aktif menggunakan armada ${expectedArmada}.`}
                     </div>
                   );
                 }
 
                 return (
                   <>
+                    {assignErrorMessage && (
+                      <div className="assign-error-banner" role="alert">
+                        <span>{assignErrorMessage}</span>
+                      </div>
+                    )}
+
                     <div
                       style={{
                         display: 'flex',
@@ -5642,10 +5927,16 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                         <span style={{ color: '#CBD5E1' }}>•</span>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#64748B', fontWeight: 600 }}>
                           <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: '#94A3B8' }} />
-                          {offlineCount} Istirahat
+                          {offlineCount} Istirahat / Off
                         </span>
                       </div>
                     </div>
+
+                    {onlineCount === 0 && offlineCount > 0 && (
+                      <div className="assign-offline-notice">
+                        Semua mitra driver saat ini sedang istirahat (off / tidak aktif). Penugasan hanya dapat dilakukan ke driver yang aktif <strong>Siap Terima Order</strong>.
+                      </div>
+                    )}
 
                     <div className="assign-drivers-list">
                       {candidateDrivers.map((drv) => {
@@ -5653,14 +5944,26 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                           assignModalOrder.assignment_status === 'assigned' &&
                           assignModalOrder.driver_id === drv.id;
 
-                        const isCar = (drv.vehicleType || '').toLowerCase() === 'mobil';
+                        const isBoth = (drv.vehicleType || '').toLowerCase() === 'both' || Boolean(drv.carData && drv.motorData);
+                        const isCar = isDriverUsingCar(drv);
                         const isDrvOnline = typeof drv.is_online === 'boolean' ? drv.is_online : true;
+                        const disabledAssignTitle = 'Tidak dapat ditugaskan: driver sedang istirahat (off / tidak aktif)';
+
+                        let displayPlate = drv.plateNumber || 'DD - MKS';
+                        let displayModel = drv.vehicleModel || (isCar ? 'Mobil' : 'Motor');
+
+                        if (isCar && drv.carData) {
+                          if (drv.carData.plateNumber) displayPlate = drv.carData.plateNumber;
+                          if (drv.carData.model) displayModel = drv.carData.model;
+                        } else if (!isCar && drv.motorData) {
+                          if (drv.motorData.plateNumber) displayPlate = drv.motorData.plateNumber;
+                          if (drv.motorData.model) displayModel = drv.motorData.model;
+                        }
 
                         return (
                           <div
                             key={drv.id}
-                            className={`assign-driver-card ${isCurrentlyAssigned ? 'is-assigned' : ''}`}
-                            style={!isDrvOnline && !isCurrentlyAssigned ? { opacity: 0.78 } : undefined}
+                            className={`assign-driver-card ${isCurrentlyAssigned ? 'is-assigned' : ''} ${!isDrvOnline ? 'is-offline' : ''}`}
                           >
                             <div className="assign-driver-left">
                               {drv.avatar ? (
@@ -5693,7 +5996,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 <div className="assign-driver-name-row" style={{ flexWrap: 'wrap' }}>
                                   <span className="assign-driver-name">{drv.name}</span>
                                   <span className={`assign-veh-badge ${isCar ? 'mobil' : 'motor'}`}>
-                                    {isCar ? 'Mobil' : 'Motor'}
+                                    {isBoth ? (isCar ? 'Mobil (Aktif)' : 'Motor (Aktif)') : (isCar ? 'Mobil' : 'Motor')}
                                   </span>
                                   <span
                                     style={{
@@ -5717,7 +6020,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                         backgroundColor: isDrvOnline ? '#10B981' : '#94A3B8'
                                       }}
                                     />
-                                    {isDrvOnline ? 'Siap Terima Order' : 'Istirahat'}
+                                    {isDrvOnline ? 'Siap Terima Order' : 'Istirahat · Off / Tidak Aktif'}
                                   </span>
                                   {isCurrentlyAssigned && (
                                     <span className="assign-status-assigned-pill">
@@ -5729,7 +6032,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                   )}
                                 </div>
                               <div className="assign-driver-meta-row">
-                                <span className="assign-plate-text">{drv.plateNumber || 'DD - MKS'}</span>
+                                <span className="assign-plate-text" title={displayModel}>
+                                  {displayPlate} {displayModel ? `• ${displayModel}` : ''}
+                                </span>
                                 <span className="assign-meta-divider">•</span>
                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                   <Phone size={11} strokeWidth={2} />
@@ -5742,6 +6047,11 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                   <span>{drv.operationalArea}</span>
                                 </div>
                               )}
+                              {!isDrvOnline && (
+                                <div className="assign-driver-offline-hint">
+                                  Tidak dapat ditugaskan saat driver sedang istirahat / off
+                                </div>
+                              )}
                             </div>
                           </div>
 
@@ -5751,8 +6061,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 <button
                                   type="button"
                                   className="btn-assign-icon-secondary"
+                                  disabled={!isDrvOnline}
                                   onClick={() => handleAssignDriverToOrder(assignModalOrder, drv, false)}
-                                  title="Tugaskan Ulang driver ini"
+                                  title={isDrvOnline ? 'Tugaskan Ulang driver ini' : disabledAssignTitle}
                                   aria-label="Tugaskan Ulang"
                                 >
                                   <RotateCw size={15} />
@@ -5760,8 +6071,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 <button
                                   type="button"
                                   className="btn-assign-icon-wa"
+                                  disabled={!isDrvOnline}
                                   onClick={() => handleAssignDriverToOrder(assignModalOrder, drv, true)}
-                                  title="Hubungi Driver & Kirim Info Pesanan via WhatsApp"
+                                  title={isDrvOnline ? 'Hubungi Driver & Kirim Info Pesanan via WhatsApp' : disabledAssignTitle}
                                   aria-label="Hubungi Driver via WhatsApp"
                                 >
                                   <MessageCircle size={16} />
@@ -5772,8 +6084,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 <button
                                   type="button"
                                   className="btn-assign-icon-primary"
+                                  disabled={!isDrvOnline}
                                   onClick={() => handleAssignDriverToOrder(assignModalOrder, drv, false)}
-                                  title="Tugaskan pesanan ke driver ini"
+                                  title={isDrvOnline ? 'Tugaskan pesanan ke driver ini' : disabledAssignTitle}
                                   aria-label="Tugaskan Driver"
                                 >
                                   <UserCheck size={16} strokeWidth={2.2} />
@@ -5781,8 +6094,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 <button
                                   type="button"
                                   className="btn-assign-icon-wa outline"
+                                  disabled={!isDrvOnline}
                                   onClick={() => handleAssignDriverToOrder(assignModalOrder, drv, true)}
-                                  title="Tugaskan & Kirim Langsung via WhatsApp"
+                                  title={isDrvOnline ? 'Tugaskan & Kirim Langsung via WhatsApp' : disabledAssignTitle}
                                   aria-label="Tugaskan dan kirim WhatsApp"
                                 >
                                   <MessageCircle size={15} />
@@ -5803,7 +6117,10 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
               <button
                 type="button"
                 className="btn-dialog-cancel"
-                onClick={() => setAssignModalOrder(null)}
+                onClick={() => {
+                  setAssignModalOrder(null);
+                  setAssignErrorMessage(null);
+                }}
               >
                 Tutup
               </button>

@@ -47,9 +47,9 @@ export default function ActivityOrderDetailView({
   // Akun Customer hanya dapat melihat rincian pesanan Pelanggan.
   // Akun Driver hanya dapat melihat rincian pesanan Driver.
   const isDriverView = Boolean(
-    initialIsDriver ||
-    currentUser?.role === 'driver' ||
-    order?.isDriver
+    typeof initialIsDriver === 'boolean'
+      ? initialIsDriver
+      : (currentUser?.role === 'driver' || order?.isDriver)
   );
 
   if (!order) return null;
@@ -74,10 +74,24 @@ export default function ActivityOrderDetailView({
       : currentDriverStep === 'picked_up'
       ? 2
       : 3;
+  const fare = Number(order.price || 15000);
   const deliveryFeeStr = order.deliveryFee || order.formattedPrice || formatRupiah(order.price || 9600);
   const totalEarningsStr = order.totalEarnings || order.formattedPrice || deliveryFeeStr;
   const isQrisPayment = String(order.paymentMethod || 'cash').toLowerCase() === 'qris';
-  const fareAmountStr = order.formattedPrice || formatRupiah(order.price || 15000);
+  const fareAmountStr = order.formattedPrice || formatRupiah(fare);
+
+  const netEarningsAmount = !isDelivered
+    ? 0
+    : order.totalEarningsAmount !== undefined
+    ? Number(order.totalEarningsAmount)
+    : Math.round((fare * 0.85) / 100) * 100;
+  const driverPlatformFeeAmount = !isDelivered
+    ? 0
+    : order.driverPlatformFee !== undefined
+    ? Number(order.driverPlatformFee)
+    : Math.max(0, fare - netEarningsAmount);
+  const driverPlatformFeeStr =
+    driverPlatformFeeAmount > 0 ? `-${formatRupiah(driverPlatformFeeAmount)}` : formatRupiah(0);
 
   // Tagihan tunai / Penyesuaian Driver matching format reference
   const cashCollectedStr = isQrisPayment
@@ -106,7 +120,6 @@ export default function ActivityOrderDetailView({
   };
 
   // Customer pricing breakdown
-  const fare = Number(order.price || 15000);
   const customerPricing = order.customerPricing || {
     tripFare: Math.max(0, fare - 2000),
     formattedTripFare: formatRupiah(Math.max(0, fare - 2000)),
@@ -496,9 +509,26 @@ export default function ActivityOrderDetailView({
                 </div>
 
                 <div className="section-data-row">
-                  <span className="data-row-label">Biaya Pengantaran</span>
-                  <span className="data-row-value">{deliveryFeeStr}</span>
+                  <span className="data-row-label">
+                    {isPackage ? 'Biaya Pengantaran' : 'Tarif Perjalanan'}
+                  </span>
+                  <span className="data-row-value">
+                    {isDelivered ? fareAmountStr : formatRupiah(0)}
+                  </span>
                 </div>
+
+                <div className="section-data-row">
+                  <span className="data-row-label">Biaya Platform</span>
+                  <span
+                    className={`data-row-value ${
+                      driverPlatformFeeAmount > 0 ? 'deduction' : ''
+                    }`}
+                  >
+                    {driverPlatformFeeStr}
+                  </span>
+                </div>
+
+                <div className="section-data-divider" />
 
                 <div className="section-data-row highlight">
                   <span className="data-row-label bold">Total Pendapatan</span>

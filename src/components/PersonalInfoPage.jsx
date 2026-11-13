@@ -33,11 +33,20 @@ export default function PersonalInfoPage({ initialData = {}, isDriver = false, o
   const [avatarUrl, setAvatarUrl] = useState(null);
 
   // 2. Data Kendaraan Mandiri Driver
-  const [vehicleType, setVehicleType] = useState('motor'); // 'motor' | 'mobil'
+  const [vehicleType, setVehicleType] = useState('motor'); // 'motor' | 'mobil' | 'both'
   const [vehicleBrand, setVehicleBrand] = useState('Honda');
   const [vehicleModelName, setVehicleModelName] = useState('');
   const [vehicleColor, setVehicleColor] = useState('');
   const [plateNumber, setPlateNumber] = useState('');
+
+  // Khusus Multi-Armada (Motor & Mobil)
+  const [motorModel, setMotorModel] = useState('');
+  const [motorColor, setMotorColor] = useState('');
+  const [motorPlate, setMotorPlate] = useState('');
+  const [carModel, setCarModel] = useState('');
+  const [carColor, setCarColor] = useState('');
+  const [carPlate, setCarPlate] = useState('');
+
   const [operationalArea, setOperationalArea] = useState('Makassar (Tamalate, Rappocini) & Gowa');
 
   // 3. Legalitas & Identitas Mandiri Driver
@@ -51,11 +60,13 @@ export default function PersonalInfoPage({ initialData = {}, isDriver = false, o
   const [emergencyContactName, setEmergencyContactName] = useState('');
   const [emergencyContactPhone, setEmergencyContactPhone] = useState('');
 
-  // 5. Berkas Dokumen (KTP, SIM, STNK)
+  // 5. Berkas Dokumen (KTP, SIM C, SIM A, STNK Motor, STNK Mobil)
   const [docs, setDocs] = useState({
     ktp: null,
-    sim: null,
-    stnk: null
+    sim: null,      // SIM C (atau SIM utama)
+    simA: null,     // SIM A (khusus mobil / both)
+    stnk: null,     // STNK Motor (atau STNK utama)
+    stnkCar: null   // STNK Mobil (khusus both)
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -67,7 +78,9 @@ export default function PersonalInfoPage({ initialData = {}, isDriver = false, o
   const fileInputRef = useRef(null);
   const ktpInputRef = useRef(null);
   const simInputRef = useRef(null);
+  const simAInputRef = useRef(null);
   const stnkInputRef = useRef(null);
+  const stnkCarInputRef = useRef(null);
   const errorBannerRef = useRef(null);
   const birthDateInputRef = useRef(null);
 
@@ -169,10 +182,32 @@ export default function PersonalInfoPage({ initialData = {}, isDriver = false, o
     setErrorMsg('');
     setBirthDateError(false);
 
-    const fullVehicleModel = vehicleModelName.trim();
-    const effectiveSim = vehicleType === 'mobil' 
+    const isBoth = vehicleType === 'both';
+    const isCarOnly = vehicleType === 'mobil';
+
+    const effMotorModel = isBoth ? motorModel.trim() : (isCarOnly ? '' : vehicleModelName.trim());
+    const effMotorColor = isBoth ? motorColor.trim() : (isCarOnly ? '' : vehicleColor.trim());
+    const effMotorPlate = isBoth ? motorPlate.toUpperCase().trim() : (isCarOnly ? '' : plateNumber.toUpperCase().trim());
+
+    const effCarModel = isBoth ? carModel.trim() : (isCarOnly ? vehicleModelName.trim() : '');
+    const effCarColor = isBoth ? carColor.trim() : (isCarOnly ? vehicleColor.trim() : '');
+    const effCarPlate = isBoth ? carPlate.toUpperCase().trim() : (isCarOnly ? plateNumber.toUpperCase().trim() : '');
+
+    const effectiveSim = isCarOnly 
       ? (simANumber.trim() || simNumber.trim()) 
       : (simNumber.trim() || simANumber.trim());
+
+    const fullVehicleModel = isBoth
+      ? `${effMotorModel || 'Motor'} & ${effCarModel || 'Mobil'}`
+      : (isCarOnly ? effCarModel : effMotorModel);
+
+    const effectivePlate = isBoth
+      ? (effMotorPlate || effCarPlate)
+      : (isCarOnly ? effCarPlate : effMotorPlate);
+
+    const effectiveColor = isBoth
+      ? (effMotorColor && effCarColor ? `${effMotorColor} / ${effCarColor}` : (effMotorColor || effCarColor))
+      : (isCarOnly ? effCarColor : effMotorColor);
 
     setTimeout(() => {
       setIsLoading(false);
@@ -189,11 +224,12 @@ export default function PersonalInfoPage({ initialData = {}, isDriver = false, o
           // Data Kendaraan & Legalitas Mandiri (khusus driver)
           vehicleData: isDriverRegistration
             ? {
-                vehicleType,
-                vehicleBrand: vehicleType === 'mobil' ? 'Mobil' : 'Motor',
+                vehicleType, // 'motor' | 'mobil' | 'both'
+                activeVehicleType: isCarOnly ? 'mobil' : 'motor',
+                vehicleBrand: isBoth ? 'Motor & Mobil' : (isCarOnly ? 'Mobil' : 'Motor'),
                 vehicleModel: fullVehicleModel,
-                vehicleColor,
-                plateNumber: plateNumber.toUpperCase().trim(),
+                vehicleColor: effectiveColor,
+                plateNumber: effectivePlate,
                 operationalArea,
                 nik: nik.trim(),
                 simNumber: effectiveSim,
@@ -202,7 +238,23 @@ export default function PersonalInfoPage({ initialData = {}, isDriver = false, o
                 simExpiry,
                 stnkExpiry,
                 emergencyContactName: emergencyContactName.trim(),
-                emergencyContactPhone: emergencyContactPhone ? formatStandardPhone(emergencyContactPhone) : ''
+                emergencyContactPhone: emergencyContactPhone ? formatStandardPhone(emergencyContactPhone) : '',
+                motorData: (vehicleType === 'motor' || isBoth) ? {
+                  type: 'motor',
+                  brand: 'Motor',
+                  model: effMotorModel,
+                  color: effMotorColor,
+                  plateNumber: effMotorPlate,
+                  simNumber: simNumber.trim()
+                } : null,
+                carData: (isCarOnly || isBoth) ? {
+                  type: 'mobil',
+                  brand: 'Mobil',
+                  model: effCarModel,
+                  color: effCarColor,
+                  plateNumber: effCarPlate,
+                  simNumber: simANumber.trim()
+                } : null
               }
             : null,
 
@@ -400,7 +452,7 @@ export default function PersonalInfoPage({ initialData = {}, isDriver = false, o
 
               {/* Tipe Kendaraan & Model */}
               <div className="personal-form-row">
-                <div className="personal-field-group">
+                <div className="personal-field-group" style={vehicleType === 'both' ? { gridColumn: 'span 2' } : {}}>
                   <label className="personal-field-label">Tipe Kendaraan</label>
                   <div className="personal-input-box">
                     <select
@@ -410,52 +462,156 @@ export default function PersonalInfoPage({ initialData = {}, isDriver = false, o
                     >
                       <option value="motor">Motor</option>
                       <option value="mobil">Mobil</option>
+                      <option value="both">Motor & Mobil (Keduanya)</option>
                     </select>
                   </div>
                 </div>
 
-                <div className="personal-field-group">
-                  <label className="personal-field-label">Model / Tipe</label>
-                  <div className="personal-input-box">
-                    <input
-                      type="text"
-                      className="personal-input-field"
-                      placeholder={vehicleType === 'mobil' ? 'Contoh: Avanza / Calya' : 'Contoh: Scoopy / Vario'}
-                      value={vehicleModelName}
-                      onChange={(e) => setVehicleModelName(e.target.value)}
-                    />
+                {vehicleType !== 'both' && (
+                  <div className="personal-field-group">
+                    <label className="personal-field-label">Model / Tipe</label>
+                    <div className="personal-input-box">
+                      <input
+                        type="text"
+                        className="personal-input-field"
+                        placeholder={vehicleType === 'mobil' ? 'Contoh: Avanza / Calya' : 'Contoh: Scoopy / Vario'}
+                        value={vehicleModelName}
+                        onChange={(e) => setVehicleModelName(e.target.value)}
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
-              {/* Warna & Plat Nomor */}
-              <div className="personal-form-row">
-                <div className="personal-field-group">
-                  <label className="personal-field-label">Warna Kendaraan</label>
-                  <div className="personal-input-box">
-                    <input
-                      type="text"
-                      className="personal-input-field"
-                      placeholder="Contoh: Matte Pink"
-                      value={vehicleColor}
-                      onChange={(e) => setVehicleColor(e.target.value)}
-                    />
+              {/* Warna & Plat Nomor (Jika Motor saja atau Mobil saja) */}
+              {vehicleType !== 'both' && (
+                <div className="personal-form-row">
+                  <div className="personal-field-group">
+                    <label className="personal-field-label">Warna Kendaraan</label>
+                    <div className="personal-input-box">
+                      <input
+                        type="text"
+                        className="personal-input-field"
+                        placeholder="Contoh: Matte Pink"
+                        value={vehicleColor}
+                        onChange={(e) => setVehicleColor(e.target.value)}
+                      />
+                    </div>
                   </div>
-                </div>
 
-                <div className="personal-field-group">
-                  <label className="personal-field-label">Plat Nomor Polisi</label>
-                  <div className="personal-input-box">
-                    <input
-                      type="text"
-                      className="personal-input-field uppercase-field"
-                      placeholder="DD 1234 XX"
-                      value={plateNumber}
-                      onChange={(e) => setPlateNumber(e.target.value.toUpperCase())}
-                    />
+                  <div className="personal-field-group">
+                    <label className="personal-field-label">Plat Nomor Polisi</label>
+                    <div className="personal-input-box">
+                      <input
+                        type="text"
+                        className="personal-input-field uppercase-field"
+                        placeholder="DD 1234 XX"
+                        value={plateNumber}
+                        onChange={(e) => setPlateNumber(e.target.value.toUpperCase())}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
+
+              {/* Tampilan jika Motor & Mobil (Keduanya) */}
+              {vehicleType === 'both' && (
+                <>
+                  <div className="personal-section-label" style={{ marginTop: 8 }}>
+                    <span>Data Motor</span>
+                  </div>
+
+                  <div className="personal-form-row">
+                    <div className="personal-field-group">
+                      <label className="personal-field-label">Model / Tipe Motor</label>
+                      <div className="personal-input-box">
+                        <input
+                          type="text"
+                          className="personal-input-field"
+                          placeholder="Contoh: Scoopy / Vario"
+                          value={motorModel}
+                          onChange={(e) => setMotorModel(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="personal-field-group">
+                      <label className="personal-field-label">Plat Nomor Polisi Motor</label>
+                      <div className="personal-input-box">
+                        <input
+                          type="text"
+                          className="personal-input-field uppercase-field"
+                          placeholder="DD 1234 XX"
+                          value={motorPlate}
+                          onChange={(e) => setMotorPlate(e.target.value.toUpperCase())}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="personal-form-row">
+                    <div className="personal-field-group" style={{ gridColumn: 'span 2' }}>
+                      <label className="personal-field-label">Warna Kendaraan Motor</label>
+                      <div className="personal-input-box">
+                        <input
+                          type="text"
+                          className="personal-input-field"
+                          placeholder="Contoh: Matte Pink"
+                          value={motorColor}
+                          onChange={(e) => setMotorColor(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="personal-section-label" style={{ marginTop: 8 }}>
+                    <span>Data Mobil</span>
+                  </div>
+
+                  <div className="personal-form-row">
+                    <div className="personal-field-group">
+                      <label className="personal-field-label">Model / Tipe Mobil</label>
+                      <div className="personal-input-box">
+                        <input
+                          type="text"
+                          className="personal-input-field"
+                          placeholder="Contoh: Avanza / Calya"
+                          value={carModel}
+                          onChange={(e) => setCarModel(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="personal-field-group">
+                      <label className="personal-field-label">Plat Nomor Polisi Mobil</label>
+                      <div className="personal-input-box">
+                        <input
+                          type="text"
+                          className="personal-input-field uppercase-field"
+                          placeholder="DD 5678 YY"
+                          value={carPlate}
+                          onChange={(e) => setCarPlate(e.target.value.toUpperCase())}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="personal-form-row">
+                    <div className="personal-field-group" style={{ gridColumn: 'span 2' }}>
+                      <label className="personal-field-label">Warna Kendaraan Mobil</label>
+                      <div className="personal-input-box">
+                        <input
+                          type="text"
+                          className="personal-input-field"
+                          placeholder="Contoh: Putih / Hitam"
+                          value={carColor}
+                          onChange={(e) => setCarColor(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
 
               {/* SECTION 3: IDENTITAS & LEGALITAS */}
               <div className="personal-section-label" style={{ marginTop: 12 }}>
@@ -482,20 +638,35 @@ export default function PersonalInfoPage({ initialData = {}, isDriver = false, o
               </div>
 
               {/* Nomor SIM C & SIM A */}
-              <div className="personal-form-row">
-                <div className="personal-field-group">
-                  <label className="personal-field-label">Nomor SIM C (Motor)</label>
-                  <div className="personal-input-box">
-                    <input
-                      type="text"
-                      className="personal-input-field"
-                      placeholder="Nomor SIM C"
-                      value={simNumber}
-                      onChange={(e) => setSimNumber(e.target.value)}
-                    />
+              {vehicleType === 'both' ? (
+                <div className="personal-form-row">
+                  <div className="personal-field-group">
+                    <label className="personal-field-label">Nomor SIM C (Motor)</label>
+                    <div className="personal-input-box">
+                      <input
+                        type="text"
+                        className="personal-input-field"
+                        placeholder="Nomor SIM C"
+                        value={simNumber}
+                        onChange={(e) => setSimNumber(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="personal-field-group">
+                    <label className="personal-field-label">Nomor SIM A (Mobil)</label>
+                    <div className="personal-input-box">
+                      <input
+                        type="text"
+                        className="personal-input-field"
+                        placeholder="Nomor SIM A"
+                        value={simANumber}
+                        onChange={(e) => setSimANumber(e.target.value)}
+                      />
+                    </div>
                   </div>
                 </div>
-
+              ) : vehicleType === 'mobil' ? (
                 <div className="personal-field-group">
                   <label className="personal-field-label">Nomor SIM A (Mobil)</label>
                   <div className="personal-input-box">
@@ -508,14 +679,27 @@ export default function PersonalInfoPage({ initialData = {}, isDriver = false, o
                     />
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="personal-field-group">
+                  <label className="personal-field-label">Nomor SIM C (Motor)</label>
+                  <div className="personal-input-box">
+                    <input
+                      type="text"
+                      className="personal-input-field"
+                      placeholder="Nomor SIM C"
+                      value={simNumber}
+                      onChange={(e) => setSimNumber(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* SECTION 4: UNGGAH DOKUMEN */}
               <div className="personal-docs-section">
                 <div className="personal-docs-header">
                   <h3 className="personal-docs-title">4. Unggah Berkas Dokumen Asli</h3>
                   <p className="personal-docs-desc">
-                    Foto KTP, SIM, dan STNK asli untuk verifikasi admin.
+                    Foto KTP, SIM, dan STNK asli untuk verifikasi admin OTWJek.
                   </p>
                 </div>
 
@@ -568,105 +752,304 @@ export default function PersonalInfoPage({ initialData = {}, isDriver = false, o
                   />
                 </div>
 
-                {/* 2. Foto SIM */}
-                <div className="personal-doc-item">
-                  <div className="personal-doc-label-row">
-                    <span className="personal-doc-name">
-                      2. Foto {vehicleType === 'motor' ? 'SIM C' : 'SIM A'} Asli
-                    </span>
-                    {docs.sim && (
-                      <span className="personal-doc-status-ok">
-                        <CheckCircle2 size={13} /> Terunggah
-                      </span>
-                    )}
-                  </div>
+                {/* DOKUMEN SIM: Kondisional Motor / Mobil / Keduanya */}
+                {vehicleType === 'both' ? (
+                  <>
+                    {/* 2. Foto SIM C (Motor) */}
+                    <div className="personal-doc-item">
+                      <div className="personal-doc-label-row">
+                        <span className="personal-doc-name">2. Foto SIM C Asli (Sepeda Motor)</span>
+                        {docs.sim && (
+                          <span className="personal-doc-status-ok">
+                            <CheckCircle2 size={13} /> Terunggah
+                          </span>
+                        )}
+                      </div>
+                      <div
+                        className={`personal-doc-upload-box ${docs.sim ? 'has-file' : ''}`}
+                        onClick={() => simInputRef.current?.click()}
+                      >
+                        {docs.sim ? (
+                          <div className="personal-doc-preview-wrapper">
+                            <img src={docs.sim.url} alt="Foto SIM C" className="personal-doc-preview-img" />
+                            <div className="personal-doc-preview-overlay">
+                              <span className="doc-overlay-text">Ganti Foto SIM C</span>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn-doc-remove"
+                              onClick={(e) => handleRemoveDoc('sim', e)}
+                              title="Hapus foto"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="personal-doc-placeholder">
+                            <ImageUp size={28} className="personal-doc-upload-icon" />
+                            <div className="doc-text-group">
+                              <span className="doc-upload-prompt">Klik untuk unggah foto SIM C</span>
+                              <span className="doc-upload-hint">SIM C masih dalam masa berlaku</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <input
+                        type="file"
+                        ref={simInputRef}
+                        onChange={(e) => handleDocUpload('sim', e)}
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                      />
+                    </div>
 
-                  <div
-                    className={`personal-doc-upload-box ${docs.sim ? 'has-file' : ''}`}
-                    onClick={() => simInputRef.current?.click()}
-                  >
-                    {docs.sim ? (
-                      <div className="personal-doc-preview-wrapper">
-                        <img src={docs.sim.url} alt="Foto SIM" className="personal-doc-preview-img" />
-                        <div className="personal-doc-preview-overlay">
-                          <span className="doc-overlay-text">Ganti Foto SIM</span>
-                        </div>
-                        <button
-                          type="button"
-                          className="btn-doc-remove"
-                          onClick={(e) => handleRemoveDoc('sim', e)}
-                          title="Hapus foto"
-                        >
-                          <X size={14} />
-                        </button>
+                    {/* 3. Foto SIM A (Mobil) */}
+                    <div className="personal-doc-item">
+                      <div className="personal-doc-label-row">
+                        <span className="personal-doc-name">3. Foto SIM A Asli (Mobil)</span>
+                        {docs.simA && (
+                          <span className="personal-doc-status-ok">
+                            <CheckCircle2 size={13} /> Terunggah
+                          </span>
+                        )}
                       </div>
-                    ) : (
-                      <div className="personal-doc-placeholder">
-                        <ImageUp size={28} className="personal-doc-upload-icon" />
-                        <div className="doc-text-group">
-                          <span className="doc-upload-prompt">Klik untuk unggah foto SIM</span>
-                          <span className="doc-upload-hint">SIM masih dalam masa berlaku</span>
-                        </div>
+                      <div
+                        className={`personal-doc-upload-box ${docs.simA ? 'has-file' : ''}`}
+                        onClick={() => simAInputRef.current?.click()}
+                      >
+                        {docs.simA ? (
+                          <div className="personal-doc-preview-wrapper">
+                            <img src={docs.simA.url} alt="Foto SIM A" className="personal-doc-preview-img" />
+                            <div className="personal-doc-preview-overlay">
+                              <span className="doc-overlay-text">Ganti Foto SIM A</span>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn-doc-remove"
+                              onClick={(e) => handleRemoveDoc('simA', e)}
+                              title="Hapus foto"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="personal-doc-placeholder">
+                            <ImageUp size={28} className="personal-doc-upload-icon" />
+                            <div className="doc-text-group">
+                              <span className="doc-upload-prompt">Klik untuk unggah foto SIM A</span>
+                              <span className="doc-upload-hint">SIM A masih dalam masa berlaku</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <input
-                    type="file"
-                    ref={simInputRef}
-                    onChange={(e) => handleDocUpload('sim', e)}
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                  />
-                </div>
+                      <input
+                        type="file"
+                        ref={simAInputRef}
+                        onChange={(e) => handleDocUpload('simA', e)}
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                      />
+                    </div>
 
-                {/* 3. Foto STNK */}
-                <div className="personal-doc-item">
-                  <div className="personal-doc-label-row">
-                    <span className="personal-doc-name">3. Foto STNK Kendaraan</span>
-                    {docs.stnk && (
-                      <span className="personal-doc-status-ok">
-                        <CheckCircle2 size={13} /> Terunggah
-                      </span>
-                    )}
-                  </div>
+                    {/* 4. Foto STNK Motor */}
+                    <div className="personal-doc-item">
+                      <div className="personal-doc-label-row">
+                        <span className="personal-doc-name">4. Foto STNK Motor</span>
+                        {docs.stnk && (
+                          <span className="personal-doc-status-ok">
+                            <CheckCircle2 size={13} /> Terunggah
+                          </span>
+                        )}
+                      </div>
+                      <div
+                        className={`personal-doc-upload-box ${docs.stnk ? 'has-file' : ''}`}
+                        onClick={() => stnkInputRef.current?.click()}
+                      >
+                        {docs.stnk ? (
+                          <div className="personal-doc-preview-wrapper">
+                            <img src={docs.stnk.url} alt="Foto STNK Motor" className="personal-doc-preview-img" />
+                            <div className="personal-doc-preview-overlay">
+                              <span className="doc-overlay-text">Ganti Foto STNK Motor</span>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn-doc-remove"
+                              onClick={(e) => handleRemoveDoc('stnk', e)}
+                              title="Hapus foto"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="personal-doc-placeholder">
+                            <ImageUp size={28} className="personal-doc-upload-icon" />
+                            <div className="doc-text-group">
+                              <span className="doc-upload-prompt">Klik untuk unggah foto STNK Motor</span>
+                              <span className="doc-upload-hint">Plat nomor dan data motor sesuai</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <input
+                        type="file"
+                        ref={stnkInputRef}
+                        onChange={(e) => handleDocUpload('stnk', e)}
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                      />
+                    </div>
 
-                  <div
-                    className={`personal-doc-upload-box ${docs.stnk ? 'has-file' : ''}`}
-                    onClick={() => stnkInputRef.current?.click()}
-                  >
-                    {docs.stnk ? (
-                      <div className="personal-doc-preview-wrapper">
-                        <img src={docs.stnk.url} alt="Foto STNK" className="personal-doc-preview-img" />
-                        <div className="personal-doc-preview-overlay">
-                          <span className="doc-overlay-text">Ganti Foto STNK</span>
-                        </div>
-                        <button
-                          type="button"
-                          className="btn-doc-remove"
-                          onClick={(e) => handleRemoveDoc('stnk', e)}
-                          title="Hapus foto"
-                        >
-                          <X size={14} />
-                        </button>
+                    {/* 5. Foto STNK Mobil */}
+                    <div className="personal-doc-item">
+                      <div className="personal-doc-label-row">
+                        <span className="personal-doc-name">5. Foto STNK Mobil</span>
+                        {docs.stnkCar && (
+                          <span className="personal-doc-status-ok">
+                            <CheckCircle2 size={13} /> Terunggah
+                          </span>
+                        )}
                       </div>
-                    ) : (
-                      <div className="personal-doc-placeholder">
-                        <ImageUp size={28} className="personal-doc-upload-icon" />
-                        <div className="doc-text-group">
-                          <span className="doc-upload-prompt">Klik untuk unggah foto STNK</span>
-                          <span className="doc-upload-hint">Plat nomor dan jenis kendaraan sesuai</span>
-                        </div>
+                      <div
+                        className={`personal-doc-upload-box ${docs.stnkCar ? 'has-file' : ''}`}
+                        onClick={() => stnkCarInputRef.current?.click()}
+                      >
+                        {docs.stnkCar ? (
+                          <div className="personal-doc-preview-wrapper">
+                            <img src={docs.stnkCar.url} alt="Foto STNK Mobil" className="personal-doc-preview-img" />
+                            <div className="personal-doc-preview-overlay">
+                              <span className="doc-overlay-text">Ganti Foto STNK Mobil</span>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn-doc-remove"
+                              onClick={(e) => handleRemoveDoc('stnkCar', e)}
+                              title="Hapus foto"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="personal-doc-placeholder">
+                            <ImageUp size={28} className="personal-doc-upload-icon" />
+                            <div className="doc-text-group">
+                              <span className="doc-upload-prompt">Klik untuk unggah foto STNK Mobil</span>
+                              <span className="doc-upload-hint">Plat nomor dan data mobil sesuai</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <input
-                    type="file"
-                    ref={stnkInputRef}
-                    onChange={(e) => handleDocUpload('stnk', e)}
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                  />
-                </div>
+                      <input
+                        type="file"
+                        ref={stnkCarInputRef}
+                        onChange={(e) => handleDocUpload('stnkCar', e)}
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Foto SIM Tunggal (SIM C atau SIM A) */}
+                    <div className="personal-doc-item">
+                      <div className="personal-doc-label-row">
+                        <span className="personal-doc-name">
+                          2. Foto {vehicleType === 'motor' ? 'SIM C' : 'SIM A'} Asli
+                        </span>
+                        {docs.sim && (
+                          <span className="personal-doc-status-ok">
+                            <CheckCircle2 size={13} /> Terunggah
+                          </span>
+                        )}
+                      </div>
+
+                      <div
+                        className={`personal-doc-upload-box ${docs.sim ? 'has-file' : ''}`}
+                        onClick={() => simInputRef.current?.click()}
+                      >
+                        {docs.sim ? (
+                          <div className="personal-doc-preview-wrapper">
+                            <img src={docs.sim.url} alt="Foto SIM" className="personal-doc-preview-img" />
+                            <div className="personal-doc-preview-overlay">
+                              <span className="doc-overlay-text">Ganti Foto SIM</span>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn-doc-remove"
+                              onClick={(e) => handleRemoveDoc('sim', e)}
+                              title="Hapus foto"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="personal-doc-placeholder">
+                            <ImageUp size={28} className="personal-doc-upload-icon" />
+                            <div className="doc-text-group">
+                              <span className="doc-upload-prompt">Klik untuk unggah foto SIM</span>
+                              <span className="doc-upload-hint">SIM masih dalam masa berlaku</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <input
+                        type="file"
+                        ref={simInputRef}
+                        onChange={(e) => handleDocUpload('sim', e)}
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                      />
+                    </div>
+
+                    {/* Foto STNK Tunggal */}
+                    <div className="personal-doc-item">
+                      <div className="personal-doc-label-row">
+                        <span className="personal-doc-name">3. Foto STNK Kendaraan</span>
+                        {docs.stnk && (
+                          <span className="personal-doc-status-ok">
+                            <CheckCircle2 size={13} /> Terunggah
+                          </span>
+                        )}
+                      </div>
+
+                      <div
+                        className={`personal-doc-upload-box ${docs.stnk ? 'has-file' : ''}`}
+                        onClick={() => stnkInputRef.current?.click()}
+                      >
+                        {docs.stnk ? (
+                          <div className="personal-doc-preview-wrapper">
+                            <img src={docs.stnk.url} alt="Foto STNK" className="personal-doc-preview-img" />
+                            <div className="personal-doc-preview-overlay">
+                              <span className="doc-overlay-text">Ganti Foto STNK</span>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn-doc-remove"
+                              onClick={(e) => handleRemoveDoc('stnk', e)}
+                              title="Hapus foto"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="personal-doc-placeholder">
+                            <ImageUp size={28} className="personal-doc-upload-icon" />
+                            <div className="doc-text-group">
+                              <span className="doc-upload-prompt">Klik untuk unggah foto STNK</span>
+                              <span className="doc-upload-hint">Plat nomor dan jenis kendaraan sesuai</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <input
+                        type="file"
+                        ref={stnkInputRef}
+                        onChange={(e) => handleDocUpload('stnk', e)}
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
             </>
           )}

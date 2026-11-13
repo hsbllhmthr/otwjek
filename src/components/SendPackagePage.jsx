@@ -128,10 +128,10 @@ export default function SendPackagePage({
   onSelectDestination,
   onSelectPickup,
   timeMode = 'now',
-  userLocation = 'Current location'
+  userLocation = 'Lokasi saat ini'
 }) {
   const [pickupQuery, setPickupQuery] = useState(
-    userLocation && userLocation !== 'Current location'
+    userLocation && userLocation !== 'Lokasi saat ini'
       ? userLocation
       : 'B/15, Graha Sejahtera Residence'
   );
@@ -154,7 +154,7 @@ export default function SendPackagePage({
 
   // Sync pickupQuery whenever userLocation changes (e.g. returning from map pickup selection)
   useEffect(() => {
-    if (userLocation && userLocation !== 'Current location') {
+    if (userLocation && userLocation !== 'Lokasi saat ini') {
       setPickupQuery(userLocation);
     }
   }, [userLocation]);
@@ -208,8 +208,8 @@ export default function SendPackagePage({
   const handleSwapLocations = () => {
     const tempPickup = pickupQuery;
     const tempDest = searchQuery;
-    setPickupQuery(tempDest || 'Current location');
-    setSearchQuery(tempPickup === 'Current location' ? '' : tempPickup);
+    setPickupQuery(tempDest || 'Lokasi saat ini');
+    setSearchQuery(tempPickup === 'Lokasi saat ini' ? '' : tempPickup);
     showToast('🔄 Titik ambil barang dan titik antar berhasil ditukar');
   };
 
@@ -268,14 +268,14 @@ export default function SendPackagePage({
             <ArrowLeft size={19} color="#1F2937" strokeWidth={2.4} />
           </button>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <h1 className="whereto-ref2-title" style={{ fontSize: 19 }}>Where to send the package?</h1>
+            <h1 className="whereto-ref2-title" style={{ fontSize: 19 }}>Mau kirim paket ke mana?</h1>
           </div>
         </div>
       </div>
 
       {/* Main Content Sheet */}
       <div className="whereto-ref2-sheet">
-        <div className="whereto-ref2-subtitle">Enter pickup and delivery points</div>
+        <div className="whereto-ref2-subtitle">Masukkan titik pengambilan dan pengantaran paket</div>
 
         {/* Route Input Card */}
         <div className="whereto-ref2-route-card">
@@ -311,21 +311,21 @@ export default function SendPackagePage({
                   onChange={(e) => handlePickupChange(e.target.value)}
                   onFocus={() => {
                     setActiveField('pickup');
-                    if (pickupQuery === 'Current location') {
+                    if (pickupQuery === 'Lokasi saat ini') {
                       setPickupQuery('');
                       setSearchResults([]);
                     }
                   }}
                   onClick={() => {
                     setActiveField('pickup');
-                    if (pickupQuery === 'Current location') {
+                    if (pickupQuery === 'Lokasi saat ini') {
                       setPickupQuery('');
                       setSearchResults([]);
                     }
                   }}
                   onBlur={() => {
                     if (!pickupQuery || !pickupQuery.trim()) {
-                      setPickupQuery('Current location');
+                      setPickupQuery('Lokasi saat ini');
                     }
                   }}
                   onKeyDown={(e) => {
@@ -340,8 +340,8 @@ export default function SendPackagePage({
                       destinationInputRef.current?.focus();
                     }
                   }}
-                  placeholder="Pick up item at?"
-                  aria-label="Pick up item at"
+                  placeholder="Ambil paket di mana?"
+                  aria-label="Titik Pengambilan Paket"
                 />
               </div>
 
@@ -368,8 +368,8 @@ export default function SendPackagePage({
                       });
                     }
                   }}
-                  placeholder="Deliver to?"
-                  aria-label="Deliver to"
+                  placeholder="Antar paket ke mana?"
+                  aria-label="Titik Pengantaran Paket"
                 />
               </div>
             </div>
@@ -381,7 +381,7 @@ export default function SendPackagePage({
             className="whereto-ref2-swap-btn"
             onClick={handleSwapLocations}
             title="Tukar titik ambil barang dan titik antar"
-            aria-label="Swap locations"
+            aria-label="Tukar lokasi"
           >
             <ArrowUpDown size={14} color="#6366F1" />
           </button>
@@ -395,7 +395,7 @@ export default function SendPackagePage({
             onClick={() => onOpenMap && onOpenMap(activeField || 'destination')}
           >
             <GreenFoldedMapIcon size={16} />
-            <span>Select on map</span>
+            <span>Pilih lewat peta</span>
           </button>
 
           <button
@@ -404,7 +404,7 @@ export default function SendPackagePage({
             onClick={handleAddDestination}
           >
             <PurplePlusCircleIcon size={18} />
-            <span>Add destination</span>
+            <span>Tambah tujuan</span>
           </button>
         </div>
 

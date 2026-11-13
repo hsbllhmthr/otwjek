@@ -105,7 +105,9 @@ test('Seam 4: OTWJek Kirim Paket Booking Message Formatter', () => {
   assert.ok(message.includes('Titip di meja resepsionis lantai 1'));
 });
 
-import { normalizePhone, formatStandardPhone } from '../src/services/dbService.js';
+import dbService, { normalizePhone, formatStandardPhone } from '../src/services/dbService.js';
+import { getPortalFromLocation, getPortalMeta } from '../src/utils/pwaPortal.js';
+import { readFileSync } from 'node:fs';
 
 test('Seam 5: Phone Number Normalization and Standard Formatting', () => {
   // Test berbagai variasi input nomor telepon Indonesia
@@ -120,6 +122,96 @@ test('Seam 5: Phone Number Normalization and Standard Formatting', () => {
   assert.equal(formatStandardPhone('081234567890'), '+6281234567890');
   assert.equal(formatStandardPhone('+62081234567890'), '+6281234567890');
   assert.equal(formatStandardPhone('81234567890'), '+6281234567890');
+});
+
+test('Seam 6: Driver Istirahat/Offline Guards Admin Assignment', () => {
+  const store = new Map();
+  const prevStorage = globalThis.localStorage;
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+    clear: () => store.clear()
+  };
+
+  try {
+    const reg = dbService.drivers.registerDriver(
+      { fullName: 'Siti Driver', phone: '081200001111' },
+      { vehicleType: 'motor', vehicleModel: 'Honda Beat', plateNumber: 'DD 1234 AB' }
+    );
+    const driverId = reg.driver.id;
+
+    const booking = dbService.bookings.create({
+      customerName: 'Pelanggan Uji',
+      customerPhone: '081299998888',
+      serviceType: 'motor',
+      pickupName: 'Mall Panakkukang',
+      dropoffName: 'Pantai Losari',
+      fareAmount: 17000
+    });
+
+    // 1. Driver pending tidak boleh bisa di-set online atau ditugaskan
+    const whilePending = dbService.drivers.setOnlineStatus(driverId, true);
+    assert.equal(whilePending.is_online, false);
+    assert.equal(dbService.bookings.assignDriver(booking.id, whilePending, 'Admin'), null);
+
+    // 2. Setelah disetujui admin namun masih istirahat (is_online: false), penugasan tetap ditolak
+    dbService.drivers.approveDriver(driverId, 'Admin');
+    const restingDriver = dbService.drivers.setOnlineStatus(driverId, false);
+    assert.equal(restingDriver.is_online, false);
+    assert.equal(dbService.bookings.assignDriver(booking.id, restingDriver, 'Admin'), null);
+
+    // 3. Meski objek driver stale (is_online: true) dikirim ke assignDriver, storage terbaru (is_online: false) tetap menolak
+    const staleDriverPayload = { ...restingDriver, is_online: true };
+    assert.equal(dbService.bookings.assignDriver(booking.id, staleDriverPayload, 'Admin'), null);
+
+    // 4. Ketika driver mengaktifkan status Siap Terima Order (is_online: true), penugasan berhasil
+    const activeDriver = dbService.drivers.setOnlineStatus(driverId, true);
+    assert.equal(activeDriver.is_online, true);
+    const assignedBooking = dbService.bookings.assignDriver(booking.id, activeDriver, 'Admin');
+    assert.ok(assignedBooking);
+    assert.equal(assignedBooking.assignment_status, 'assigned');
+    assert.equal(assignedBooking.driver_id, driverId);
+  } finally {
+    if (prevStorage === undefined) {
+      delete globalThis.localStorage;
+    } else {
+      globalThis.localStorage = prevStorage;
+    }
+  }
+});
+
+test('Seam 7: Separate PWA Mini-App Metadata & Manifests for Customer, Driver, and Admin', () => {
+  assert.equal(getPortalFromLocation('/', ''), 'customer');
+  assert.equal(getPortalFromLocation('/driver', ''), 'driver');
+  assert.equal(getPortalFromLocation('/driver/', ''), 'driver');
+  assert.equal(getPortalFromLocation('/admin', ''), 'admin');
+  assert.equal(getPortalFromLocation('/admin/', ''), 'admin');
+
+  const custMeta = getPortalMeta('customer');
+  const drvMeta = getPortalMeta('driver');
+  const admMeta = getPortalMeta('admin');
+  assert.notEqual(custMeta.manifestHref, drvMeta.manifestHref);
+  assert.notEqual(drvMeta.manifestHref, admMeta.manifestHref);
+
+  const custManifest = JSON.parse(readFileSync(new URL('../public/manifest.webmanifest', import.meta.url), 'utf8'));
+  const drvManifest = JSON.parse(readFileSync(new URL('../public/manifest-driver.webmanifest', import.meta.url), 'utf8'));
+  const admManifest = JSON.parse(readFileSync(new URL('../public/manifest-admin.webmanifest', import.meta.url), 'utf8'));
+
+  assert.equal(custManifest.id, '/');
+  assert.equal(custManifest.start_url, '/');
+  assert.equal(custManifest.scope, '/');
+
+  assert.equal(drvManifest.id, '/driver');
+  assert.equal(drvManifest.start_url, '/driver');
+  assert.equal(drvManifest.scope, '/driver');
+
+  assert.equal(admManifest.id, '/admin');
+  assert.equal(admManifest.start_url, '/admin');
+  assert.equal(admManifest.scope, '/admin');
+
+  assert.equal(new Set([custManifest.id, drvManifest.id, admManifest.id]).size, 3);
+  assert.equal(new Set([custManifest.short_name, drvManifest.short_name, admManifest.short_name]).size, 3);
 });
 
 

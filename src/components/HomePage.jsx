@@ -152,11 +152,11 @@ export default function HomePage({
             onClick={() => onSelectService('where-to')}
             role="button"
             tabIndex={0}
-            aria-label="Where to?"
+            aria-label="Mau ke mana?"
           >
             <div className="where-to-left">
               <RedLocationPin size={22} />
-              <span className="where-to-placeholder">Where to?</span>
+              <span className="where-to-placeholder">Mau ke mana?</span>
             </div>
             <Search size={20} className="where-to-search-icon" />
           </div>
@@ -250,7 +250,7 @@ export default function HomePage({
               role="button"
               tabIndex={0}
             >
-              <h2 className="popular-card-title">Popular destinations</h2>
+              <h2 className="popular-card-title">Destinasi Populer</h2>
               <ChevronRight size={17} strokeWidth={2.4} className="popular-chevron" />
             </div>
 

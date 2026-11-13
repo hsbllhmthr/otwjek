@@ -49,8 +49,18 @@ function formatBookingToOrder(b) {
     : '11 Okt 2026';
 
   const fare = Number(b.fare_amount || 15000);
-  const deliveryFee = Number(b.delivery_fee || Math.round((fare * 0.85) / 100) * 100);
-  const totalEarnings = Number(b.total_earnings || deliveryFee);
+  const deliveryFee =
+    b.delivery_fee !== undefined && b.delivery_fee !== null
+      ? Number(b.delivery_fee)
+      : b.booking_status === 'cancelled'
+      ? 0
+      : Math.round((fare * 0.85) / 100) * 100;
+  const totalEarnings =
+    b.total_earnings !== undefined && b.total_earnings !== null
+      ? Number(b.total_earnings)
+      : deliveryFee;
+  const driverPlatformFee =
+    b.booking_status === 'cancelled' ? 0 : Math.max(0, fare - totalEarnings);
 
   const isQris = String(b.payment_method || 'cash').toLowerCase() === 'qris';
   const cashVal = isQris
@@ -140,8 +150,10 @@ function formatBookingToOrder(b) {
     serviceName: sName,
     price: fare,
     formattedPrice: formatRupiah(fare),
+    deliveryFeeAmount: deliveryFee,
     deliveryFee: formatRupiah(deliveryFee),
     totalEarningsAmount: totalEarnings,
+    driverPlatformFee,
     totalEarnings: formatRupiah(totalEarnings),
     cashCollected: cashVal < 0 ? `-${formatRupiah(Math.abs(cashVal))}` : formatRupiah(cashVal),
     adjustment: adjVal < 0 ? `-${formatRupiah(Math.abs(adjVal))}` : formatRupiah(adjVal),
@@ -216,7 +228,7 @@ export default function ActivityPage({ onBack, currentUser, isDriver }) {
   const dropdownRef = useRef(null);
 
   const activeUser = currentUser || dbService.session.getCurrentUser();
-  const isDriverView = Boolean(isDriver || activeUser?.role === 'driver');
+  const isDriverView = typeof isDriver === 'boolean' ? isDriver : Boolean(activeUser?.role === 'driver');
 
   // Ambil data pesanan dinamis langsung dari dbService khusus untuk akun yang aktif
   const loadBookings = useCallback(() => {

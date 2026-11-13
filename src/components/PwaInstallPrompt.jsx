@@ -2,13 +2,17 @@ import React, { useState, useEffect } from 'react';
 import './PwaInstallPrompt.css';
 import { Download, X, Share, PlusSquare, Sparkles, CheckCircle2 } from 'lucide-react';
 import otwjekLogo from '../assets/otwjek_logo.png';
+import { getPortalMeta } from '../utils/pwaPortal.js';
 
-export default function PwaInstallPrompt() {
+export default function PwaInstallPrompt({ portal = 'customer' }) {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showPrompt, setShowPrompt] = useState(false);
   const [isIos, setIsIos] = useState(false);
   const [showIosGuide, setShowIosGuide] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
+
+  const portalMeta = getPortalMeta(portal);
+  const dismissStorageKey = `otwjek_pwa_dismissed_${portalMeta.portal}`;
 
   useEffect(() => {
     // Cek apakah sudah berjalan di mode standalone (sudah diinstall)
@@ -18,12 +22,15 @@ export default function PwaInstallPrompt() {
 
     if (isStandalone) {
       setIsInstalled(true);
+      setShowPrompt(false);
       return;
     }
 
-    // Cek apakah user pernah menutup banner dalam sesi ini
-    const isDismissed = sessionStorage.getItem('otwjek_pwa_dismissed');
-    if (isDismissed) return;
+    // Cek apakah user pernah menutup banner pada portal ini dalam sesi ini
+    const isDismissed = sessionStorage.getItem(dismissStorageKey);
+    if (isDismissed) {
+      setShowPrompt(false);
+    }
 
     // Deteksi perangkat iOS (Safari)
     const userAgent = window.navigator.userAgent.toLowerCase();
@@ -34,29 +41,34 @@ export default function PwaInstallPrompt() {
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      setShowPrompt(true);
+      if (!sessionStorage.getItem(dismissStorageKey)) {
+        setShowPrompt(true);
+      }
     };
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
-    window.addEventListener('appinstalled', () => {
+    const handleAppInstalled = () => {
       setIsInstalled(true);
       setShowPrompt(false);
       setDeferredPrompt(null);
-    });
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
 
     // Untuk iOS jika belum standalone, tampilkan opsi setelah beberapa detik
-    if (isIosDevice && !isStandalone) {
-      const timer = setTimeout(() => {
+    let timer = null;
+    if (isIosDevice && !isStandalone && !isDismissed) {
+      timer = setTimeout(() => {
         setShowPrompt(true);
       }, 3000);
-      return () => clearTimeout(timer);
     }
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+      if (timer) clearTimeout(timer);
     };
-  }, []);
+  }, [dismissStorageKey]);
 
   const handleInstallClick = async () => {
     if (isIos) {
@@ -76,7 +88,7 @@ export default function PwaInstallPrompt() {
 
   const handleDismiss = () => {
     setShowPrompt(false);
-    sessionStorage.setItem('otwjek_pwa_dismissed', 'true');
+    sessionStorage.setItem(dismissStorageKey, 'true');
   };
 
   if (isInstalled || !showPrompt) return null;
@@ -84,19 +96,23 @@ export default function PwaInstallPrompt() {
   return (
     <>
       {/* Floating PWA Install Bar */}
-      <div className="pwa-install-banner" role="banner" aria-label="Instal Aplikasi OTWJek">
+      <div
+        className={`pwa-install-banner ${portalMeta.portal === 'admin' ? 'is-admin' : ''}`}
+        role="banner"
+        aria-label={`Instal ${portalMeta.appName}`}
+      >
         <div className="pwa-banner-content">
           <div className="pwa-banner-icon-wrap">
-            <img src={otwjekLogo} alt="OTWJek" className="pwa-banner-app-icon" />
+            <img src={otwjekLogo} alt={portalMeta.appName} className="pwa-banner-app-icon" />
           </div>
 
           <div className="pwa-banner-text">
             <div className="pwa-banner-title">
-              Pasang Aplikasi OTWJek
+              {portalMeta.installTitle}
               <Sparkles size={13} className="pwa-sparkle-icon" />
             </div>
             <div className="pwa-banner-subtitle">
-              Akses cepat tanpa browser & lebih hemat kuota
+              {portalMeta.installSubtitle}
             </div>
           </div>
         </div>
@@ -106,7 +122,7 @@ export default function PwaInstallPrompt() {
             type="button"
             className="btn-pwa-install"
             onClick={handleInstallClick}
-            aria-label="Instal Aplikasi"
+            aria-label={`Instal ${portalMeta.appName}`}
           >
             <Download size={15} />
             <span>Instal</span>
@@ -129,7 +145,7 @@ export default function PwaInstallPrompt() {
         <div className="pwa-ios-modal-backdrop" onClick={() => setShowIosGuide(false)}>
           <div className="pwa-ios-modal-sheet" onClick={(e) => e.stopPropagation()}>
             <div className="pwa-ios-modal-header">
-              <div className="pwa-ios-modal-title">Cara Pasang di iPhone / iPad</div>
+              <div className="pwa-ios-modal-title">Pasang {portalMeta.appName} di iPhone / iPad</div>
               <button
                 type="button"
                 className="btn-modal-close"
@@ -157,7 +173,7 @@ export default function PwaInstallPrompt() {
               <div className="pwa-step-item">
                 <div className="pwa-step-num">3</div>
                 <div className="pwa-step-desc">
-                  Ketuk <strong>&quot;Tambah&quot; (Add)</strong> di pojok kanan atas. Ikon aplikasi OTWJek akan langsung muncul di layar utama!
+                  Ketuk <strong>&quot;Tambah&quot; (Add)</strong> di pojok kanan atas. Ikon aplikasi <strong>{portalMeta.appName}</strong> akan langsung muncul di layar utama!
                 </div>
               </div>
             </div>

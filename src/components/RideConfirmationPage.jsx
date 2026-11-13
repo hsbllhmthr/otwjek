@@ -654,8 +654,8 @@ export default function RideConfirmationPage({
         {
           id: 'shesend-instant',
           name: 'Paket Instant',
-          eta: `${Math.min(5, Math.max(2, Math.round(actualDur * 0.3)))} mins away`,
-          capacity: 'Max 10 kg',
+          eta: `${Math.min(5, Math.max(2, Math.round(actualDur * 0.3)))} mnt lagi`,
+          capacity: 'Maks. 10 kg',
           price: baseSendInstantFare,
           hasDiscount: false,
           ComponentIcon: SheSendInstantBike3D
@@ -663,8 +663,8 @@ export default function RideConfirmationPage({
         {
           id: 'shesend-hemat',
           name: 'Paket Hemat',
-          eta: `${Math.min(6, Math.max(3, Math.round(actualDur * 0.35)))} mins away`,
-          capacity: 'Max 5 kg',
+          eta: `${Math.min(6, Math.max(3, Math.round(actualDur * 0.35)))} mnt lagi`,
+          capacity: 'Maks. 5 kg',
           price: baseSendHematFare,
           hasDiscount: true,
           ComponentIcon: SheSendHematBike3D
@@ -672,8 +672,8 @@ export default function RideConfirmationPage({
         {
           id: 'shesend-cargo',
           name: 'Paket Mobil',
-          eta: `${Math.min(7, Math.max(4, Math.round(actualDur * 0.45)))} mins away`,
-          capacity: 'Max 50 kg',
+          eta: `${Math.min(7, Math.max(4, Math.round(actualDur * 0.45)))} mnt lagi`,
+          capacity: 'Maks. 50 kg',
           price: baseSendCarFare,
           hasDiscount: false,
           ComponentIcon: SheSendCargo3D
@@ -683,8 +683,8 @@ export default function RideConfirmationPage({
         {
           id: 'standard-bike',
           name: 'Motor Standar',
-          eta: `${Math.min(5, Math.max(2, Math.round(actualDur * 0.3)))} mins away`,
-          capacity: '1',
+          eta: `${Math.min(5, Math.max(2, Math.round(actualDur * 0.3)))} mnt lagi`,
+          capacity: '1 org',
           price: standardBikePrice,
           hasDiscount: false,
           ComponentIcon: StandardBike3D
@@ -692,8 +692,8 @@ export default function RideConfirmationPage({
         {
           id: 'hemat-bike',
           name: 'Motor Hemat',
-          eta: `${Math.min(5, Math.max(2, Math.round(actualDur * 0.3)))} mins away`,
-          capacity: '1',
+          eta: `${Math.min(5, Math.max(2, Math.round(actualDur * 0.3)))} mnt lagi`,
+          capacity: '1 org',
           price: hematBikePrice,
           hasDiscount: true,
           ComponentIcon: HematBike3D
@@ -701,8 +701,8 @@ export default function RideConfirmationPage({
         {
           id: 'hemat-car',
           name: 'Mobil Hemat',
-          eta: `${Math.min(6, Math.max(3, Math.round(actualDur * 0.4)))} mins away`,
-          capacity: '4',
+          eta: `${Math.min(6, Math.max(3, Math.round(actualDur * 0.4)))} mnt lagi`,
+          capacity: '4 org',
           price: hematCarPrice,
           hasDiscount: true,
           ComponentIcon: HematCar3D
@@ -842,8 +842,8 @@ export default function RideConfirmationPage({
         className: 'leaflet-best-badge-wrapper',
         html: `
           <div class="map-badge-best leaflet-anchored-best">
-            <span class="badge-best-title">Best</span>
-            <span class="badge-best-meta">${calcDuration} min · ${calcDistance} km</span>
+            <span class="badge-best-title">Terbaik</span>
+            <span class="badge-best-meta">${calcDuration} mnt · ${calcDistance} km</span>
           </div>
         `,
         iconSize: [100, 42],
@@ -1022,7 +1022,7 @@ export default function RideConfirmationPage({
                 <Banknote size={15} color="#FF337F" />
               )}
             </div>
-            <span>{paymentMethod === 'qris' ? 'QRIS' : 'Cash'}</span>
+            <span>{paymentMethod === 'qris' ? 'QRIS' : 'Tunai'}</span>
           </button>
 
           <div className="payment-bar-divider" />
@@ -1033,7 +1033,7 @@ export default function RideConfirmationPage({
             onClick={() => showToast('🎟️ Promo "OTWJEK" diterapkan!')}
           >
             <Tag size={15} color="#6B7280" />
-            <span>Offers</span>
+            <span>Promo</span>
           </button>
 
           <div className="payment-bar-divider" />
@@ -1069,9 +1069,9 @@ export default function RideConfirmationPage({
               <span>Kirim Paket Sekarang · Rp{currentRide.price.toLocaleString('id-ID')}</span>
             </span>
           ) : paymentMethod === 'qris' ? (
-            <span>Book with QRIS · Rp{currentRide.price.toLocaleString('id-ID')}</span>
+            <span>Pesan dengan QRIS · Rp{currentRide.price.toLocaleString('id-ID')}</span>
           ) : (
-            <span>Book with cash · Rp{currentRide.price.toLocaleString('id-ID')}</span>
+            <span>Pesan dengan Tunai · Rp{currentRide.price.toLocaleString('id-ID')}</span>
           )}
         </button>
       </div>

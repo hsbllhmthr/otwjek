@@ -347,10 +347,21 @@
   letter-spacing: -0.1px;
 }
 
+.data-row-value.deduction {
+  color: #E11D48;
+  font-weight: 600;
+}
+
 .data-row-value.bold {
   color: #111827;
   font-weight: 700;
   font-size: 15px;
+}
+
+.section-data-divider {
+  height: 1px;
+  background-color: #F1F5F9;
+  width: 100%;
 }
 
 .section-data-row.highlight {
