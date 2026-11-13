@@ -1333,7 +1333,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
               type="button"
               className="btn-topbar-hamburger"
               onClick={() => {
-                if (window.innerWidth < 1024) {
+                if (window.innerWidth <= 1024) {
                   setSidebarOpen(!sidebarOpen);
                 } else {
                   setSidebarCollapsed(!sidebarCollapsed);
@@ -1344,6 +1344,11 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
             >
               <Menu size={18} />
             </button>
+            <div className="topbar-mobile-brand">
+              <img src={otwjekLogo} alt="OTWJek" className="topbar-mobile-logo" />
+              <span className="topbar-mobile-title">OTWJEK</span>
+              <span className="topbar-mobile-role">Admin</span>
+            </div>
           </div>
 
           <div className="topbar-right">
@@ -1869,7 +1874,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 }}
                                 title={`Klik untuk melihat detail ${d.name}`}
                               >
-                                <td className="tailadmin-td user-td">
+                                <td className="tailadmin-td user-td" data-label="Driver">
                                   <div className="table-user-cell">
                                     <div className={`table-user-avatar ${!d.avatar ? 'driver-initial-avatar' : ''}`}>
                                       {d.avatar ? (
@@ -1899,7 +1904,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                     </div>
                                   </div>
                                 </td>
-                                <td className="tailadmin-td service-td">
+                                <td className="tailadmin-td service-td" data-label="Layanan">
                                   <div className="table-cell-meta">
                                     <span className="table-primary-text" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                                       {d.vehicleType === 'both' || (d.motorData && d.carData) || (d.activeVehicleType && d.vehicleType && d.activeVehicleType !== d.vehicleType) ? (
@@ -1930,7 +1935,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                     </span>
                                   </div>
                                 </td>
-                                <td className="tailadmin-td area-td">
+                                <td className="tailadmin-td area-td" data-label="Wilayah">
                                   <div className="table-cell-meta">
                                     <span
                                       className="table-primary-text area-truncate"
@@ -1949,8 +1954,8 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                     </span>
                                   </div>
                                 </td>
-                                <td className="tailadmin-td status-td">
-                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 5 }}>
+                                <td className="tailadmin-td status-td" data-label="Status">
+                                  <div className="table-status-stack">
                                     <span className={`table-status-pill ${statusClass}`}>
                                       {statusLabel}
                                     </span>
@@ -1980,7 +1985,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                     </span>
                                   </div>
                                 </td>
-                                <td className="tailadmin-td action-td text-right">
+                                <td className="tailadmin-td action-td text-right" data-label="Aksi">
                                   <div className="table-action-group table-action-icons-row">
                                     <button
                                       type="button"
@@ -2337,7 +2342,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 onClick={() => setSelectedCustomerDetail(c)}
                                 title={`Klik untuk melihat detail ${c.full_name || 'Pelanggan'}`}
                               >
-                                <td className="tailadmin-td user-td">
+                                <td className="tailadmin-td user-td" data-label="Pelanggan">
                                   <div className="table-user-cell">
                                     <div className="table-user-avatar customer-initial-avatar">
                                       {c.avatar_url ? (
@@ -2366,13 +2371,13 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                     </div>
                                   </div>
                                 </td>
-                                <td className="tailadmin-td contact-td">
+                                <td className="tailadmin-td contact-td" data-label="Kontak">
                                   <div className="table-cell-meta">
                                     <span className="table-primary-text">{c.phone || '-'}</span>
                                     <span className="table-secondary-text">{c.email || 'Tanpa email'}</span>
                                   </div>
                                 </td>
-                                <td className="tailadmin-td area-td">
+                                <td className="tailadmin-td area-td" data-label="Aktivitas">
                                   <div className="table-cell-meta">
                                     <span className="table-primary-text">
                                       {orderCount > 0 ? `${orderCount}x Pesanan` : 'Pelanggan Baru'}
@@ -2382,12 +2387,12 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                     </span>
                                   </div>
                                 </td>
-                                <td className="tailadmin-td status-td">
+                                <td className="tailadmin-td status-td" data-label="Status">
                                   <span className={`table-status-pill ${statusClass}`}>
                                     {statusLabel}
                                   </span>
                                 </td>
-                                <td className="tailadmin-td action-td text-right">
+                                <td className="tailadmin-td action-td text-right" data-label="Aksi">
                                   <div className="table-action-group table-action-icons-row">
                                     <button
                                       type="button"
@@ -2930,7 +2935,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
 
                           return (
                             <tr key={driver.id} className="tailadmin-tr">
-                              <td className="tailadmin-td user-td">
+                              <td className="tailadmin-td user-td" data-label="Driver">
                                 <div className="table-user-cell">
                                   <div className={`table-user-avatar ${!driver.avatar ? 'driver-initial-avatar' : ''}`}>
                                     {driver.avatar ? (
@@ -2972,7 +2977,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                   </div>
                                 </div>
                               </td>
-                              <td className="tailadmin-td service-td">
+                              <td className="tailadmin-td service-td" data-label="Layanan">
                                 <div className="table-cell-meta">
                                   <span className="table-primary-text" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                                     {driver.vehicleType === 'both' || (driver.motorData && driver.carData) || (driver.activeVehicleType && driver.vehicleType && driver.activeVehicleType !== driver.vehicleType) ? (
@@ -3003,7 +3008,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                   </span>
                                 </div>
                               </td>
-                              <td className="tailadmin-td docs-td">
+                              <td className="tailadmin-td docs-td" data-label="Berkas">
                                 <span
                                   className={`table-status-pill docs-status-pill ${isDocsComplete ? 'active' : 'pending'}`}
                                   onClick={(e) => {
@@ -3028,7 +3033,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                   {isDocsComplete ? 'Dokumen Lengkap' : 'Belum Lengkap'}
                                 </span>
                               </td>
-                              <td className="tailadmin-td area-td">
+                              <td className="tailadmin-td area-td" data-label="Wilayah">
                                 <div className="table-cell-meta">
                                   <span
                                     className="table-primary-text area-truncate"
@@ -3047,8 +3052,8 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                   </span>
                                 </div>
                               </td>
-                              <td className="tailadmin-td status-td">
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 5 }}>
+                              <td className="tailadmin-td status-td" data-label="Status">
+                                <div className="table-status-stack">
                                   <span className={`table-status-pill ${statusClass}`}>
                                     {statusLabel}
                                   </span>
@@ -3078,7 +3083,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                   </span>
                                 </div>
                               </td>
-                              <td className="tailadmin-td action-td text-right">
+                              <td className="tailadmin-td action-td text-right" data-label="Aksi">
                                 <div className="table-action-group table-action-icons-row">
                                   <button
                                     type="button"
@@ -3312,7 +3317,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                 </button>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flex: 1, justifyContent: 'flex-end' }}>
+              <div className="dash-filter-right-controls">
                 <div className="assign-select-wrap">
                   <select
                     className="assign-select-filter"
@@ -3327,7 +3332,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                   <ChevronDown size={14} className="assign-select-icon" />
                 </div>
 
-                <div className="dash-search-box" style={{ minWidth: 260 }}>
+                <div className="dash-search-box wide">
                   <Search size={16} className="search-icon" />
                   <input
                     type="text"
@@ -3352,7 +3357,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
             <section className="dash-customer-list-section">
               <div className="overview-split-card tailadmin-table-card">
                 <div className="tailadmin-table-responsive">
-                  <table className="tailadmin-project-table">
+                  <table className="tailadmin-project-table mobile-hide-thead">
                     <thead>
                       <tr className="tailadmin-th-row">
                         <th className="tailadmin-th text-left">Kode & Waktu</th>
@@ -3401,9 +3406,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
 
                           return (
                             <tr key={ord.id} className="tailadmin-tr">
-                              <td className="tailadmin-td">
+                              <td className="tailadmin-td user-td" data-label="Pesanan">
                                 <div className="table-cell-meta">
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                                     <span style={{ fontWeight: 800, color: '#0F172A', fontSize: 13.5 }}>
                                       {orderCode}
                                     </span>
@@ -3428,26 +3433,24 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 </div>
                               </td>
 
-                              <td className="tailadmin-td">
+                              <td className="tailadmin-td" data-label="Pelanggan">
                                 <div className="table-cell-meta">
                                   <span className="table-primary-text">{ord.customer_name || 'Pelanggan OTWJek'}</span>
                                   <span className="table-secondary-text">{ord.customer_phone || '-'}</span>
                                 </div>
                               </td>
 
-                              <td className="tailadmin-td" style={{ maxWidth: 260 }}>
+                              <td className="tailadmin-td route-td" data-label="Rute" style={{ maxWidth: 260 }}>
                                 <div className="table-cell-meta">
                                   <span
-                                    className="table-primary-text"
-                                    style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                                    className="table-primary-text route-line-text"
                                     title={`Jemput: ${ord.pickup_name || '-'} (${ord.pickup_address || ''})`}
                                   >
                                     <MapPin size={12} color="#10B981" strokeWidth={2.5} style={{ flexShrink: 0, marginRight: 4 }} />
                                     {ord.pickup_name || 'Titik Jemput'}
                                   </span>
                                   <span
-                                    className="table-secondary-text"
-                                    style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                                    className="table-secondary-text route-line-text"
                                     title={`Tujuan: ${ord.dropoff_name || '-'} (${ord.dropoff_address || ''})`}
                                   >
                                     <MapPin size={12} color="#EF4444" strokeWidth={2.5} style={{ flexShrink: 0, marginRight: 4 }} />
@@ -3456,7 +3459,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 </div>
                               </td>
 
-                              <td className="tailadmin-td">
+                              <td className="tailadmin-td" data-label="Driver">
                                 {isAssigned ? (
                                   <div className="table-cell-meta">
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -3505,7 +3508,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 )}
                               </td>
 
-                              <td className="tailadmin-td">
+                              <td className="tailadmin-td" data-label="Tarif & Bayar">
                                 <div className="table-cell-meta">
                                   <span className="table-primary-text" style={{ fontWeight: 700 }}>
                                     {fareFormatted}
@@ -3516,7 +3519,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 </div>
                               </td>
 
-                              <td className="tailadmin-td text-center">
+                              <td className="tailadmin-td text-center" data-label="Status">
                                 {isCompleted ? (
                                   <span className="table-status-pill active" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                     <Check size={11} strokeWidth={2.5} /> Selesai
@@ -3536,7 +3539,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 )}
                               </td>
 
-                              <td className="tailadmin-td action-td text-right">
+                              <td className="tailadmin-td action-td text-right" data-label="Rincian">
                                 <button
                                   type="button"
                                   className="btn-table-icon-action"
@@ -3952,7 +3955,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                               onClick={() => setSelectedCustomerDetail(cust)}
                               title={`Klik untuk melihat detail ${cust.full_name || 'Pelanggan'}`}
                             >
-                              <td className="tailadmin-td user-td">
+                              <td className="tailadmin-td user-td" data-label="Pelanggan">
                                 <div className="table-user-cell">
                                   <div className="table-user-avatar customer-initial-avatar">
                                     {cust.avatar_url ? (
@@ -3981,7 +3984,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                   </div>
                                 </div>
                               </td>
-                              <td className="tailadmin-td contact-td">
+                              <td className="tailadmin-td contact-td" data-label="Kontak">
                                 <div className="table-cell-meta">
                                   <span className="table-primary-text">
                                     {cust.phone || '-'}
@@ -4001,7 +4004,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                   <span className="table-secondary-text">{cust.email || 'Tanpa email'}</span>
                                 </div>
                               </td>
-                              <td className="tailadmin-td area-td">
+                              <td className="tailadmin-td area-td" data-label="Aktivitas">
                                 <div className="table-cell-meta">
                                   <span className="table-primary-text">
                                     {orderCount > 0 ? `${orderCount}x Pesanan` : 'Pelanggan Baru'}
@@ -4011,12 +4014,12 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                   </span>
                                 </div>
                               </td>
-                              <td className="tailadmin-td status-td">
+                              <td className="tailadmin-td status-td" data-label="Status">
                                 <span className={`table-status-pill ${statusClass}`}>
                                   {statusLabel}
                                 </span>
                               </td>
-                              <td className="tailadmin-td action-td text-right">
+                              <td className="tailadmin-td action-td text-right" data-label="Aksi">
                                 <div className="table-action-group table-action-icons-row">
                                   <button
                                     type="button"
@@ -4202,7 +4205,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                 </button>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flex: 1, justifyContent: 'flex-end' }}>
+              <div className="dash-filter-right-controls">
                 <div className="assign-select-wrap">
                   <select
                     className="assign-select-filter"
@@ -4217,7 +4220,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                   <ChevronDown size={14} className="assign-select-icon" />
                 </div>
 
-                <div className="dash-search-box" style={{ minWidth: 260 }}>
+                <div className="dash-search-box wide">
                   <Search size={16} className="search-icon" />
                   <input
                     type="text"
@@ -4242,7 +4245,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
             <section className="dash-customer-list-section">
               <div className="overview-split-card tailadmin-table-card">
                 <div className="tailadmin-table-responsive">
-                  <table className="tailadmin-project-table">
+                  <table className="tailadmin-project-table mobile-hide-thead">
                     <thead>
                       <tr className="tailadmin-th-row">
                         <th className="tailadmin-th text-left">Kode & Layanan</th>
@@ -4291,9 +4294,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
 
                           return (
                             <tr key={ord.id} className="tailadmin-tr">
-                              <td className="tailadmin-td">
+                              <td className="tailadmin-td user-td" data-label="Kode & Layanan">
                                 <div className="table-cell-meta">
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                                     <span style={{ fontWeight: 800, color: '#EE4335', fontSize: 13.5 }}>
                                       {orderCode}
                                     </span>
@@ -4320,7 +4323,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 </div>
                               </td>
 
-                              <td className="tailadmin-td">
+                              <td className="tailadmin-td" data-label="Pelanggan">
                                 <div className="table-cell-meta">
                                   <span className="table-primary-text">
                                     {ord.customer_name || 'Pelanggan OTWJek'}
@@ -4334,19 +4337,17 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 </div>
                               </td>
 
-                              <td className="tailadmin-td" style={{ maxWidth: 280 }}>
+                              <td className="tailadmin-td route-td" data-label="Rute" style={{ maxWidth: 280 }}>
                                 <div className="table-cell-meta">
                                   <span
-                                    className="table-primary-text"
-                                    style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                                    className="table-primary-text route-line-text"
                                     title={`Jemput: ${ord.pickup_name || '-'} (${ord.pickup_address || ''})`}
                                   >
                                     <MapPin size={13} color="#10B981" strokeWidth={2.5} style={{ flexShrink: 0, marginRight: 5 }} />
                                     {ord.pickup_name || 'Titik Jemput'}
                                   </span>
                                   <span
-                                    className="table-secondary-text"
-                                    style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                                    className="table-secondary-text route-line-text"
                                     title={`Tujuan: ${ord.dropoff_name || '-'} (${ord.dropoff_address || ''})`}
                                   >
                                     <MapPin size={13} color="#EF4444" strokeWidth={2.5} style={{ flexShrink: 0, marginRight: 5 }} />
@@ -4355,7 +4356,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 </div>
                               </td>
 
-                              <td className="tailadmin-td">
+                              <td className="tailadmin-td" data-label="Mitra Driver">
                                 {isAssigned ? (
                                   <div className="table-cell-meta">
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -4412,7 +4413,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 )}
                               </td>
 
-                              <td className="tailadmin-td action-td text-right">
+                              <td className="tailadmin-td action-td text-right" data-label="Aksi Penugasan">
                                 {!isTaskCompleted && (
                                   <div className="table-action-group" style={{ justifyContent: 'flex-end', gap: 6 }}>
                                     <button
@@ -5903,23 +5904,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                       </div>
                     )}
 
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 8,
-                        padding: '7px 12px',
-                        borderRadius: 10,
-                        backgroundColor: '#F8FAFC',
-                        border: '1px solid #E2E8F0',
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: '#475569'
-                      }}
-                    >
+                    <div className="assign-readiness-summary">
                       <span>Status Kesiapan Driver:</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div className="assign-readiness-counts">
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#059669', fontWeight: 700 }}>
                           <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: '#10B981' }} />
                           {onlineCount} Siap Order
@@ -6170,31 +6157,11 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
         return (
           <div className="admin-modal-backdrop" onClick={() => setOrderDetailModalData(null)}>
             <div
-              className="admin-modal-dialog"
-              style={{
-                maxWidth: 480,
-                width: '95%',
-                borderRadius: 16,
-                overflow: 'hidden',
-                backgroundColor: '#FFFFFF',
-                boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)',
-                display: 'flex',
-                flexDirection: 'column',
-                maxHeight: '90vh'
-              }}
+              className="admin-modal-dialog order-detail-admin-dialog"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header Modal */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '16px 20px',
-                  borderBottom: '1px solid #F1F5F9',
-                  backgroundColor: '#FFFFFF'
-                }}
-              >
+              <div className="order-detail-admin-header">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0F172A' }}>
                     Rincian Pesanan
@@ -6211,7 +6178,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
               </div>
 
               {/* Body Modal: Exact Customer Receipt Flow matching reference */}
-              <div style={{ overflowY: 'auto', flex: 1, backgroundColor: '#FFFFFF' }}>
+              <div className="order-detail-admin-body">
                 <div className="customer-detail-flow">
                   {/* 1. Rute Perjalanan */}
                   <section className="customer-card-section">
@@ -6488,19 +6455,8 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
               </div>
 
               {/* Modal Footer Controls */}
-              <div
-                style={{
-                  padding: '14px 20px',
-                  backgroundColor: '#F8FAFC',
-                  borderTop: '1px solid #E2E8F0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 8,
-                  flexWrap: 'wrap'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div className="order-detail-admin-footer">
+                <div className="order-detail-admin-footer-actions">
                   {!isCustomerOrderCompleted(ord) && !isCustomerOrderCancelled(ord) && (
                     <>
                       <button

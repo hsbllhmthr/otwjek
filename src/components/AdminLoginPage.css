@@ -8,13 +8,15 @@
 
 .signin-page-viewport {
   width: 100%;
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   background-color: #F8FAFC;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 32px 16px;
+  padding: max(24px, env(safe-area-inset-top, 24px)) 16px max(24px, env(safe-area-inset-bottom, 24px));
   position: relative;
   box-sizing: border-box;
   font-family: -apple-system, BlinkMacSystemFont, 'Plus Jakarta Sans', Roboto, sans-serif;
@@ -241,10 +243,36 @@
   to { transform: rotate(360deg); }
 }
 
-/* Responsiveness for mobile screens */
+/* Responsiveness for tablet & mobile screens */
+@media (max-width: 768px) {
+  .signin-input {
+    font-size: 16px;
+  }
+}
+
 @media (max-width: 480px) {
+  .signin-page-viewport {
+    align-items: flex-start;
+    padding: max(20px, env(safe-area-inset-top, 20px)) 12px max(20px, env(safe-area-inset-bottom, 20px));
+  }
+
   .signin-card-container {
-    padding: 32px 20px 24px 20px;
-    border-radius: 20px;
+    padding: 28px 20px 22px;
+    border-radius: 18px;
+    margin: auto 0;
+  }
+
+  .signin-logo {
+    width: 58px;
+    height: 58px;
+    border-radius: 14px;
+  }
+
+  .signin-title {
+    font-size: 22px;
+  }
+
+  .signin-subtitle {
+    font-size: 13px;
   }
 }
