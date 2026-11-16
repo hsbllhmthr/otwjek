@@ -111,12 +111,12 @@ export default function ActivityOrderDetailView({
 
   // Driver details for customer view
   const driverInfo = order.driver || {
-    name: isCar ? 'Nurul Hidayah' : 'Siti Rahmawati',
-    rating: 4.9,
-    tripsCount: '1.250+ perjalanan',
-    vehicleModel: isCar ? 'Toyota Calya · Silver' : 'Honda Vario 160 · Hitam',
-    plateNumber: isCar ? 'DD 1289 AZ' : 'DD 4521 XY',
-    phone: '085255655084'
+    name: order.assignmentStatus === 'assigned' ? 'Mitra Driver OTWJek' : 'Menunggu Penugasan Admin',
+    rating: 5.0,
+    tripsCount: '-',
+    vehicleModel: isCar ? 'Layanan Mobil' : 'Layanan Motor',
+    plateNumber: '',
+    phone: ''
   };
 
   // Customer pricing breakdown
@@ -197,7 +197,8 @@ export default function ActivityOrderDetailView({
     setCustomerRatingSubmitted(true);
     showToast(`Terima kasih! Anda memberi rating ⭐ ${star}`);
     try {
-      const existing = JSON.parse(localStorage.getItem('otwjek_db_customer_ratings') || '[]');
+      const parsed = JSON.parse(localStorage.getItem('otwjek_db_customer_ratings') || '[]');
+      const existing = Array.isArray(parsed) ? parsed : [];
       existing.unshift({
         orderCode,
         orderNumber,

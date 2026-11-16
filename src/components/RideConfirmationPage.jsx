@@ -733,6 +733,7 @@ export default function RideConfirmationPage({
     }
 
     const map = mapInstanceRef.current;
+    let isCancelled = false;
 
     // Draw route polyline and attach dynamic markers
     const loadRouteAndPins = async () => {
@@ -752,6 +753,16 @@ export default function RideConfirmationPage({
         }
       } catch (err) {
         console.warn('OSRM route fallback used:', err);
+      }
+
+      if (
+        isCancelled ||
+        !mapInstanceRef.current ||
+        mapInstanceRef.current !== map ||
+        !map._panes?.overlayPane ||
+        !mapContainerRef.current
+      ) {
+        return;
       }
 
       setActualDist(calcDistance);
@@ -867,7 +878,7 @@ export default function RideConfirmationPage({
       });
 
       setTimeout(() => {
-        if (mapInstanceRef.current) {
+        if (!isCancelled && mapInstanceRef.current && mapInstanceRef.current === map && mapInstanceRef.current._container) {
           mapInstanceRef.current.invalidateSize();
         }
       }, 150);
@@ -876,6 +887,7 @@ export default function RideConfirmationPage({
     loadRouteAndPins();
 
     return () => {
+      isCancelled = true;
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;

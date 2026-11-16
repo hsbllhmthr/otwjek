@@ -367,6 +367,15 @@ export default function ProfilePage({ user: propUser, onBack, onLogout, isDriver
     }
   };
 
+  const getStoredDriverDocs = useCallback(() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('otwjek_db_driver_documents') || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }, []);
+
   const handleDocUpload = useCallback(async (docType, e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -376,9 +385,9 @@ export default function ProfilePage({ user: propUser, onBack, onLogout, isDriver
       setDocFiles((prev) => ({ ...prev, [docType]: docInfo }));
 
       // Persist ke localStorage driver documents
-      const storedDocs = JSON.parse(localStorage.getItem('otwjek_db_driver_documents') || '[]');
+      const storedDocs = getStoredDriverDocs();
       const existingIdx = storedDocs.findIndex(
-        (d) => d.driver_id === driverProfile?.id && d.document_type === docType
+        (d) => d && d.driver_id === driverProfile?.id && d.document_type === docType
       );
       const docEntry = {
         id: existingIdx >= 0 ? storedDocs[existingIdx].id : `doc-${Date.now()}`,
@@ -399,19 +408,19 @@ export default function ProfilePage({ user: propUser, onBack, onLogout, isDriver
       console.error('Error uploading doc:', err);
     }
     e.target.value = '';
-  }, [driverProfile]);
+  }, [driverProfile, getStoredDriverDocs]);
 
   const handleRemoveDoc = useCallback((docType, e) => {
     e.stopPropagation();
     setDocFiles((prev) => ({ ...prev, [docType]: null }));
     try {
-      const storedDocs = JSON.parse(localStorage.getItem('otwjek_db_driver_documents') || '[]');
+      const storedDocs = getStoredDriverDocs();
       const filtered = storedDocs.filter(
-        (d) => !(d.driver_id === driverProfile?.id && d.document_type === docType)
+        (d) => !(d && d.driver_id === driverProfile?.id && d.document_type === docType)
       );
       localStorage.setItem('otwjek_db_driver_documents', JSON.stringify(filtered));
     } catch (_) {}
-  }, [driverProfile]);
+  }, [driverProfile, getStoredDriverDocs]);
 
   // Cek per-dokumen apakah sudah diunggah
   const getDocStatus = useCallback((docType) => {
@@ -422,16 +431,14 @@ export default function ProfilePage({ user: propUser, onBack, onLogout, isDriver
       return { name: d.name || `${docType.toUpperCase()}.jpg`, url: d.url || d };
     }
     if (driverProfile?.id) {
-      try {
-        const storedDocs = JSON.parse(localStorage.getItem('otwjek_db_driver_documents') || '[]');
-        const found = storedDocs.find(
-          (d) => d.driver_id === driverProfile.id && d.document_type === docType && d.document_url
-        );
-        if (found) return { name: found.file_name || `${docType}.jpg`, url: found.document_url };
-      } catch (_) {}
+      const storedDocs = getStoredDriverDocs();
+      const found = storedDocs.find(
+        (d) => d && d.driver_id === driverProfile.id && d.document_type === docType && d.document_url
+      );
+      if (found) return { name: found.file_name || `${docType}.jpg`, url: found.document_url };
     }
     return null;
-  }, [docFiles, currentUser, driverProfile]);
+  }, [docFiles, currentUser, driverProfile, getStoredDriverDocs]);
 
   const handleAvatarBadgeClick = () => {
     avatarInputRef.current?.click();

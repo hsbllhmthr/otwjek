@@ -76,19 +76,25 @@ export function formatStandardPhone(phone) {
 
 
 function getStoredArray(key, defaultData = []) {
-  if (typeof localStorage === 'undefined') return defaultData;
+  const safeDefault = Array.isArray(defaultData) ? defaultData : [];
+  if (typeof localStorage === 'undefined') return safeDefault;
   try {
     const data = localStorage.getItem(key);
     if (!data) {
-      if (defaultData && defaultData.length > 0) {
-        localStorage.setItem(key, JSON.stringify(defaultData));
+      if (safeDefault.length > 0) {
+        localStorage.setItem(key, JSON.stringify(safeDefault));
       }
-      return defaultData;
+      return safeDefault;
     }
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    if (!Array.isArray(parsed)) {
+      localStorage.setItem(key, JSON.stringify(safeDefault));
+      return safeDefault;
+    }
+    return parsed;
   } catch (err) {
     console.error(`Error reading ${key} from storage:`, err);
-    return defaultData;
+    return safeDefault;
   }
 }
 
@@ -303,7 +309,11 @@ export function initializeLocalDatabase() {
 }
 
 // Inisialisasi saat file di-load
-initializeLocalDatabase();
+try {
+  initializeLocalDatabase();
+} catch (err) {
+  console.error('Error initializing local database on boot:', err);
+}
 
 export const dbService = {
   // ==========================================
@@ -1225,28 +1235,6 @@ export const dbService = {
         sessionUser?.name ||
         'Pelanggan OTWJek';
 
-      const defaultDriver = sType === 'mobil'
-        ? {
-            id: 'drv-calya-01',
-            name: 'Nurul Hidayah',
-            rating: 4.9,
-            tripsCount: '1.420+ perjalanan',
-            vehicleType: 'mobil',
-            vehicleModel: 'Toyota Calya (Silver)',
-            plateNumber: 'DD 1289 AZ',
-            phone: '085255655084'
-          }
-        : {
-            id: 'drv-vario-01',
-            name: 'Siti Rahmawati',
-            rating: 4.9,
-            tripsCount: '2.150+ perjalanan',
-            vehicleType: 'motor',
-            vehicleModel: 'Honda Vario 160 (Hitam)',
-            plateNumber: 'DD 4521 XY',
-            phone: '085255655084'
-          };
-
       const existingIdx = rideData.id ? bookings.findIndex((b) => b.id === rideData.id) : -1;
       const existingBooking = existingIdx !== -1 ? bookings[existingIdx] : null;
 
@@ -1257,39 +1245,50 @@ export const dbService = {
       );
 
       const sourceDriver = rideData.driver || (existingBooking?.assignment_status === 'assigned' ? existingBooking.driver : null);
+      const storedDrivers = getStoredArray(STORAGE_KEYS.DRIVERS, []);
+      const lookupDriverId = sourceDriver?.id || rideData.driverId || existingBooking?.driver_id;
+      const liveMatchedDriver = hasExplicitDriver && lookupDriverId
+        ? storedDrivers.find((d) => d && (d.id === lookupDriverId || d.user_id === lookupDriverId))
+        : null;
+      const effectiveSource = liveMatchedDriver || sourceDriver;
 
-      const assignedDriver = sourceDriver
+      const resolvedPlate = effectiveSource
+        ? effectiveSource.vehicleType === 'both'
+          ? sType === 'mobil'
+            ? effectiveSource.carData?.plateNumber || effectiveSource.plateNumber
+            : effectiveSource.motorData?.plateNumber || effectiveSource.plateNumber
+          : effectiveSource.plateNumber
+        : rideData.plateNumber || null;
+
+      const resolvedModel = effectiveSource
+        ? effectiveSource.vehicleType === 'both'
+          ? sType === 'mobil'
+            ? effectiveSource.carData?.model || effectiveSource.vehicleModel
+            : effectiveSource.motorData?.model || effectiveSource.vehicleModel
+          : effectiveSource.vehicleModel ||
+            `${effectiveSource.vehicleBrand || ''} ${effectiveSource.vehicleColor ? `(${effectiveSource.vehicleColor})` : ''}`.trim()
+        : rideData.vehicleModel || null;
+
+      const assignedDriver = hasExplicitDriver && effectiveSource
         ? {
-            id: sourceDriver.id || rideData.driverId || defaultDriver.id,
-            user_id: sourceDriver.user_id || existingBooking?.driver_user_id || null,
-            name: sourceDriver.name || rideData.driverName || defaultDriver.name,
-            rating: sourceDriver.rating || rideData.driverRating || defaultDriver.rating,
-            tripsCount: sourceDriver.tripsCount
-              ? typeof sourceDriver.tripsCount === 'number'
-                ? `${sourceDriver.tripsCount}+ perjalanan`
-                : sourceDriver.tripsCount
-              : defaultDriver.tripsCount,
-            vehicleType: sourceDriver.vehicleType || rideData.vehicleType || defaultDriver.vehicleType,
+            id: effectiveSource.id || rideData.driverId || null,
+            user_id: effectiveSource.user_id || existingBooking?.driver_user_id || null,
+            name: effectiveSource.name || rideData.driverName || 'Mitra Driver OTWJek',
+            rating: Number(effectiveSource.rating || rideData.driverRating || 5.0),
+            tripsCount: effectiveSource.tripsCount
+              ? typeof effectiveSource.tripsCount === 'number'
+                ? `${effectiveSource.tripsCount}+ perjalanan`
+                : effectiveSource.tripsCount
+              : 'Mitra Resmi',
+            vehicleType: effectiveSource.vehicleType || rideData.vehicleType || sType,
             vehicleModel:
-              sourceDriver.vehicleModel ||
-              `${sourceDriver.vehicleBrand || ''} ${sourceDriver.vehicleColor ? `(${sourceDriver.vehicleColor})` : ''}`.trim() ||
-              defaultDriver.vehicleModel,
-            plateNumber: sourceDriver.plateNumber || rideData.plateNumber || defaultDriver.plateNumber,
-            phone: sourceDriver.phone || rideData.driverPhone || defaultDriver.phone,
-            avatar: sourceDriver.avatar || null
+              resolvedModel ||
+              (sType === 'mobil' ? 'Mobil Mitra Resmi' : 'Motor Mitra Resmi'),
+            plateNumber: resolvedPlate || 'DD - MKS',
+            phone: effectiveSource.phone || rideData.driverPhone || '',
+            avatar: effectiveSource.avatar || null
           }
-        : {
-            id: rideData.driverId || defaultDriver.id,
-            user_id: null,
-            name: rideData.driverName || defaultDriver.name,
-            rating: rideData.driverRating || defaultDriver.rating,
-            tripsCount: rideData.driverTrips || defaultDriver.tripsCount,
-            vehicleType: rideData.vehicleType || defaultDriver.vehicleType,
-            vehicleModel: rideData.vehicleModel || defaultDriver.vehicleModel,
-            plateNumber: rideData.plateNumber || defaultDriver.plateNumber,
-            phone: rideData.driverPhone || defaultDriver.phone,
-            avatar: null
-          };
+        : null;
 
       const resolvedPickupName = rideData.pickup?.name || rideData.pickupName || 'Titik Penjemputan';
       const resolvedPickupAddress = rideData.pickup?.address || rideData.pickupAddress || resolvedPickupName;
@@ -1304,15 +1303,15 @@ export const dbService = {
         customer_id: resolvedCustomerId,
         customer_phone: resolvedCustomerPhone,
         customer_name: resolvedCustomerName,
-        driver_id: assignedDriver.id,
-        driver_user_id: assignedDriver.user_id || existingBooking?.driver_user_id || null,
-        driver_name: assignedDriver.name,
-        driver_phone: assignedDriver.phone,
-        driver_vehicle: assignedDriver.vehicleModel,
-        driver_plate: assignedDriver.plateNumber,
-        driver_rating: assignedDriver.rating,
+        driver_id: assignedDriver ? assignedDriver.id : null,
+        driver_user_id: assignedDriver ? assignedDriver.user_id || existingBooking?.driver_user_id || null : null,
+        driver_name: assignedDriver ? assignedDriver.name : null,
+        driver_phone: assignedDriver ? assignedDriver.phone : null,
+        driver_vehicle: assignedDriver ? assignedDriver.vehicleModel : null,
+        driver_plate: assignedDriver ? assignedDriver.plateNumber : null,
+        driver_rating: assignedDriver ? assignedDriver.rating : null,
         driver: assignedDriver,
-        assignment_status: hasExplicitDriver ? 'assigned' : 'unassigned',
+        assignment_status: hasExplicitDriver && assignedDriver ? 'assigned' : 'unassigned',
         assigned_by: existingBooking?.assigned_by || (hasExplicitDriver ? 'Pilihan Pelanggan' : null),
         assigned_at: existingBooking?.assigned_at || (hasExplicitDriver ? now.toISOString() : null),
         service_type: sType,
@@ -1564,29 +1563,79 @@ export const dbService = {
       return updated;
     },
 
+    _normalizeStoredBookings(rawBookings) {
+      if (!Array.isArray(rawBookings)) return [];
+      const storedDrivers = getStoredArray(STORAGE_KEYS.DRIVERS, []);
+      return rawBookings
+        .filter((b) => {
+          if (!b) return false;
+          if (typeof b.id === 'string' && (b.id.startsWith('book-seed-') || b.id.startsWith('ord-ref-'))) {
+            return false;
+          }
+          return true;
+        })
+        .map((b) => {
+          const isPlaceholderDriver =
+            b.driver_id === 'drv-calya-01' || b.driver_id === 'drv-vario-01';
+          if (b.assignment_status !== 'assigned' || isPlaceholderDriver) {
+            return {
+              ...b,
+              assignment_status: 'unassigned',
+              driver_id: null,
+              driver_user_id: null,
+              driver_name: null,
+              driver_phone: null,
+              driver_vehicle: null,
+              driver_plate: null,
+              driver_rating: null,
+              driver: null
+            };
+          }
+
+          const liveDriver = storedDrivers.find(
+            (d) =>
+              d &&
+              ((b.driver_id && d.id === b.driver_id) ||
+                (b.driver_user_id && d.user_id === b.driver_user_id) ||
+                (b.driver_phone && d.phone && normalizePhone(d.phone) === normalizePhone(b.driver_phone)))
+          );
+          if (!liveDriver) return b;
+
+          const livePlate =
+            liveDriver.vehicleType === 'both'
+              ? b.service_type === 'mobil'
+                ? liveDriver.carData?.plateNumber || liveDriver.plateNumber
+                : liveDriver.motorData?.plateNumber || liveDriver.plateNumber
+              : liveDriver.plateNumber;
+
+          return {
+            ...b,
+            driver_name: liveDriver.name || b.driver_name,
+            driver_plate: livePlate || b.driver_plate,
+            driver_phone: liveDriver.phone || b.driver_phone,
+            driver: b.driver
+              ? {
+                  ...b.driver,
+                  name: liveDriver.name || b.driver.name,
+                  plateNumber: livePlate || b.driver.plateNumber,
+                  phone: liveDriver.phone || b.driver.phone
+                }
+              : b.driver
+          };
+        });
+    },
+
     getAllAdmin() {
       const rawBookings = getStoredArray(STORAGE_KEYS.BOOKINGS, []);
-      return rawBookings.filter((b) => {
-        if (!b) return false;
-        if (typeof b.id === 'string' && (b.id.startsWith('book-seed-') || b.id.startsWith('ord-ref-'))) {
-          return false;
-        }
-        return true;
-      });
+      return this._normalizeStoredBookings(rawBookings);
     },
 
     getAll(accountUser = null) {
       const activeUser = accountUser || dbService.session.getCurrentUser();
       const rawBookings = getStoredArray(STORAGE_KEYS.BOOKINGS, []);
-      
-      // Hapus data dummy bawaan lama jika tersisa
-      const realBookings = rawBookings.filter((b) => {
-        if (!b) return false;
-        if (typeof b.id === 'string' && (b.id.startsWith('book-seed-') || b.id.startsWith('ord-ref-'))) {
-          return false;
-        }
-        return true;
-      });
+
+      // Hapus data dummy bawaan lama dan sinkronkan nama mitra driver asli
+      const realBookings = this._normalizeStoredBookings(rawBookings);
 
       // Jika ada akun yang login, sinkronkan pesanan milik akun tersebut (baik sebagai Driver maupun Pelanggan)
       if (activeUser) {

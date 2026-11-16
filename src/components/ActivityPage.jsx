@@ -83,32 +83,24 @@ function formatBookingToOrder(b) {
       .padEnd(12, '0')
       .slice(-12)}`;
 
-  const defaultDriver = isCar
-    ? {
-        name: 'Nurul Hidayah',
-        rating: 4.9,
-        tripsCount: '1.420+ perjalanan',
-        vehicleModel: 'Toyota Calya · Silver',
-        plateNumber: 'DD 1289 AZ',
-        phone: '085255655084'
+  const isAssignedDriver = b.assignment_status === 'assigned';
+  const driverObj = isAssignedDriver
+    ? b.driver || {
+        name: b.driver_name || 'Mitra Driver OTWJek',
+        rating: b.driver_rating || 5.0,
+        tripsCount: b.driver_trips || 'Mitra Resmi',
+        vehicleModel: b.driver_vehicle || (isCar ? 'Mobil Mitra Resmi' : 'Motor Mitra Resmi'),
+        plateNumber: b.driver_plate || '',
+        phone: b.driver_phone || ''
       }
     : {
-        name: 'Siti Rahmawati',
-        rating: 4.9,
-        tripsCount: '2.150+ perjalanan',
-        vehicleModel: 'Honda Vario 160 · Hitam',
-        plateNumber: 'DD 4521 XY',
-        phone: '085255655084'
+        name: 'Menunggu Penugasan Admin',
+        rating: 5.0,
+        tripsCount: '-',
+        vehicleModel: isCar ? 'Layanan Mobil' : 'Layanan Motor',
+        plateNumber: '',
+        phone: ''
       };
-
-  const driverObj = b.driver || {
-    name: b.driver_name || defaultDriver.name,
-    rating: b.driver_rating || defaultDriver.rating,
-    tripsCount: b.driver_trips || defaultDriver.tripsCount,
-    vehicleModel: b.driver_vehicle || defaultDriver.vehicleModel,
-    plateNumber: b.driver_plate || defaultDriver.plateNumber,
-    phone: b.driver_phone || defaultDriver.phone
-  };
 
   const platformFee = 2000;
   const tripFare = Math.max(0, fare - platformFee);

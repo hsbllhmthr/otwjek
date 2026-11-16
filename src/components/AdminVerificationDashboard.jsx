@@ -22,24 +22,19 @@ import {
   ChevronRight,
   ChevronDown,
   Trash2,
-  Bell,
-  Moon,
   Edit3,
   ArrowUpDown,
   Check,
   Package,
   Car,
   MapPin,
-  Phone,
-  RotateCw,
-  MessageCircle,
   Receipt,
   FileText,
-  Banknote,
-  QrCode,
-  CheckCheck
+  Copy,
+  CheckCheck,
+  MoreVertical
 } from 'lucide-react';
-import dbService from '../services/dbService.js';
+import dbService, { normalizePhone } from '../services/dbService.js';
 import driverPlaceholder from '../assets/driver_placeholder.svg';
 import otwjekLogo from '../assets/otwjek_logo.png';
 import { compressImageFile } from '../utils/imageCompressor.js';
@@ -58,12 +53,210 @@ export const getDriverEffectiveType = (driver) => {
   return isDriverUsingCar(driver) ? 'mobil' : 'motor';
 };
 
+const REJECT_REASON_OPTIONS = [
+  'Foto KTP buram atau tidak terbaca dengan jelas.',
+  'Masa berlaku SIM sudah kadaluarsa.',
+  'Masa berlaku pajak STNK sudah habis / Plat nomor tidak sesuai.',
+  'Foto KTP/SIM terpotong atau bukan dokumen asli.',
+  'Foto wajah driver tidak jelas atau bukan perempuan.'
+];
+
+const isMultiFleetDriver = (driver) =>
+  Boolean(driver) &&
+  (driver.vehicleType === 'both' ||
+    Boolean(driver.motorData && driver.carData) ||
+    Boolean(driver.activeVehicleType && driver.vehicleType && driver.activeVehicleType !== driver.vehicleType));
+
+const getDriverServiceLabel = (driver, includeActiveMode = true) => {
+  if (!driver) return '-';
+  const isCar = isDriverUsingCar(driver);
+  if (isMultiFleetDriver(driver)) {
+    return includeActiveMode ? `Multi-Armada (${isCar ? 'Mobil' : 'Motor'})` : 'Multi-Armada';
+  }
+  return isCar ? 'SheCar (Mobil)' : 'SheRide (Motor)';
+};
+
+const getDriverDocSummary = (driver, driverDocs = []) => {
+  if (!driver) return { isComplete: false, label: '-' };
+  const hasKtp = Boolean(driverDocs.find((d) => d.document_type === 'ktp')?.document_url || driver.ktpUrl);
+  const hasSim = Boolean(driverDocs.find((d) => d.document_type === 'sim')?.document_url || driver.simUrl);
+  const hasStnk = Boolean(driverDocs.find((d) => d.document_type === 'stnk')?.document_url || driver.stnkUrl);
+  const missing = [!hasKtp && 'KTP', !hasSim && 'SIM', !hasStnk && 'STNK'].filter(Boolean);
+  return {
+    isComplete: missing.length === 0,
+    label: missing.length === 0 ? 'Lengkap (KTP, SIM, STNK)' : `Belum lengkap (${missing.join(', ')})`
+  };
+};
+
+/**
+ * Shared confirmation dialog shell used across destructive and approval actions
+ * in the Admin dashboard to avoid decorative icon badges and keep keyboard/contrast consistent.
+ */
+function AdminConfirmDialog({
+  idPrefix,
+  title,
+  subtitle,
+  onClose,
+  onConfirm,
+  confirmLabel,
+  confirmTone = 'danger',
+  confirmDisabled = false,
+  summaryItems = [],
+  note,
+  warningNote,
+  children,
+  dialogClassName = ''
+}) {
+  const titleId = `${idPrefix}-title`;
+
+  return (
+    <div className="admin-modal-backdrop" onClick={onClose}>
+      <div
+        className={`admin-modal-dialog admin-confirm-dialog ${dialogClassName}`.trim()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="dialog-header confirm-dialog-header">
+          <div className="confirm-header-copy">
+            <h3 id={titleId} className="dialog-title">{title}</h3>
+            {subtitle && <span className="dialog-sub">{subtitle}</span>}
+          </div>
+          <button
+            type="button"
+            className="btn-close-dialog confirm-close-btn"
+            onClick={onClose}
+            aria-label="Tutup dialog"
+            title="Tutup dialog"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="dialog-body confirm-dialog-body">
+          {summaryItems.length > 0 && (
+            <div className="confirm-summary-list">
+              {summaryItems.map((item) => (
+                <div key={item.label} className="confirm-summary-row">
+                  <span className="confirm-summary-label">{item.label}</span>
+                  <span className={`confirm-summary-value${item.tone ? ` tone-${item.tone}` : ''}`}>
+                    {item.value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {children}
+
+          {note && <p className="confirm-dialog-note">{note}</p>}
+          {warningNote && <div className="confirm-warning-note">{warningNote}</div>}
+        </div>
+
+        <div className="dialog-footer confirm-dialog-footer">
+          <button
+            type="button"
+            className="btn-dialog-cancel"
+            onClick={onClose}
+          >
+            Batal
+          </button>
+          <button
+            type="button"
+            className={confirmTone === 'approve' ? 'btn-dialog-confirm-approve' : 'btn-dialog-confirm-reject'}
+            onClick={onConfirm}
+            disabled={confirmDisabled}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Menu dropdown 3-dot di pojok kanan atas card mobile untuk semua aksi baris tabel.
+ * Disembunyikan pada desktop (>= 768px) karena kolom aksi tabel tampil langsung.
+ */
+function MobileCardActionMenu({ menuKey, activeKey, onToggle, onClose, items = [] }) {
+  const visibleItems = items.filter(Boolean);
+  if (visibleItems.length === 0) return null;
+  const isOpen = activeKey === menuKey;
+
+  return (
+    <div
+      className="mobile-card-action-menu"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        className={`mobile-card-action-trigger ${isOpen ? 'is-open' : ''}`}
+        aria-label="Menu Aksi"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        title="Menu Aksi"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle(menuKey);
+        }}
+      >
+        <MoreVertical size={18} />
+      </button>
+
+      {isOpen && (
+        <div className="mobile-card-action-dropdown" role="menu">
+          {visibleItems.map((item) => {
+            const cls = `mobile-card-action-item ${item.variant ? `is-${item.variant}` : ''}`;
+            if (item.href) {
+              return (
+                <a
+                  key={item.key}
+                  href={item.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={cls}
+                  role="menuitem"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onClose();
+                  }}
+                >
+                  {item.icon}
+                  <span>{item.label}</span>
+                </a>
+              );
+            }
+            return (
+              <button
+                key={item.key}
+                type="button"
+                className={cls}
+                role="menuitem"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose();
+                  item.onClick?.();
+                }}
+              >
+                {item.icon}
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminVerificationDashboard({ admin, onLogout, onGoToCustomerApp }) {
   // Navigation Section: 'overview' | 'drivers' | 'customers'
   const [mainSection, setMainSection] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const [activeCardMenuKey, setActiveCardMenuKey] = useState(null);
 
   // =========================================================================
   // STATE DRIVER
@@ -83,15 +276,16 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
   // Driver Modals
   const [previewDoc, setPreviewDoc] = useState(null); // { type, url, title, driverName }
   const [rejectModalDriver, setRejectModalDriver] = useState(null); // driver object
-  const [rejectReason, setRejectReason] = useState('Foto dokumen buram atau tidak terbaca dengan jelas.');
+  const [rejectReason, setRejectReason] = useState(REJECT_REASON_OPTIONS[0]);
   const [customRejectReason, setCustomRejectReason] = useState('');
   const [approveConfirmDriver, setApproveConfirmDriver] = useState(null);
   
   // State Edit & Lengkapi Data Driver oleh Admin
   const [editingDriver, setEditingDriver] = useState(null);
   const [editDriverForm, setEditDriverForm] = useState(null);
-  const [editDriverActiveTab, setEditDriverActiveTab] = useState('identitas'); // 'identitas' | 'kendaraan' | 'legalitas' | 'verifikasi'
+  const [editDriverActiveTab, setEditDriverActiveTab] = useState('identitas'); // 'identitas' | 'kendaraan' | 'dokumen' | 'status'
   const [isSavingDriver, setIsSavingDriver] = useState(false);
+  const [editAvatarError, setEditAvatarError] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
   // =========================================================================
@@ -208,16 +402,81 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
     };
   }, []);
 
-  // Tutup dropdown menu kolom saat klik di luar
+  // Tutup dropdown menu kolom dan menu aksi card saat klik di luar
   useEffect(() => {
     const handleGlobalClick = (e) => {
       if (activeColumnMenu && !e.target.closest('.th-filter-dropdown-container')) {
         setActiveColumnMenu(null);
       }
+      if (activeCardMenuKey && !e.target.closest('.mobile-card-action-menu')) {
+        setActiveCardMenuKey(null);
+      }
     };
     document.addEventListener('mousedown', handleGlobalClick);
     return () => document.removeEventListener('mousedown', handleGlobalClick);
-  }, [activeColumnMenu]);
+  }, [activeColumnMenu, activeCardMenuKey]);
+
+  const handleToggleCardMenu = useCallback((menuKey) => {
+    setActiveCardMenuKey((prev) => (prev === menuKey ? null : menuKey));
+  }, []);
+
+  // Tutup modal aktif atau menu card saat tombol Escape ditekan (Aksesibilitas Keyboard R-32)
+  useEffect(() => {
+    const hasOpenModal =
+      activeCardMenuKey ||
+      previewDoc ||
+      clearDbModalOpen ||
+      driverDeleteConfirm ||
+      customerDeleteConfirm ||
+      customerStatusConfirm ||
+      approveConfirmDriver ||
+      rejectModalDriver ||
+      selectedCustomerDetail ||
+      orderDetailModalData ||
+      assignModalOrder ||
+      editingDriver;
+
+    if (!hasOpenModal) return undefined;
+
+    const handleKeyDown = (e) => {
+      if (e.key !== 'Escape') return;
+      if (activeCardMenuKey) { setActiveCardMenuKey(null); return; }
+      if (previewDoc) { setPreviewDoc(null); return; }
+      if (clearDbModalOpen) { setClearDbModalOpen(false); return; }
+      if (driverDeleteConfirm) { setDriverDeleteConfirm(null); return; }
+      if (customerDeleteConfirm) { setCustomerDeleteConfirm(null); return; }
+      if (customerStatusConfirm) { setCustomerStatusConfirm(null); return; }
+      if (approveConfirmDriver) { setApproveConfirmDriver(null); return; }
+      if (rejectModalDriver) { setRejectModalDriver(null); return; }
+      if (selectedCustomerDetail) { setSelectedCustomerDetail(null); return; }
+      if (orderDetailModalData) { setOrderDetailModalData(null); return; }
+      if (assignModalOrder) {
+        setAssignModalOrder(null);
+        setAssignErrorMessage(null);
+        return;
+      }
+      if (editingDriver && !isSavingDriver) {
+        setEditingDriver(null);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [
+    activeCardMenuKey,
+    previewDoc,
+    clearDbModalOpen,
+    driverDeleteConfirm,
+    customerDeleteConfirm,
+    customerStatusConfirm,
+    approveConfirmDriver,
+    rejectModalDriver,
+    selectedCustomerDetail,
+    orderDetailModalData,
+    assignModalOrder,
+    editingDriver,
+    isSavingDriver
+  ]);
 
   const toggleColumnMenu = (menuKey) => {
     setActiveColumnMenu((prev) => (prev === menuKey ? null : menuKey));
@@ -914,6 +1173,12 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
     setApproveConfirmDriver(null);
   };
 
+  const openRejectDriverModal = (driver) => {
+    setRejectReason(REJECT_REASON_OPTIONS[0]);
+    setCustomRejectReason('');
+    setRejectModalDriver(driver);
+  };
+
   const handleConfirmReject = () => {
     if (!rejectModalDriver) return;
     const finalReason = rejectReason === 'custom' ? customRejectReason : rejectReason;
@@ -926,17 +1191,14 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
 
   const formatOperationalArea = (area) => {
     if (!area) return 'Makassar & sekitarnya';
-    const trimmed = area.trim();
-    if (trimmed.length > 20) {
-      return `${trimmed.slice(0, 18)}...`;
-    }
-    return trimmed;
+    return area.trim();
   };
 
   const getDriverDocs = (driverId) => {
     try {
-      const storedDocs = JSON.parse(localStorage.getItem('otwjek_db_driver_documents') || '[]');
-      return storedDocs.filter((d) => d.driver_id === driverId);
+      const parsedDocs = JSON.parse(localStorage.getItem('otwjek_db_driver_documents') || '[]');
+      const storedDocs = Array.isArray(parsedDocs) ? parsedDocs : [];
+      return storedDocs.filter((d) => d && d.driver_id === driverId);
     } catch {
       return [];
     }
@@ -967,7 +1229,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
       plateNumber: driver.plateNumber || '',
       vehicleColor: driver.vehicleColor || '',
       operationalArea: driver.operationalArea || 'Makassar dan sekitarnya',
-      badge: driver.badge || (driver.verification_status === 'approved' ? 'Mitra Resmi 🌸' : 'Calon Mitra 🌸'),
+      badge: driver.badge || (driver.verification_status === 'approved' ? 'Mitra Resmi' : 'Calon Mitra'),
 
       motorModel: driver.motorData?.model || (driver.vehicleType === 'motor' ? driver.vehicleModel : ''),
       motorPlate: driver.motorData?.plateNumber || (driver.vehicleType === 'motor' ? driver.plateNumber : ''),
@@ -991,7 +1253,15 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
       stnkUrl: stnkDoc?.document_url || '',
       stnkCarUrl: stnkCarDoc?.document_url || ''
     });
+    setEditAvatarError(false);
     setEditDriverActiveTab(initialTab);
+  };
+
+  const handleFileLabelKeyDown = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      e.currentTarget.click();
+    }
   };
 
   const handleAvatarFile = async (e) => {
@@ -999,6 +1269,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
     if (!file) return;
     try {
       const base64 = await compressImageFile(file, 400, 400, 0.8);
+      setEditAvatarError(false);
       setEditDriverForm((prev) => ({ ...prev, avatar: base64 }));
     } catch (err) {
       alert('Gagal membaca gambar profil: ' + err.message);
@@ -1352,38 +1623,6 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
           </div>
 
           <div className="topbar-right">
-            {/* Dark Mode Button */}
-            <button
-              type="button"
-              className="topbar-circle-btn"
-              onClick={() => setDarkMode(!darkMode)}
-              title={darkMode ? 'Mode Terang' : 'Mode Gelap'}
-              aria-label="Toggle Dark Mode"
-            >
-              <Moon size={18} />
-            </button>
-
-            {/* Notification Bell */}
-            <button
-              type="button"
-              className="topbar-circle-btn notification-btn"
-              onClick={() => {
-                setMainSection('drivers');
-                setDriverTab('pending');
-              }}
-              title={
-                driverCounts.pending > 0
-                  ? `${driverCounts.pending} calon mitra menunggu verifikasi`
-                  : 'Notifikasi'
-              }
-              aria-label="Notifikasi"
-            >
-              <Bell size={18} />
-              {(driverCounts.pending + newCustomersCount + orderCounts.total + allOrdersMetrics.inProgress) > 0 && (
-                <span className="topbar-notification-dot" />
-              )}
-            </button>
-
             {/* User Profile Capsule */}
             <div className="topbar-user-profile" title="Admin OTWJEK">
               <div className="topbar-user-avatar">
@@ -1413,15 +1652,6 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
               </h2>
             </div>
             <div className="page-header-actions-row">
-              <button
-                type="button"
-                className="btn-header-clean-db"
-                onClick={() => setClearDbModalOpen(true)}
-                title="Bersihkan Seluruh Database"
-              >
-                <Trash2 size={14} />
-                <span>Bersihkan Database</span>
-              </button>
               <div className="page-header-breadcrumb">
                 <span className="breadcrumb-lead">Dashboard</span>
                 <span className="breadcrumb-slash">/</span>
@@ -1857,7 +2087,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                             </td>
                           </tr>
                         ) : (
-                          paginatedDrivers.map((d) => {
+                          paginatedDrivers.map((d, idx) => {
                             const isPending = d.verification_status === 'pending';
                             const isRejected = d.verification_status === 'rejected';
                             const statusClass = isPending ? 'pending' : isRejected ? 'cancel' : 'active';
@@ -1866,7 +2096,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
 
                             return (
                               <tr
-                                key={d.id}
+                                key={d.id || `${d.phone || d.name || 'drv'}-${idx}`}
                                 className="tailadmin-tr"
                                 onClick={() => {
                                   setMainSection('drivers');
@@ -1874,7 +2104,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 }}
                                 title={`Klik untuk melihat detail ${d.name}`}
                               >
-                                <td className="tailadmin-td user-td" data-label="Driver">
+                                <td className="tailadmin-td user-td user-td--has-actions" data-label="Driver">
                                   <div className="table-user-cell">
                                     <div className={`table-user-avatar ${!d.avatar ? 'driver-initial-avatar' : ''}`}>
                                       {d.avatar ? (
@@ -1903,30 +2133,32 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                       </span>
                                     </div>
                                   </div>
+                                  <MobileCardActionMenu
+                                    menuKey={`overview-driver-${d.id || idx}`}
+                                    activeKey={activeCardMenuKey}
+                                    onToggle={handleToggleCardMenu}
+                                    onClose={() => setActiveCardMenuKey(null)}
+                                    items={[
+                                      {
+                                        key: 'edit',
+                                        label: isPending ? 'Lengkapi & Verifikasi' : 'Edit Data Driver',
+                                        icon: <Edit3 size={15} />,
+                                        onClick: () => handleOpenEditDriver(d)
+                                      },
+                                      {
+                                        key: 'delete',
+                                        label: 'Hapus Data Driver',
+                                        icon: <Trash2 size={15} />,
+                                        variant: 'danger',
+                                        onClick: () => setDriverDeleteConfirm(d)
+                                      }
+                                    ]}
+                                  />
                                 </td>
                                 <td className="tailadmin-td service-td" data-label="Layanan">
                                   <div className="table-cell-meta">
-                                    <span className="table-primary-text" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                                      {d.vehicleType === 'both' || (d.motorData && d.carData) || (d.activeVehicleType && d.vehicleType && d.activeVehicleType !== d.vehicleType) ? (
-                                        <>
-                                          Multi-Armada
-                                          <span style={{
-                                            fontSize: 10.5,
-                                            padding: '1px 6px',
-                                            borderRadius: 6,
-                                            fontWeight: 700,
-                                            backgroundColor: isDriverUsingCar(d) ? '#EFF6FF' : '#FDF2F8',
-                                            color: isDriverUsingCar(d) ? '#1D4ED8' : '#DB2777',
-                                            border: isDriverUsingCar(d) ? '1px solid #BFDBFE' : '1px solid #FBCFE8'
-                                          }}>
-                                            Aktif: {isDriverUsingCar(d) ? 'Mobil' : 'Motor'}
-                                          </span>
-                                        </>
-                                      ) : isDriverUsingCar(d) ? (
-                                        'SheCar (Mobil)'
-                                      ) : (
-                                        'SheRide (Motor)'
-                                      )}
+                                    <span className="table-primary-text">
+                                      {getDriverServiceLabel(d, false)}
                                     </span>
                                     <span className="table-secondary-text">
                                       {d.vehicleModel || (isDriverUsingCar(d) ? 'Mobil' : 'Motor')}
@@ -2322,7 +2554,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                             </td>
                           </tr>
                         ) : (
-                          paginatedCustomers.map((c) => {
+                          paginatedCustomers.map((c, idx) => {
                             const isSuspended = c.status === 'suspended';
                             const statusClass = isSuspended ? 'cancel' : 'active';
                             const statusLabel = isSuspended ? 'Ditangguhkan' : 'Aktif';
@@ -2337,12 +2569,12 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
 
                             return (
                               <tr
-                                key={c.id}
+                                key={c.id || `${c.phone || c.full_name || 'cust'}-${idx}`}
                                 className="tailadmin-tr"
                                 onClick={() => setSelectedCustomerDetail(c)}
                                 title={`Klik untuk melihat detail ${c.full_name || 'Pelanggan'}`}
                               >
-                                <td className="tailadmin-td user-td" data-label="Pelanggan">
+                                <td className="tailadmin-td user-td user-td--has-actions" data-label="Pelanggan">
                                   <div className="table-user-cell">
                                     <div className="table-user-avatar customer-initial-avatar">
                                       {c.avatar_url ? (
@@ -2370,6 +2602,20 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                       </span>
                                     </div>
                                   </div>
+                                  <MobileCardActionMenu
+                                    menuKey={`overview-customer-${c.id || idx}`}
+                                    activeKey={activeCardMenuKey}
+                                    onToggle={handleToggleCardMenu}
+                                    onClose={() => setActiveCardMenuKey(null)}
+                                    items={[
+                                      {
+                                        key: 'detail',
+                                        label: 'Lihat Detail Profil',
+                                        icon: <Eye size={15} />,
+                                        onClick: () => setSelectedCustomerDetail(c)
+                                      }
+                                    ]}
+                                  />
                                 </td>
                                 <td className="tailadmin-td contact-td" data-label="Kontak">
                                   <div className="table-cell-meta">
@@ -2908,7 +3154,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                           </td>
                         </tr>
                       ) : (
-                        paginatedDriversView.map((driver) => {
+                        paginatedDriversView.map((driver, idx) => {
                           const driverDocs = getDriverDocs(driver.id);
                           const ktpDoc = driverDocs.find((d) => d.document_type === 'ktp');
                           const simDoc = driverDocs.find((d) => d.document_type === 'sim');
@@ -2934,8 +3180,8 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                           const waPhone = (driver.phone || '').replace(/^\+?62|^0/, '62');
 
                           return (
-                            <tr key={driver.id} className="tailadmin-tr">
-                              <td className="tailadmin-td user-td" data-label="Driver">
+                            <tr key={driver.id || `${driver.phone || driver.name || 'drv'}-${idx}`} className="tailadmin-tr">
+                              <td className="tailadmin-td user-td user-td--has-actions" data-label="Driver">
                                 <div className="table-user-cell">
                                   <div className={`table-user-avatar ${!driver.avatar ? 'driver-initial-avatar' : ''}`}>
                                     {driver.avatar ? (
@@ -2976,30 +3222,68 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                     </span>
                                   </div>
                                 </div>
+                                <MobileCardActionMenu
+                                  menuKey={`driver-verification-${driver.id || idx}`}
+                                  activeKey={activeCardMenuKey}
+                                  onToggle={handleToggleCardMenu}
+                                  onClose={() => setActiveCardMenuKey(null)}
+                                  items={[
+                                    {
+                                      key: 'edit',
+                                      label: 'Edit & Lengkapi Data',
+                                      icon: <Edit3 size={15} />,
+                                      onClick: () => handleOpenEditDriver(driver)
+                                    },
+                                    isPending
+                                      ? {
+                                          key: 'approve',
+                                          label: 'Setujui Driver',
+                                          icon: <CheckCircle2 size={15} />,
+                                          variant: 'success',
+                                          onClick: () => setApproveConfirmDriver(driver)
+                                        }
+                                      : null,
+                                    isPending
+                                      ? {
+                                          key: 'reject',
+                                          label: 'Tolak Berkas Driver',
+                                          icon: <XCircle size={15} />,
+                                          variant: 'warning',
+                                          onClick: () => openRejectDriverModal(driver)
+                                        }
+                                      : null,
+                                    isApproved
+                                      ? {
+                                          key: 'revoke',
+                                          label: 'Cabut Status Persetujuan',
+                                          icon: <XCircle size={15} />,
+                                          variant: 'warning',
+                                          onClick: () => openRejectDriverModal(driver)
+                                        }
+                                      : null,
+                                    isRejected
+                                      ? {
+                                          key: 'reapprove',
+                                          label: 'Tinjau Ulang & Setujui',
+                                          icon: <CheckCircle2 size={15} />,
+                                          variant: 'success',
+                                          onClick: () => setApproveConfirmDriver(driver)
+                                        }
+                                      : null,
+                                    {
+                                      key: 'delete',
+                                      label: 'Hapus Data Driver',
+                                      icon: <Trash2 size={15} />,
+                                      variant: 'danger',
+                                      onClick: () => setDriverDeleteConfirm(driver)
+                                    }
+                                  ]}
+                                />
                               </td>
                               <td className="tailadmin-td service-td" data-label="Layanan">
                                 <div className="table-cell-meta">
-                                  <span className="table-primary-text" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                                    {driver.vehicleType === 'both' || (driver.motorData && driver.carData) || (driver.activeVehicleType && driver.vehicleType && driver.activeVehicleType !== driver.vehicleType) ? (
-                                      <>
-                                        Multi-Armada
-                                        <span style={{
-                                          fontSize: 10.5,
-                                          padding: '1px 6px',
-                                          borderRadius: 6,
-                                          fontWeight: 700,
-                                          backgroundColor: isDriverUsingCar(driver) ? '#EFF6FF' : '#FDF2F8',
-                                          color: isDriverUsingCar(driver) ? '#1D4ED8' : '#DB2777',
-                                          border: isDriverUsingCar(driver) ? '1px solid #BFDBFE' : '1px solid #FBCFE8'
-                                        }}>
-                                          Aktif: {isDriverUsingCar(driver) ? 'Mobil' : 'Motor'}
-                                        </span>
-                                      </>
-                                    ) : isDriverUsingCar(driver) ? (
-                                      'SheCar (Mobil)'
-                                    ) : (
-                                      'SheRide (Motor)'
-                                    )}
+                                  <span className="table-primary-text">
+                                    {getDriverServiceLabel(driver, false)}
                                   </span>
                                   <span className="table-secondary-text">
                                     {driver.vehicleModel || (isDriverUsingCar(driver) ? 'Mobil' : 'Motor')}
@@ -3117,7 +3401,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                         className="btn-table-icon-action btn-icon-reject"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          setRejectModalDriver(driver);
+                                          openRejectDriverModal(driver);
                                         }}
                                         title="Tolak Berkas Driver"
                                         aria-label="Tolak Driver"
@@ -3133,7 +3417,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                       className="btn-table-icon-action btn-icon-revoke"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        setRejectModalDriver(driver);
+                                        openRejectDriverModal(driver);
                                       }}
                                       title="Cabut Status Persetujuan"
                                       aria-label="Cabut Status Persetujuan"
@@ -3384,7 +3668,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                           </td>
                         </tr>
                       ) : (
-                        paginatedAllOrdersView.map((ord) => {
+                        paginatedAllOrdersView.map((ord, idx) => {
                           const sType = String(ord.service_type || '').toLowerCase();
                           const isCar = sType === 'mobil' || sType === 'car';
                           const isSend = sType === 'paket' || sType === 'send' || sType === 'package' || sType === 'food';
@@ -3405,8 +3689,8 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                           const isAssigned = ord.assignment_status === 'assigned';
 
                           return (
-                            <tr key={ord.id} className="tailadmin-tr">
-                              <td className="tailadmin-td user-td" data-label="Pesanan">
+                            <tr key={ord.id || `${orderCode}-${ord.created_at || idx}`} className="tailadmin-tr">
+                              <td className="tailadmin-td user-td user-td--has-actions" data-label="Pesanan">
                                 <div className="table-cell-meta">
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                                     <span style={{ fontWeight: 800, color: '#0F172A', fontSize: 13.5 }}>
@@ -3431,6 +3715,20 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                   </div>
                                   <span className="table-secondary-text">{createdDateStr}</span>
                                 </div>
+                                <MobileCardActionMenu
+                                  menuKey={`order-list-${ord.id || orderCode || idx}`}
+                                  activeKey={activeCardMenuKey}
+                                  onToggle={handleToggleCardMenu}
+                                  onClose={() => setActiveCardMenuKey(null)}
+                                  items={[
+                                    {
+                                      key: 'detail',
+                                      label: 'Lihat Rincian Pesanan',
+                                      icon: <Eye size={15} />,
+                                      onClick: () => setOrderDetailModalData(ord)
+                                    }
+                                  ]}
+                                />
                               </td>
 
                               <td className="tailadmin-td" data-label="Pelanggan">
@@ -3934,7 +4232,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                           </td>
                         </tr>
                       ) : (
-                        paginatedCustomersView.map((cust) => {
+                        paginatedCustomersView.map((cust, idx) => {
                           const waPhone = (cust.phone || '').replace(/^\+?62|^0/, '62');
                           const isSuspended = cust.status === 'suspended';
                           const statusClass = isSuspended ? 'cancel' : 'active';
@@ -3950,12 +4248,12 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
 
                           return (
                             <tr
-                              key={cust.id}
+                              key={cust.id || `${cust.phone || cust.full_name || 'cust'}-${idx}`}
                               className="tailadmin-tr"
                               onClick={() => setSelectedCustomerDetail(cust)}
                               title={`Klik untuk melihat detail ${cust.full_name || 'Pelanggan'}`}
                             >
-                              <td className="tailadmin-td user-td" data-label="Pelanggan">
+                              <td className="tailadmin-td user-td user-td--has-actions" data-label="Pelanggan">
                                 <div className="table-user-cell">
                                   <div className="table-user-avatar customer-initial-avatar">
                                     {cust.avatar_url ? (
@@ -3983,6 +4281,34 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                     </span>
                                   </div>
                                 </div>
+                                <MobileCardActionMenu
+                                  menuKey={`customer-list-${cust.id || idx}`}
+                                  activeKey={activeCardMenuKey}
+                                  onToggle={handleToggleCardMenu}
+                                  onClose={() => setActiveCardMenuKey(null)}
+                                  items={[
+                                    {
+                                      key: 'detail',
+                                      label: 'Lihat Detail Profil',
+                                      icon: <Eye size={15} />,
+                                      onClick: () => setSelectedCustomerDetail(cust)
+                                    },
+                                    {
+                                      key: 'status',
+                                      label: isSuspended ? 'Aktifkan Akun' : 'Tangguhkan Akun',
+                                      icon: isSuspended ? <UserCheck size={15} /> : <UserX size={15} />,
+                                      variant: isSuspended ? 'success' : 'warning',
+                                      onClick: () => setCustomerStatusConfirm(cust)
+                                    },
+                                    {
+                                      key: 'delete',
+                                      label: 'Hapus Data Pelanggan',
+                                      icon: <Trash2 size={15} />,
+                                      variant: 'danger',
+                                      onClick: () => setCustomerDeleteConfirm(cust)
+                                    }
+                                  ]}
+                                />
                               </td>
                               <td className="tailadmin-td contact-td" data-label="Kontak">
                                 <div className="table-cell-meta">
@@ -4245,7 +4571,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
             <section className="dash-customer-list-section">
               <div className="overview-split-card tailadmin-table-card">
                 <div className="tailadmin-table-responsive">
-                  <table className="tailadmin-project-table mobile-hide-thead">
+                  <table className="tailadmin-project-table mobile-hide-thead assignment-orders-table">
                     <thead>
                       <tr className="tailadmin-th-row">
                         <th className="tailadmin-th text-left">Kode & Layanan</th>
@@ -4272,7 +4598,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                           </td>
                         </tr>
                       ) : (
-                        paginatedOrdersView.map((ord) => {
+                        paginatedOrdersView.map((ord, idx) => {
                           const sType = String(ord.service_type || '').toLowerCase();
                           const isCar = sType === 'mobil' || sType === 'car';
                           const isSend = sType === 'paket' || sType === 'send' || sType === 'package' || sType === 'food';
@@ -4293,27 +4619,18 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                             : 'Baru saja';
 
                           return (
-                            <tr key={ord.id} className="tailadmin-tr">
-                              <td className="tailadmin-td user-td" data-label="Kode & Layanan">
+                            <tr key={ord.id || `${orderCode}-${ord.created_at || idx}`} className="tailadmin-tr">
+                              <td
+                                className={`tailadmin-td user-td ${!isTaskCompleted ? 'user-td--has-actions' : ''}`}
+                                data-label="Kode & Layanan"
+                              >
                                 <div className="table-cell-meta">
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                                    <span style={{ fontWeight: 800, color: '#EE4335', fontSize: 13.5 }}>
+                                  <div className="assignment-order-title-row">
+                                    <span className="assignment-order-code">
                                       {orderCode}
                                     </span>
-                                    <span
-                                      style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: 4,
-                                        fontSize: 11.5,
-                                        fontWeight: 700,
-                                        padding: '2px 8px',
-                                        borderRadius: 8,
-                                        backgroundColor: isCar ? '#ECFDF5' : isSend ? '#FFF7ED' : '#FDF2F8',
-                                        color: isCar ? '#059669' : isSend ? '#EA580C' : '#DB2777'
-                                      }}
-                                    >
-                                      {isCar ? <Car size={12} /> : isSend ? <Package size={12} /> : <Bike size={12} />}
+                                    <span className="assignment-order-sep" aria-hidden="true">•</span>
+                                    <span className="assignment-order-service">
                                       {sLabel}
                                     </span>
                                   </div>
@@ -4321,6 +4638,39 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                     {createdDateStr} • {fareFormatted} ({(ord.payment_method || 'cash').toUpperCase()})
                                   </span>
                                 </div>
+                                <MobileCardActionMenu
+                                  menuKey={`assignment-list-${ord.id || orderCode || idx}`}
+                                  activeKey={activeCardMenuKey}
+                                  onToggle={handleToggleCardMenu}
+                                  onClose={() => setActiveCardMenuKey(null)}
+                                  items={
+                                    !isTaskCompleted
+                                      ? [
+                                          {
+                                            key: 'assign',
+                                            label: isAssigned ? 'Ganti Driver' : 'Tugaskan Driver',
+                                            icon: <UserCheck size={15} />,
+                                            variant: isAssigned ? undefined : 'primary',
+                                            onClick: () => {
+                                              setAssignModalOrder(ord);
+                                              setAssignDriverSearch('');
+                                              setAssignVehicleFilter('recommended');
+                                              setAssignErrorMessage(null);
+                                            }
+                                          },
+                                          isAssigned && (ord.driver_phone || ord.driver?.phone)
+                                            ? {
+                                                key: 'wa',
+                                                label: 'Kirim WA ke Driver',
+                                                icon: <ExternalLink size={15} />,
+                                                variant: 'success',
+                                                href: buildDriverTaskWhatsAppUrl(ord, ord.driver)
+                                              }
+                                            : null
+                                        ]
+                                      : []
+                                  }
+                                />
                               </td>
 
                               <td className="tailadmin-td" data-label="Pelanggan">
@@ -4337,22 +4687,34 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 </div>
                               </td>
 
-                              <td className="tailadmin-td route-td" data-label="Rute" style={{ maxWidth: 280 }}>
-                                <div className="table-cell-meta">
-                                  <span
-                                    className="table-primary-text route-line-text"
-                                    title={`Jemput: ${ord.pickup_name || '-'} (${ord.pickup_address || ''})`}
+                              <td className="tailadmin-td route-td assignment-route-td" data-label="Rute">
+                                <div className="assignment-route-columns">
+                                  <div
+                                    className="assignment-route-col"
+                                    title={`Lokasi: ${ord.pickup_name || '-'} (${ord.pickup_address || ''})`}
                                   >
-                                    <MapPin size={13} color="#10B981" strokeWidth={2.5} style={{ flexShrink: 0, marginRight: 5 }} />
-                                    {ord.pickup_name || 'Titik Jemput'}
-                                  </span>
-                                  <span
-                                    className="table-secondary-text route-line-text"
+                                    <span className="assignment-route-label">Lokasi</span>
+                                    <div className="assignment-route-val-group">
+                                      <span className="assignment-route-value">
+                                        {ord.pickup_name || 'Titik Jemput'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="assignment-route-divider" aria-hidden="true" />
+                                  <div
+                                    className="assignment-route-col"
                                     title={`Tujuan: ${ord.dropoff_name || '-'} (${ord.dropoff_address || ''})`}
                                   >
-                                    <MapPin size={13} color="#EF4444" strokeWidth={2.5} style={{ flexShrink: 0, marginRight: 5 }} />
-                                    {ord.dropoff_name || 'Titik Tujuan'} ({ord.distance_km || 3.2} km)
-                                  </span>
+                                    <span className="assignment-route-label">Tujuan</span>
+                                    <div className="assignment-route-val-group">
+                                      <span className="assignment-route-value">
+                                        {ord.dropoff_name || 'Titik Tujuan'}
+                                      </span>
+                                      <span className="assignment-route-distance">
+                                        {ord.distance_km || 3.2} km
+                                      </span>
+                                    </div>
+                                  </div>
                                 </div>
                               </td>
 
@@ -4360,7 +4722,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 {isAssigned ? (
                                   <div className="table-cell-meta">
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                                      <span className="table-primary-text" style={{ color: '#059669', fontWeight: 700 }}>
+                                      <span className="table-primary-text" style={{ fontWeight: 600 }}>
                                         {ord.driver_name || ord.driver?.name || 'Mitra Driver'}
                                       </span>
                                       <span
@@ -4406,7 +4768,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                     <span className="table-status-pill pending">
                                       Belum Ditugaskan
                                     </span>
-                                    <span className="table-secondary-text" style={{ marginTop: 3 }}>
+                                    <span className="table-secondary-text assignment-empty-driver-hint">
                                       Pilih driver aktif untuk mengambil order
                                     </span>
                                   </div>
@@ -4553,142 +4915,96 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
       {/* MODAL 2: TOLAK PENGAJUAN DRIVER (REJECT DENGAN ALASAN)            */}
       {/* ================================================================= */}
       {rejectModalDriver && (
-        <div className="admin-modal-backdrop" onClick={() => setRejectModalDriver(null)}>
-          <div className="admin-modal-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="dialog-header">
-              <div className="dialog-icon-wrap reject">
-                <XCircle size={22} />
-              </div>
-              <div>
-                <h3 className="dialog-title">Tolak Pendaftaran Driver</h3>
-                <span className="dialog-sub">Calon: {rejectModalDriver.name}</span>
-              </div>
-              <button
-                type="button"
-                className="btn-close-dialog"
-                onClick={() => setRejectModalDriver(null)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="dialog-body">
-              <p className="dialog-instruction">
-                Pilih alasan penolakan agar calon pengemudi dapat memperbaiki dokumennya:
-              </p>
-
-              <div className="reason-options-list">
-                {[
-                  'Foto KTP buram atau tidak terbaca dengan jelas.',
-                  'Masa berlaku SIM sudah kadaluarsa.',
-                  'Masa berlaku pajak STNK sudah habis / Plat nomor tidak sesuai.',
-                  'Foto KTP/SIM terpotong atau bukan dokumen asli.',
-                  'Foto wajah driver tidak jelas atau bukan perempuan.'
-                ].map((reason) => (
-                  <label key={reason} className="reason-radio-item">
-                    <input
-                      type="radio"
-                      name="rejectReason"
-                      value={reason}
-                      checked={rejectReason === reason}
-                      onChange={(e) => setRejectReason(e.target.value)}
-                    />
-                    <span>{reason}</span>
-                  </label>
-                ))}
-
-                <label className="reason-radio-item">
+        <AdminConfirmDialog
+          idPrefix="reject-driver-dialog"
+          dialogClassName="admin-confirm-dialog--wide"
+          title="Tolak Pendaftaran Mitra?"
+          subtitle={[rejectModalDriver.name, rejectModalDriver.plateNumber].filter(Boolean).join(', ')}
+          onClose={() => setRejectModalDriver(null)}
+          onConfirm={handleConfirmReject}
+          confirmLabel="Tolak Pendaftaran"
+          confirmTone="danger"
+          confirmDisabled={rejectReason === 'custom' && !customRejectReason.trim()}
+        >
+          <p className="confirm-section-label">Pilih alasan penolakan berkas</p>
+          <div className="reason-options-list">
+            {REJECT_REASON_OPTIONS.map((reason) => {
+              const isSelected = rejectReason === reason;
+              return (
+                <label
+                  key={reason}
+                  className={`reason-radio-item confirm-radio-item${isSelected ? ' is-selected' : ''}`}
+                >
                   <input
                     type="radio"
                     name="rejectReason"
-                    value="custom"
-                    checked={rejectReason === 'custom'}
-                    onChange={() => setRejectReason('custom')}
+                    value={reason}
+                    checked={isSelected}
+                    onChange={(e) => setRejectReason(e.target.value)}
                   />
-                  <span>Tulis alasan khusus lainnya:</span>
+                  <span>{reason}</span>
                 </label>
-              </div>
+              );
+            })}
 
-              {rejectReason === 'custom' && (
-                <textarea
-                  className="dialog-custom-textarea"
-                  placeholder="Ketikkan alasan penolakan secara spesifik..."
-                  rows={3}
-                  value={customRejectReason}
-                  onChange={(e) => setCustomRejectReason(e.target.value)}
-                />
-              )}
-            </div>
-
-            <div className="dialog-footer">
-              <button
-                type="button"
-                className="btn-dialog-cancel"
-                onClick={() => setRejectModalDriver(null)}
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                className="btn-dialog-confirm-reject"
-                onClick={handleConfirmReject}
-                disabled={rejectReason === 'custom' && !customRejectReason.trim()}
-              >
-                Kirim Penolakan
-              </button>
-            </div>
+            <label
+              className={`reason-radio-item confirm-radio-item${rejectReason === 'custom' ? ' is-selected' : ''}`}
+            >
+              <input
+                type="radio"
+                name="rejectReason"
+                value="custom"
+                checked={rejectReason === 'custom'}
+                onChange={() => setRejectReason('custom')}
+              />
+              <span>Tulis alasan khusus lainnya</span>
+            </label>
           </div>
-        </div>
+
+          {rejectReason === 'custom' && (
+            <textarea
+              className="dialog-custom-textarea"
+              placeholder="Tuliskan alasan penolakan secara spesifik..."
+              rows={3}
+              value={customRejectReason}
+              onChange={(e) => setCustomRejectReason(e.target.value)}
+            />
+          )}
+        </AdminConfirmDialog>
       )}
 
       {/* ================================================================= */}
       {/* MODAL 3: KONFIRMASI APPROVE DRIVER                                */}
       {/* ================================================================= */}
-      {approveConfirmDriver && (
-        <div className="admin-modal-backdrop" onClick={() => setApproveConfirmDriver(null)}>
-          <div className="admin-modal-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="dialog-header">
-              <div className="dialog-icon-wrap approve">
-                <CheckCircle2 size={24} />
-              </div>
-              <div>
-                <h3 className="dialog-title">Setujui Mitra Pengemudi?</h3>
-                <span className="dialog-sub">Calon: {approveConfirmDriver.name}</span>
-              </div>
-              <button
-                type="button"
-                className="btn-close-dialog"
-                onClick={() => setApproveConfirmDriver(null)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="dialog-body">
-              <p className="dialog-instruction">
-                Dengan menyetujui, akun pengemudi <strong>{approveConfirmDriver.name}</strong> ({approveConfirmDriver.plateNumber}) akan aktif secara resmi dan muncul di katalog pesanan SheRide / SheCar untuk pelanggan wanita.
-              </p>
-            </div>
-
-            <div className="dialog-footer">
-              <button
-                type="button"
-                className="btn-dialog-cancel"
-                onClick={() => setApproveConfirmDriver(null)}
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                className="btn-dialog-confirm-approve"
-                onClick={() => handleApprove(approveConfirmDriver)}
-              >
-                Ya, Setujui Mitra Ini
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {approveConfirmDriver && (() => {
+        const docStatus = getDriverDocSummary(approveConfirmDriver, getDriverDocs(approveConfirmDriver.id));
+        const vehicleSummary = [approveConfirmDriver.vehicleModel, approveConfirmDriver.plateNumber]
+          .filter(Boolean)
+          .join(', ') || '-';
+        return (
+          <AdminConfirmDialog
+            idPrefix="approve-driver-dialog"
+            title="Setujui Mitra Pengemudi?"
+            subtitle="Konfirmasi aktivasi akun calon mitra"
+            onClose={() => setApproveConfirmDriver(null)}
+            onConfirm={() => handleApprove(approveConfirmDriver)}
+            confirmLabel="Setujui Mitra"
+            confirmTone="approve"
+            summaryItems={[
+              { label: 'Nama Mitra', value: approveConfirmDriver.name || '-' },
+              { label: 'Layanan', value: getDriverServiceLabel(approveConfirmDriver) },
+              { label: 'Kendaraan', value: vehicleSummary },
+              { label: 'No. WhatsApp', value: approveConfirmDriver.phone || '-' },
+              {
+                label: 'Berkas',
+                value: docStatus.label,
+                tone: docStatus.isComplete ? 'ok' : 'warn'
+              }
+            ]}
+            note="Setelah disetujui, akun pengemudi langsung aktif dan muncul di katalog pesanan SheRide / SheCar."
+          />
+        );
+      })()}
 
       {/* ================================================================= */}
       {/* MODAL 4: DETAIL AKUN PELANGGAN (CUSTOMER DETAIL)                  */}
@@ -4830,240 +5146,132 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
       {/* ================================================================= */}
       {/* MODAL 5: KONFIRMASI STATUS PELANGGAN (AKTIFKAN/TANGGUHKAN)        */}
       {/* ================================================================= */}
-      {customerStatusConfirm && (
-        <div className="admin-modal-backdrop" onClick={() => setCustomerStatusConfirm(null)}>
-          <div className="admin-modal-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="dialog-header">
-              <div className={`dialog-icon-wrap ${customerStatusConfirm.status === 'suspended' ? 'approve' : 'reject'}`}>
-                {customerStatusConfirm.status === 'suspended' ? (
-                  <UserCheck size={22} />
-                ) : (
-                  <UserX size={22} />
-                )}
-              </div>
-              <div>
-                <h3 className="dialog-title">
-                  {customerStatusConfirm.status === 'suspended'
-                    ? 'Aktifkan Akun Pelanggan?'
-                    : 'Tangguhkan Akun Pelanggan?'}
-                </h3>
-                <span className="dialog-sub">Pelanggan: {customerStatusConfirm.full_name}</span>
-              </div>
-              <button
-                type="button"
-                className="btn-close-dialog"
-                onClick={() => setCustomerStatusConfirm(null)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="dialog-body">
-              <p className="dialog-instruction">
-                {customerStatusConfirm.status === 'suspended'
-                  ? `Akun ${customerStatusConfirm.full_name} akan diaktifkan kembali sehingga dapat masuk dan melakukan pemesanan layanan OTWJek.`
-                  : `Apakah Anda yakin ingin menangguhkan akun ${customerStatusConfirm.full_name}? Pelanggan tidak akan dapat memesan sampai akun diaktifkan kembali.`}
-              </p>
-            </div>
-
-            <div className="dialog-footer">
-              <button
-                type="button"
-                className="btn-dialog-cancel"
-                onClick={() => setCustomerStatusConfirm(null)}
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                className={`btn-dialog-confirm-${customerStatusConfirm.status === 'suspended' ? 'approve' : 'reject'}`}
-                onClick={() => handleToggleCustomerStatus(customerStatusConfirm)}
-              >
-                {customerStatusConfirm.status === 'suspended'
-                  ? 'Ya, Aktifkan Akun'
-                  : 'Ya, Tangguhkan Akun'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {customerStatusConfirm && (() => {
+        const isSuspended = customerStatusConfirm.status === 'suspended';
+        return (
+          <AdminConfirmDialog
+            idPrefix="customer-status-dialog"
+            title={isSuspended ? 'Aktifkan Akun Pelanggan?' : 'Tangguhkan Akun Pelanggan?'}
+            subtitle="Konfirmasi perubahan akses pelanggan"
+            onClose={() => setCustomerStatusConfirm(null)}
+            onConfirm={() => handleToggleCustomerStatus(customerStatusConfirm)}
+            confirmLabel={isSuspended ? 'Aktifkan Akun' : 'Tangguhkan Akun'}
+            confirmTone={isSuspended ? 'approve' : 'danger'}
+            summaryItems={[
+              { label: 'Nama Pelanggan', value: customerStatusConfirm.full_name || 'Pelanggan' },
+              { label: 'No. WhatsApp', value: customerStatusConfirm.phone || '-' },
+              {
+                label: 'Status Saat Ini',
+                value: isSuspended ? 'Ditangguhkan' : 'Aktif',
+                tone: isSuspended ? 'danger' : 'ok'
+              }
+            ]}
+            note={
+              isSuspended
+                ? 'Akun akan diaktifkan kembali sehingga pelanggan dapat masuk dan memesan layanan OTWJek.'
+                : 'Pelanggan tidak dapat membuat pesanan baru sampai akun ini diaktifkan kembali.'
+            }
+          />
+        );
+      })()}
 
       {/* ================================================================= */}
       {/* MODAL 6: KONFIRMASI HAPUS PELANGGAN                               */}
       {/* ================================================================= */}
       {customerDeleteConfirm && (
-        <div className="admin-modal-backdrop" onClick={() => setCustomerDeleteConfirm(null)}>
-          <div className="admin-modal-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="dialog-header">
-              <div className="dialog-icon-wrap reject">
-                <Trash2 size={22} />
-              </div>
-              <div>
-                <h3 className="dialog-title">Hapus Akun Pelanggan?</h3>
-                <span className="dialog-sub">Pelanggan: {customerDeleteConfirm.full_name}</span>
-              </div>
-              <button
-                type="button"
-                className="btn-close-dialog"
-                onClick={() => setCustomerDeleteConfirm(null)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="dialog-body">
-              <p className="dialog-instruction">
-                Tindakan ini akan menghapus data akun <strong>{customerDeleteConfirm.full_name}</strong> ({customerDeleteConfirm.phone}) secara permanen dari basis data pelanggan OTWJek.
-              </p>
-            </div>
-
-            <div className="dialog-footer">
-              <button
-                type="button"
-                className="btn-dialog-cancel"
-                onClick={() => setCustomerDeleteConfirm(null)}
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                className="btn-dialog-confirm-reject"
-                onClick={() => handleDeleteCustomer(customerDeleteConfirm)}
-              >
-                Ya, Hapus Permanen
-              </button>
-            </div>
-          </div>
-        </div>
+        <AdminConfirmDialog
+          idPrefix="customer-delete-dialog"
+          title="Hapus Akun Pelanggan?"
+          subtitle="Tindakan permanen dan tidak dapat dibatalkan"
+          onClose={() => setCustomerDeleteConfirm(null)}
+          onConfirm={() => handleDeleteCustomer(customerDeleteConfirm)}
+          confirmLabel="Hapus Akun"
+          confirmTone="danger"
+          summaryItems={[
+            { label: 'Nama Pelanggan', value: customerDeleteConfirm.full_name || '-' },
+            { label: 'No. WhatsApp', value: customerDeleteConfirm.phone || '-' },
+            { label: 'Riwayat Order', value: `${getCustomerOrderCount(customerDeleteConfirm)} pesanan` }
+          ]}
+          warningNote="Seluruh data akun pelanggan ini akan dihapus permanen dari basis data OTWJek."
+        />
       )}
 
       {/* ================================================================= */}
       {/* MODAL: KONFIRMASI HAPUS DRIVER                                    */}
       {/* ================================================================= */}
       {driverDeleteConfirm && (
-        <div className="admin-modal-backdrop" onClick={() => setDriverDeleteConfirm(null)}>
-          <div className="admin-modal-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="dialog-header">
-              <div className="dialog-icon-wrap reject">
-                <Trash2 size={22} />
-              </div>
-              <div>
-                <h3 className="dialog-title">Hapus Akun Mitra Driver?</h3>
-                <span className="dialog-sub">Mitra: {driverDeleteConfirm.name}</span>
-              </div>
-              <button
-                type="button"
-                className="btn-close-dialog"
-                onClick={() => setDriverDeleteConfirm(null)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="dialog-body">
-              <p className="dialog-instruction">
-                Tindakan ini akan menghapus data akun mitra <strong>{driverDeleteConfirm.name}</strong> ({driverDeleteConfirm.phone}) beserta seluruh berkas dokumennya secara permanen dari basis data OTWJek.
-              </p>
-            </div>
-
-            <div className="dialog-footer">
-              <button
-                type="button"
-                className="btn-dialog-cancel"
-                onClick={() => setDriverDeleteConfirm(null)}
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                className="btn-dialog-confirm-reject"
-                onClick={() => handleDeleteDriver(driverDeleteConfirm)}
-              >
-                Ya, Hapus Driver
-              </button>
-            </div>
-          </div>
-        </div>
+        <AdminConfirmDialog
+          idPrefix="driver-delete-dialog"
+          title="Hapus Akun Mitra Driver?"
+          subtitle="Tindakan permanen dan tidak dapat dibatalkan"
+          onClose={() => setDriverDeleteConfirm(null)}
+          onConfirm={() => handleDeleteDriver(driverDeleteConfirm)}
+          confirmLabel="Hapus Mitra"
+          confirmTone="danger"
+          summaryItems={[
+            { label: 'Nama Mitra', value: driverDeleteConfirm.name || '-' },
+            { label: 'Layanan', value: getDriverServiceLabel(driverDeleteConfirm) },
+            {
+              label: 'Kendaraan',
+              value: [driverDeleteConfirm.vehicleModel, driverDeleteConfirm.plateNumber].filter(Boolean).join(', ') || '-'
+            },
+            { label: 'No. WhatsApp', value: driverDeleteConfirm.phone || '-' }
+          ]}
+          warningNote="Data akun mitra beserta dokumen KTP, SIM, dan STNK akan dihapus permanen."
+        />
       )}
 
       {/* ================================================================= */}
       {/* MODAL: KONFIRMASI BERSIHKAN SELURUH DATABASE                      */}
       {/* ================================================================= */}
       {clearDbModalOpen && (
-        <div className="admin-modal-backdrop" onClick={() => setClearDbModalOpen(false)}>
-          <div className="admin-modal-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="dialog-header">
-              <div className="dialog-icon-wrap reject">
-                <AlertTriangle size={22} />
-              </div>
-              <div>
-                <h3 className="dialog-title" style={{ color: '#DC2626' }}>Bersihkan Seluruh Database?</h3>
-                <span className="dialog-sub">Tindakan ini permanen dan tidak dapat dibatalkan</span>
-              </div>
-              <button
-                type="button"
-                className="btn-close-dialog"
-                onClick={() => setClearDbModalOpen(false)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="dialog-body">
-              <p className="dialog-instruction" style={{ lineHeight: 1.6 }}>
-                Apakah Anda yakin ingin <strong>membersihkan seluruh basis data OTWJek</strong>?
-                <br /><br />
-                • Seluruh <strong>data mitra driver</strong> akan dihapus permanen.
-                <br />
-                • Seluruh <strong>berkas dokumen KTP/SIM/STNK</strong> akan dihapus.
-                <br />
-                • Seluruh <strong>akun pengguna & pelanggan</strong> akan dihapus.
-                <br />
-                • Seluruh <strong>riwayat pesanan</strong> akan dihapus.
-                <br /><br />
-                <em>Hanya akun Super Admin yang akan tetap dipertahankan agar Anda tetap dapat login.</em>
-              </p>
-            </div>
-
-            <div className="dialog-footer">
-              <button
-                type="button"
-                className="btn-dialog-cancel"
-                onClick={() => setClearDbModalOpen(false)}
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                className="btn-dialog-confirm-reject"
-                onClick={handleClearEntireDatabase}
-                style={{ backgroundColor: '#DC2626', borderColor: '#DC2626' }}
-              >
-                Ya, Bersihkan Seluruh Database
-              </button>
-            </div>
-          </div>
-        </div>
+        <AdminConfirmDialog
+          idPrefix="clear-db-dialog"
+          title="Bersihkan Seluruh Database?"
+          subtitle="Tindakan permanen dan tidak dapat dibatalkan"
+          onClose={() => setClearDbModalOpen(false)}
+          onConfirm={handleClearEntireDatabase}
+          confirmLabel="Bersihkan Database"
+          confirmTone="danger"
+          summaryItems={[
+            { label: 'Data Mitra Driver', value: 'Dihapus permanen', tone: 'danger' },
+            { label: 'Berkas KTP, SIM, STNK', value: 'Dihapus permanen', tone: 'danger' },
+            { label: 'Akun Pelanggan', value: 'Dihapus permanen', tone: 'danger' },
+            { label: 'Riwayat Pesanan', value: 'Dihapus permanen', tone: 'danger' }
+          ]}
+          warningNote="Hanya akun Super Admin yang dipertahankan agar Anda tetap dapat masuk ke dashboard."
+        />
       )}
 
       {/* ================================================================= */}
       {/* MODAL 7: EDIT & LENGKAPI DATA DRIVER (SIMPLE, CLEAN & MINIMALIST) */}
       {/* ================================================================= */}
       {editingDriver && editDriverForm && (
-        <div className="admin-modal-backdrop" onClick={() => !isSavingDriver && setEditingDriver(null)}>
-          <div className="admin-modal-dialog driver-edit-dialog-minimal" onClick={(e) => e.stopPropagation()}>
-            {/* Header: Clean & Uncluttered */}
+        <div
+          className="admin-modal-backdrop"
+          onClick={() => !isSavingDriver && setEditingDriver(null)}
+        >
+          <div
+            className="admin-modal-dialog driver-edit-dialog-minimal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="driver-edit-dialog-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
             <div className="dialog-header edit-dialog-header-minimal">
-              <div>
+              <div className="edit-header-copy">
                 <div className="edit-dialog-title-row">
-                  <h3 className="dialog-title">Edit Data Mitra Driver</h3>
-                  <span className={`table-status-pill ${
-                    editDriverForm.verification_status === 'pending'
-                      ? 'pending'
-                      : editDriverForm.verification_status === 'rejected'
-                      ? 'cancel'
-                      : 'active'
-                  }`}>
+                  <h3 id="driver-edit-dialog-title" className="dialog-title">Edit Data Mitra Driver</h3>
+                  <span
+                    className={`table-status-pill ${
+                      editDriverForm.verification_status === 'pending'
+                        ? 'pending'
+                        : editDriverForm.verification_status === 'rejected'
+                        ? 'cancel'
+                        : 'active'
+                    }`}
+                  >
                     {editDriverForm.verification_status === 'pending'
                       ? 'Menunggu Review'
                       : editDriverForm.verification_status === 'rejected'
@@ -5078,95 +5286,96 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                 className="btn-close-dialog"
                 disabled={isSavingDriver}
                 onClick={() => setEditingDriver(null)}
+                aria-label="Tutup dialog"
                 title="Tutup dialog"
               >
                 <X size={16} />
               </button>
             </div>
 
-            {/* Clean Text-Only Tabs */}
-            <div className="driver-edit-tabs-minimal">
-              <button
-                type="button"
-                className={`tab-btn-minimal ${editDriverActiveTab === 'identitas' ? 'active' : ''}`}
-                onClick={() => setEditDriverActiveTab('identitas')}
-              >
-                Identitas
-              </button>
-              <button
-                type="button"
-                className={`tab-btn-minimal ${editDriverActiveTab === 'kendaraan' ? 'active' : ''}`}
-                onClick={() => setEditDriverActiveTab('kendaraan')}
-              >
-                Kendaraan
-              </button>
-              <button
-                type="button"
-                className={`tab-btn-minimal ${editDriverActiveTab === 'dokumen' ? 'active' : ''}`}
-                onClick={() => setEditDriverActiveTab('dokumen')}
-              >
-                Dokumen
-              </button>
-              <button
-                type="button"
-                className={`tab-btn-minimal ${editDriverActiveTab === 'status' ? 'active' : ''}`}
-                onClick={() => setEditDriverActiveTab('status')}
-              >
-                Status & Darurat
-              </button>
+            {/* Clean Navigation Tabs */}
+            <div
+              className="driver-edit-tabs-minimal"
+              role="tablist"
+              aria-label="Bagian data mitra driver"
+            >
+              {[
+                { id: 'identitas', label: 'Identitas' },
+                { id: 'kendaraan', label: 'Kendaraan' },
+                { id: 'dokumen', label: 'Dokumen' },
+                { id: 'status', label: 'Status & Darurat' }
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  id={`driver-edit-tab-${tab.id}`}
+                  aria-selected={editDriverActiveTab === tab.id}
+                  aria-controls={`driver-edit-panel-${tab.id}`}
+                  className={`tab-btn-minimal ${editDriverActiveTab === tab.id ? 'active' : ''}`}
+                  onClick={() => setEditDriverActiveTab(tab.id)}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
 
             {/* Modal Body */}
             <div className="dialog-body edit-body-minimal">
               {/* TAB 1: IDENTITAS */}
               {editDriverActiveTab === 'identitas' && (
-                <div className="edit-section-stack">
-                  {/* Avatar minimal */}
+                <div
+                  role="tabpanel"
+                  id="driver-edit-panel-identitas"
+                  aria-labelledby="driver-edit-tab-identitas"
+                  className="edit-section-stack"
+                >
                   <div className="avatar-row-minimal">
-                    {editDriverForm.avatar ? (
-                      <img
-                        src={editDriverForm.avatar}
-                        alt="Driver Avatar"
-                        className="avatar-thumb-minimal"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
-                    ) : (
-                      <div
-                        className="avatar-thumb-minimal"
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: 'linear-gradient(135deg, #FF337F 0%, #E11D6F 100%)',
-                          color: '#FFFFFF',
-                          fontWeight: 800,
-                          fontSize: 18,
-                          borderRadius: '50%'
-                        }}
-                      >
-                        {(editDriverForm.name || 'D').trim().charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <div className="avatar-info-minimal">
-                      <span className="avatar-label-minimal">Foto Profil Mitra</span>
-                      <label className="btn-file-text-minimal">
-                        <span>Pilih Foto Baru</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          style={{ display: 'none' }}
-                          onChange={handleAvatarFile}
+                    <div className="avatar-identity-group">
+                      {editDriverForm.avatar && !editAvatarError ? (
+                        <img
+                          src={editDriverForm.avatar}
+                          alt={`Foto profil ${editDriverForm.name || 'mitra'}`}
+                          className="avatar-thumb-minimal"
+                          onError={() => setEditAvatarError(true)}
                         />
-                      </label>
+                      ) : (
+                        <div className="avatar-fallback-minimal" aria-hidden="true">
+                          {(editDriverForm.name || 'D').trim().charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="avatar-info-minimal">
+                        <span className="avatar-label-minimal">Foto Profil Mitra</span>
+                        <span className="avatar-helper-minimal">
+                          {editDriverForm.avatar && !editAvatarError
+                            ? 'Foto profil terpasang'
+                            : 'Belum ada foto profil'}
+                        </span>
+                      </div>
                     </div>
+                    <label
+                      htmlFor="driver-edit-avatar-input"
+                      role="button"
+                      tabIndex={0}
+                      className="btn-avatar-upload-minimal"
+                      onKeyDown={handleFileLabelKeyDown}
+                    >
+                      <span>{editDriverForm.avatar && !editAvatarError ? 'Ganti Foto' : 'Pilih Foto'}</span>
+                      <input
+                        id="driver-edit-avatar-input"
+                        type="file"
+                        accept="image/*"
+                        className="visually-hidden-input"
+                        onChange={handleAvatarFile}
+                      />
+                    </label>
                   </div>
 
                   <div className="minimal-grid">
                     <div className="minimal-field">
-                      <label>Nama Lengkap</label>
+                      <label htmlFor="edit-driver-name">Nama Lengkap</label>
                       <input
+                        id="edit-driver-name"
                         type="text"
                         placeholder="Nama lengkap driver"
                         value={editDriverForm.name}
@@ -5175,8 +5384,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                     </div>
 
                     <div className="minimal-field">
-                      <label>Nomor WhatsApp</label>
+                      <label htmlFor="edit-driver-phone">Nomor WhatsApp</label>
                       <input
+                        id="edit-driver-phone"
                         type="text"
                         placeholder="08xxxxxxxxxx"
                         value={editDriverForm.phone}
@@ -5185,8 +5395,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                     </div>
 
                     <div className="minimal-field">
-                      <label>NIK (KTP)</label>
+                      <label htmlFor="edit-driver-nik">NIK (KTP)</label>
                       <input
+                        id="edit-driver-nik"
                         type="text"
                         maxLength={16}
                         placeholder="16 digit NIK"
@@ -5196,8 +5407,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                     </div>
 
                     <div className="minimal-field">
-                      <label>Jenis Kelamin</label>
+                      <label htmlFor="edit-driver-gender">Jenis Kelamin</label>
                       <input
+                        id="edit-driver-gender"
                         type="text"
                         value="Perempuan (Khusus Wanita)"
                         readOnly
@@ -5206,8 +5418,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                     </div>
 
                     <div className="minimal-field full">
-                      <label>Bio / Catatan Pelayanan</label>
+                      <label htmlFor="edit-driver-bio">Bio / Catatan Pelayanan</label>
                       <textarea
+                        id="edit-driver-bio"
                         rows={2}
                         placeholder="Catatan pelayanan driver..."
                         value={editDriverForm.bio}
@@ -5220,11 +5433,17 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
 
               {/* TAB 2: KENDARAAN */}
               {editDriverActiveTab === 'kendaraan' && (
-                <div className="edit-section-stack">
+                <div
+                  role="tabpanel"
+                  id="driver-edit-panel-kendaraan"
+                  aria-labelledby="driver-edit-tab-kendaraan"
+                  className="edit-section-stack"
+                >
                   <div className="minimal-grid">
                     <div className="minimal-field">
-                      <label>Jenis Layanan</label>
+                      <label htmlFor="edit-driver-vehicle-type">Jenis Layanan</label>
                       <select
+                        id="edit-driver-vehicle-type"
                         value={editDriverForm.vehicleType}
                         onChange={(e) => setEditDriverForm({ ...editDriverForm, vehicleType: e.target.value })}
                       >
@@ -5237,8 +5456,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                     {editDriverForm.vehicleType === 'both' ? (
                       <>
                         <div className="minimal-field">
-                          <label>Armada Aktif Beroperasi</label>
+                          <label htmlFor="edit-driver-active-vehicle">Armada Aktif Beroperasi</label>
                           <select
+                            id="edit-driver-active-vehicle"
                             value={editDriverForm.activeVehicleType || 'motor'}
                             onChange={(e) => setEditDriverForm({ ...editDriverForm, activeVehicleType: e.target.value })}
                           >
@@ -5248,8 +5468,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                         </div>
 
                         <div className="minimal-field">
-                          <label>Model Motor</label>
+                          <label htmlFor="edit-driver-motor-model">Model Motor</label>
                           <input
+                            id="edit-driver-motor-model"
                             type="text"
                             placeholder="Scoopy, Beat, Vario..."
                             value={editDriverForm.motorModel || ''}
@@ -5258,8 +5479,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                         </div>
 
                         <div className="minimal-field">
-                          <label>Plat Nomor Motor</label>
+                          <label htmlFor="edit-driver-motor-plate">Plat Nomor Motor</label>
                           <input
+                            id="edit-driver-motor-plate"
                             type="text"
                             placeholder="DD 1234 XX"
                             value={editDriverForm.motorPlate || ''}
@@ -5268,8 +5490,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                         </div>
 
                         <div className="minimal-field">
-                          <label>Model Mobil</label>
+                          <label htmlFor="edit-driver-car-model">Model Mobil</label>
                           <input
+                            id="edit-driver-car-model"
                             type="text"
                             placeholder="Avanza, Calya, Brio..."
                             value={editDriverForm.carModel || ''}
@@ -5278,8 +5501,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                         </div>
 
                         <div className="minimal-field">
-                          <label>Plat Nomor Mobil</label>
+                          <label htmlFor="edit-driver-car-plate">Plat Nomor Mobil</label>
                           <input
+                            id="edit-driver-car-plate"
                             type="text"
                             placeholder="DD 5678 YY"
                             value={editDriverForm.carPlate || ''}
@@ -5290,8 +5514,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                     ) : (
                       <>
                         <div className="minimal-field">
-                          <label>Merk Kendaraan</label>
+                          <label htmlFor="edit-driver-vehicle-brand">Merk Kendaraan</label>
                           <input
+                            id="edit-driver-vehicle-brand"
                             type="text"
                             placeholder="Honda, Yamaha, Toyota..."
                             value={editDriverForm.vehicleBrand}
@@ -5300,8 +5525,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                         </div>
 
                         <div className="minimal-field">
-                          <label>Model & Tipe</label>
+                          <label htmlFor="edit-driver-vehicle-model">Model & Tipe</label>
                           <input
+                            id="edit-driver-vehicle-model"
                             type="text"
                             placeholder="Scoopy, Fazzio, Calya..."
                             value={editDriverForm.vehicleModel}
@@ -5310,8 +5536,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                         </div>
 
                         <div className="minimal-field">
-                          <label>Plat Nomor</label>
+                          <label htmlFor="edit-driver-plate">Plat Nomor</label>
                           <input
+                            id="edit-driver-plate"
                             type="text"
                             placeholder="DD 1234 XX"
                             value={editDriverForm.plateNumber}
@@ -5322,8 +5549,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                     )}
 
                     <div className="minimal-field">
-                      <label>Warna Kendaraan</label>
+                      <label htmlFor="edit-driver-color">Warna Kendaraan</label>
                       <input
+                        id="edit-driver-color"
                         type="text"
                         placeholder="Warna kendaraan"
                         value={editDriverForm.vehicleColor}
@@ -5332,8 +5560,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                     </div>
 
                     <div className="minimal-field">
-                      <label>Area Operasional</label>
+                      <label htmlFor="edit-driver-area">Area Operasional</label>
                       <input
+                        id="edit-driver-area"
                         type="text"
                         placeholder="Makassar, Gowa..."
                         value={editDriverForm.operationalArea}
@@ -5342,10 +5571,11 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                     </div>
 
                     <div className="minimal-field full">
-                      <label>Badge Mitra</label>
+                      <label htmlFor="edit-driver-badge">Badge Mitra</label>
                       <input
+                        id="edit-driver-badge"
                         type="text"
-                        placeholder="Mitra Resmi 🌸"
+                        placeholder="Mitra Resmi"
                         value={editDriverForm.badge}
                         onChange={(e) => setEditDriverForm({ ...editDriverForm, badge: e.target.value })}
                       />
@@ -5355,285 +5585,200 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
               )}
 
               {/* TAB 3: DOKUMEN & LEGALITAS */}
-              {editDriverActiveTab === 'dokumen' && (
-                <div className="edit-section-stack">
-                  <div className="minimal-grid">
-                    <div className="minimal-field">
-                      <label>Nomor SIM</label>
-                      <input
-                        type="text"
-                        placeholder="Nomor SIM"
-                        value={editDriverForm.simNumber}
-                        onChange={(e) => setEditDriverForm({ ...editDriverForm, simNumber: e.target.value })}
-                      />
+              {editDriverActiveTab === 'dokumen' && (() => {
+                const docRows = [
+                  {
+                    key: 'ktp',
+                    label: 'Foto KTP Asli',
+                    url: editDriverForm.ktpUrl,
+                    previewType: 'KTP',
+                    previewTitle: 'Foto KTP'
+                  },
+                  ...(editDriverForm.vehicleType === 'both'
+                    ? [
+                        {
+                          key: 'sim',
+                          label: 'Foto SIM C Asli (Motor)',
+                          url: editDriverForm.simUrl,
+                          previewType: 'SIM C',
+                          previewTitle: 'Foto SIM C (Motor)'
+                        },
+                        {
+                          key: 'simA',
+                          label: 'Foto SIM A Asli (Mobil)',
+                          url: editDriverForm.simAUrl,
+                          previewType: 'SIM A',
+                          previewTitle: 'Foto SIM A (Mobil)'
+                        },
+                        {
+                          key: 'stnk',
+                          label: 'Foto STNK Motor',
+                          url: editDriverForm.stnkUrl,
+                          previewType: 'STNK Motor',
+                          previewTitle: 'Foto STNK Motor'
+                        },
+                        {
+                          key: 'stnkCar',
+                          label: 'Foto STNK Mobil',
+                          url: editDriverForm.stnkCarUrl,
+                          previewType: 'STNK Mobil',
+                          previewTitle: 'Foto STNK Mobil'
+                        }
+                      ]
+                    : [
+                        {
+                          key: 'sim',
+                          label: `Foto ${editDriverForm.vehicleType === 'mobil' ? 'SIM A' : 'SIM C'} Asli`,
+                          url: editDriverForm.simUrl,
+                          previewType: 'SIM',
+                          previewTitle: 'Foto SIM'
+                        },
+                        {
+                          key: 'stnk',
+                          label: 'Foto STNK Kendaraan',
+                          url: editDriverForm.stnkUrl,
+                          previewType: 'STNK',
+                          previewTitle: 'Foto STNK'
+                        }
+                      ])
+                ];
+
+                return (
+                  <div
+                    role="tabpanel"
+                    id="driver-edit-panel-dokumen"
+                    aria-labelledby="driver-edit-tab-dokumen"
+                    className="edit-section-stack"
+                  >
+                    <div className="minimal-grid">
+                      <div className="minimal-field">
+                        <label htmlFor="edit-driver-sim-number">Nomor SIM</label>
+                        <input
+                          id="edit-driver-sim-number"
+                          type="text"
+                          placeholder="Nomor SIM"
+                          value={editDriverForm.simNumber}
+                          onChange={(e) => setEditDriverForm({ ...editDriverForm, simNumber: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="minimal-field">
+                        <label htmlFor="edit-driver-sim-expiry">Masa Berlaku SIM</label>
+                        <input
+                          id="edit-driver-sim-expiry"
+                          type="date"
+                          value={editDriverForm.simExpiry || ''}
+                          onChange={(e) => setEditDriverForm({ ...editDriverForm, simExpiry: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="minimal-field full">
+                        <label htmlFor="edit-driver-stnk-expiry">Masa Berlaku STNK</label>
+                        <input
+                          id="edit-driver-stnk-expiry"
+                          type="date"
+                          value={editDriverForm.stnkExpiry || ''}
+                          onChange={(e) => setEditDriverForm({ ...editDriverForm, stnkExpiry: e.target.value })}
+                        />
+                      </div>
                     </div>
 
-                    <div className="minimal-field">
-                      <label>Masa Berlaku SIM</label>
-                      <input
-                        type="date"
-                        value={editDriverForm.simExpiry || ''}
-                        onChange={(e) => setEditDriverForm({ ...editDriverForm, simExpiry: e.target.value })}
-                      />
-                    </div>
-
-                    <div className="minimal-field full">
-                      <label>Masa Berlaku STNK</label>
-                      <input
-                        type="date"
-                        value={editDriverForm.stnkExpiry || ''}
-                        onChange={(e) => setEditDriverForm({ ...editDriverForm, stnkExpiry: e.target.value })}
-                      />
+                    <div className="docs-list-minimal">
+                      {docRows.map((row) => {
+                        const inputId = `driver-edit-doc-${row.key}`;
+                        return (
+                          <div key={row.key} className="doc-row-minimal">
+                            <div className="doc-info-minimal">
+                              <span className="doc-name-minimal">{row.label}</span>
+                              <span className={`doc-status-badge ${row.url ? 'ready' : 'empty'}`}>
+                                {row.url ? 'Tersedia' : 'Belum Ada'}
+                              </span>
+                            </div>
+                            <div className="doc-actions-minimal">
+                              {row.url && (
+                                <button
+                                  type="button"
+                                  className="btn-doc-link-minimal"
+                                  onClick={() =>
+                                    setPreviewDoc({
+                                      type: row.previewType,
+                                      title: row.previewTitle,
+                                      url: row.url,
+                                      driverName: editDriverForm.name
+                                    })
+                                  }
+                                >
+                                  Lihat Foto
+                                </button>
+                              )}
+                              <label
+                                htmlFor={inputId}
+                                role="button"
+                                tabIndex={0}
+                                className="btn-doc-upload-minimal"
+                                onKeyDown={handleFileLabelKeyDown}
+                              >
+                                <span>{row.url ? 'Ganti File' : 'Unggah File'}</span>
+                                <input
+                                  id={inputId}
+                                  type="file"
+                                  accept="image/*"
+                                  className="visually-hidden-input"
+                                  onChange={(e) => handleDocFile(row.key, e)}
+                                />
+                              </label>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-
-                  {/* Clean Minimal Document Rows */}
-                  <div className="docs-list-minimal">
-                    <div className="doc-row-minimal">
-                      <div className="doc-info-minimal">
-                        <span className="doc-name-minimal">Foto KTP Asli</span>
-                        <span className={`doc-status-badge ${editDriverForm.ktpUrl ? 'ready' : 'empty'}`}>
-                          {editDriverForm.ktpUrl ? 'Tersedia' : 'Belum Ada'}
-                        </span>
-                      </div>
-                      <div className="doc-actions-minimal">
-                        {editDriverForm.ktpUrl && (
-                          <button
-                            type="button"
-                            className="btn-doc-link-minimal"
-                            onClick={() => setPreviewDoc({ type: 'KTP', title: 'Foto KTP', url: editDriverForm.ktpUrl, driverName: editDriverForm.name })}
-                          >
-                            Lihat Foto
-                          </button>
-                        )}
-                        <label className="btn-doc-upload-minimal">
-                          <span>{editDriverForm.ktpUrl ? 'Ganti File' : 'Unggah File'}</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            style={{ display: 'none' }}
-                            onChange={(e) => handleDocFile('ktp', e)}
-                          />
-                        </label>
-                      </div>
-                    </div>
-
-                    {editDriverForm.vehicleType === 'both' ? (
-                      <>
-                        {/* 2. Foto SIM C */}
-                        <div className="doc-row-minimal">
-                          <div className="doc-info-minimal">
-                            <span className="doc-name-minimal">Foto SIM C Asli (Motor)</span>
-                            <span className={`doc-status-badge ${editDriverForm.simUrl ? 'ready' : 'empty'}`}>
-                              {editDriverForm.simUrl ? 'Tersedia' : 'Belum Ada'}
-                            </span>
-                          </div>
-                          <div className="doc-actions-minimal">
-                            {editDriverForm.simUrl && (
-                              <button
-                                type="button"
-                                className="btn-doc-link-minimal"
-                                onClick={() => setPreviewDoc({ type: 'SIM C', title: 'Foto SIM C (Motor)', url: editDriverForm.simUrl, driverName: editDriverForm.name })}
-                              >
-                                Lihat Foto
-                              </button>
-                            )}
-                            <label className="btn-doc-upload-minimal">
-                              <span>{editDriverForm.simUrl ? 'Ganti File' : 'Unggah File'}</span>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                style={{ display: 'none' }}
-                                onChange={(e) => handleDocFile('sim', e)}
-                              />
-                            </label>
-                          </div>
-                        </div>
-
-                        {/* 3. Foto SIM A */}
-                        <div className="doc-row-minimal">
-                          <div className="doc-info-minimal">
-                            <span className="doc-name-minimal">Foto SIM A Asli (Mobil)</span>
-                            <span className={`doc-status-badge ${editDriverForm.simAUrl ? 'ready' : 'empty'}`}>
-                              {editDriverForm.simAUrl ? 'Tersedia' : 'Belum Ada'}
-                            </span>
-                          </div>
-                          <div className="doc-actions-minimal">
-                            {editDriverForm.simAUrl && (
-                              <button
-                                type="button"
-                                className="btn-doc-link-minimal"
-                                onClick={() => setPreviewDoc({ type: 'SIM A', title: 'Foto SIM A (Mobil)', url: editDriverForm.simAUrl, driverName: editDriverForm.name })}
-                              >
-                                Lihat Foto
-                              </button>
-                            )}
-                            <label className="btn-doc-upload-minimal">
-                              <span>{editDriverForm.simAUrl ? 'Ganti File' : 'Unggah File'}</span>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                style={{ display: 'none' }}
-                                onChange={(e) => handleDocFile('simA', e)}
-                              />
-                            </label>
-                          </div>
-                        </div>
-
-                        {/* 4. Foto STNK Motor */}
-                        <div className="doc-row-minimal">
-                          <div className="doc-info-minimal">
-                            <span className="doc-name-minimal">Foto STNK Motor</span>
-                            <span className={`doc-status-badge ${editDriverForm.stnkUrl ? 'ready' : 'empty'}`}>
-                              {editDriverForm.stnkUrl ? 'Tersedia' : 'Belum Ada'}
-                            </span>
-                          </div>
-                          <div className="doc-actions-minimal">
-                            {editDriverForm.stnkUrl && (
-                              <button
-                                type="button"
-                                className="btn-doc-link-minimal"
-                                onClick={() => setPreviewDoc({ type: 'STNK Motor', title: 'Foto STNK Motor', url: editDriverForm.stnkUrl, driverName: editDriverForm.name })}
-                              >
-                                Lihat Foto
-                              </button>
-                            )}
-                            <label className="btn-doc-upload-minimal">
-                              <span>{editDriverForm.stnkUrl ? 'Ganti File' : 'Unggah File'}</span>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                style={{ display: 'none' }}
-                                onChange={(e) => handleDocFile('stnk', e)}
-                              />
-                            </label>
-                          </div>
-                        </div>
-
-                        {/* 5. Foto STNK Mobil */}
-                        <div className="doc-row-minimal">
-                          <div className="doc-info-minimal">
-                            <span className="doc-name-minimal">Foto STNK Mobil</span>
-                            <span className={`doc-status-badge ${editDriverForm.stnkCarUrl ? 'ready' : 'empty'}`}>
-                              {editDriverForm.stnkCarUrl ? 'Tersedia' : 'Belum Ada'}
-                            </span>
-                          </div>
-                          <div className="doc-actions-minimal">
-                            {editDriverForm.stnkCarUrl && (
-                              <button
-                                type="button"
-                                className="btn-doc-link-minimal"
-                                onClick={() => setPreviewDoc({ type: 'STNK Mobil', title: 'Foto STNK Mobil', url: editDriverForm.stnkCarUrl, driverName: editDriverForm.name })}
-                              >
-                                Lihat Foto
-                              </button>
-                            )}
-                            <label className="btn-doc-upload-minimal">
-                              <span>{editDriverForm.stnkCarUrl ? 'Ganti File' : 'Unggah File'}</span>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                style={{ display: 'none' }}
-                                onChange={(e) => handleDocFile('stnkCar', e)}
-                              />
-                            </label>
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="doc-row-minimal">
-                          <div className="doc-info-minimal">
-                            <span className="doc-name-minimal">Foto {editDriverForm.vehicleType === 'mobil' ? 'SIM A' : 'SIM C'} Asli</span>
-                            <span className={`doc-status-badge ${editDriverForm.simUrl ? 'ready' : 'empty'}`}>
-                              {editDriverForm.simUrl ? 'Tersedia' : 'Belum Ada'}
-                            </span>
-                          </div>
-                          <div className="doc-actions-minimal">
-                            {editDriverForm.simUrl && (
-                              <button
-                                type="button"
-                                className="btn-doc-link-minimal"
-                                onClick={() => setPreviewDoc({ type: 'SIM', title: 'Foto SIM', url: editDriverForm.simUrl, driverName: editDriverForm.name })}
-                              >
-                                Lihat Foto
-                              </button>
-                            )}
-                            <label className="btn-doc-upload-minimal">
-                              <span>{editDriverForm.simUrl ? 'Ganti File' : 'Unggah File'}</span>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                style={{ display: 'none' }}
-                                onChange={(e) => handleDocFile('sim', e)}
-                              />
-                            </label>
-                          </div>
-                        </div>
-
-                        <div className="doc-row-minimal">
-                          <div className="doc-info-minimal">
-                            <span className="doc-name-minimal">Foto STNK Kendaraan</span>
-                            <span className={`doc-status-badge ${editDriverForm.stnkUrl ? 'ready' : 'empty'}`}>
-                              {editDriverForm.stnkUrl ? 'Tersedia' : 'Belum Ada'}
-                            </span>
-                          </div>
-                          <div className="doc-actions-minimal">
-                            {editDriverForm.stnkUrl && (
-                              <button
-                                type="button"
-                                className="btn-doc-link-minimal"
-                                onClick={() => setPreviewDoc({ type: 'STNK', title: 'Foto STNK', url: editDriverForm.stnkUrl, driverName: editDriverForm.name })}
-                              >
-                                Lihat Foto
-                              </button>
-                            )}
-                            <label className="btn-doc-upload-minimal">
-                              <span>{editDriverForm.stnkUrl ? 'Ganti File' : 'Unggah File'}</span>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                style={{ display: 'none' }}
-                                onChange={(e) => handleDocFile('stnk', e)}
-                              />
-                            </label>
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* TAB 4: STATUS & DARURAT */}
               {editDriverActiveTab === 'status' && (
-                <div className="edit-section-stack">
+                <div
+                  role="tabpanel"
+                  id="driver-edit-panel-status"
+                  aria-labelledby="driver-edit-tab-status"
+                  className="edit-section-stack"
+                >
                   <div className="minimal-grid">
                     <div className="minimal-field">
-                      <label>Kontak Darurat (Nama)</label>
+                      <label htmlFor="edit-driver-emergency-name">Kontak Darurat (Nama)</label>
                       <input
+                        id="edit-driver-emergency-name"
                         type="text"
                         placeholder="Nama keluarga / kerabat"
                         value={editDriverForm.emergencyContactName}
-                        onChange={(e) => setEditDriverForm({ ...editDriverForm, emergencyContactName: e.target.value })}
+                        onChange={(e) =>
+                          setEditDriverForm({ ...editDriverForm, emergencyContactName: e.target.value })
+                        }
                       />
                     </div>
 
                     <div className="minimal-field">
-                      <label>Nomor HP Darurat</label>
+                      <label htmlFor="edit-driver-emergency-phone">Nomor HP Darurat</label>
                       <input
+                        id="edit-driver-emergency-phone"
                         type="text"
                         placeholder="08xxxxxxxxxx"
                         value={editDriverForm.emergencyContactPhone}
-                        onChange={(e) => setEditDriverForm({ ...editDriverForm, emergencyContactPhone: e.target.value })}
+                        onChange={(e) =>
+                          setEditDriverForm({ ...editDriverForm, emergencyContactPhone: e.target.value })
+                        }
                       />
                     </div>
 
                     <div className="minimal-field full">
-                      <label>Status Verifikasi Akun</label>
+                      <label htmlFor="edit-driver-status">Status Verifikasi Akun</label>
                       <select
+                        id="edit-driver-status"
                         value={editDriverForm.verification_status}
-                        onChange={(e) => setEditDriverForm({ ...editDriverForm, verification_status: e.target.value })}
+                        onChange={(e) =>
+                          setEditDriverForm({ ...editDriverForm, verification_status: e.target.value })
+                        }
                       >
                         <option value="approved">Disetujui (Approved / Aktif)</option>
                         <option value="pending">Menunggu Review (Pending)</option>
@@ -5643,12 +5788,15 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
 
                     {editDriverForm.verification_status === 'rejected' && (
                       <div className="minimal-field full">
-                        <label>Alasan Penolakan</label>
+                        <label htmlFor="edit-driver-rejection-reason">Alasan Penolakan</label>
                         <textarea
+                          id="edit-driver-rejection-reason"
                           rows={2}
                           placeholder="Jelaskan alasan penolakan berkas..."
                           value={editDriverForm.rejection_reason}
-                          onChange={(e) => setEditDriverForm({ ...editDriverForm, rejection_reason: e.target.value })}
+                          onChange={(e) =>
+                            setEditDriverForm({ ...editDriverForm, rejection_reason: e.target.value })
+                          }
                         />
                       </div>
                     )}
@@ -5657,7 +5805,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
               )}
             </div>
 
-            {/* Clean Footer Buttons (No Icons) */}
+            {/* Footer Actions */}
             <div className="dialog-footer edit-footer-minimal">
               <button
                 type="button"
@@ -5707,97 +5855,95 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
         >
           <div
             className="admin-modal-dialog assign-dialog-clean"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="assign-driver-dialog-title"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Clean Header without oversized alert box */}
             <div className="assign-dialog-header">
               <div className="assign-header-left">
-                <div className="assign-header-title-row">
-                  <h3 className="assign-header-title">Tugaskan Mitra Driver</h3>
-                </div>
+                <h3 id="assign-driver-dialog-title" className="assign-header-title">
+                  Tugaskan Mitra Driver
+                </h3>
                 <p className="assign-header-sub">
-                  Pelanggan: <strong>{assignModalOrder.customer_name || 'Pelanggan OTWJek'}</strong> • Layanan: <strong>{assignModalOrder.service_name || (assignModalOrder.service_type === 'mobil' ? 'OTWMobil' : assignModalOrder.service_type === 'paket' ? 'OTWPaket' : 'OTWMotor')}</strong>
+                  Pelanggan: {assignModalOrder.customer_name || 'Pelanggan OTWJek'} • Layanan{' '}
+                  {assignModalOrder.service_name ||
+                    (assignModalOrder.service_type === 'mobil'
+                      ? 'Mobil'
+                      : assignModalOrder.service_type === 'paket'
+                        ? 'Paket'
+                        : 'Motor')}
                 </p>
               </div>
               <button
                 type="button"
-                className="btn-close-dialog"
+                className="assign-close-text-btn"
                 onClick={() => {
                   setAssignModalOrder(null);
                   setAssignErrorMessage(null);
                 }}
-                title="Tutup"
+                aria-label="Tutup dialog penugasan"
               >
-                <X size={18} />
+                ×
               </button>
             </div>
 
             <div className="assign-body-clean">
-              {/* Order Route & Info Card */}
+              {/* Ringkasan Pesanan & Rute Minimalis */}
               <div className="assign-order-card">
                 <div className="assign-order-card-header">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span className={`assign-service-tag ${(assignModalOrder.service_type || 'motor').toLowerCase()}`}>
-                      {assignModalOrder.service_type === 'mobil' ? (
-                        <Car size={13} strokeWidth={2.2} />
-                      ) : assignModalOrder.service_type === 'paket' ? (
-                        <Package size={13} strokeWidth={2.2} />
-                      ) : (
-                        <Bike size={13} strokeWidth={2.2} />
-                      )}
-                      <span>{assignModalOrder.service_name || (assignModalOrder.service_type === 'mobil' ? 'OTWMobil' : assignModalOrder.service_type === 'paket' ? 'OTWPaket' : 'OTWMotor')}</span>
-                    </span>
-                    <span className="assign-order-distance">
-                      {assignModalOrder.distance_km || 3.2} km
-                    </span>
-                  </div>
-                  <div className="assign-price-wrap">
-                    <span className="assign-price-val">
-                      Rp {Number(assignModalOrder.fare_amount || 15000).toLocaleString('id-ID')}
-                    </span>
-                    <span className="assign-pay-badge">
-                      {(assignModalOrder.payment_method || 'CASH').toUpperCase()}
-                    </span>
-                  </div>
+                  <span className="assign-order-service-summary">
+                    {assignModalOrder.service_name ||
+                      (assignModalOrder.service_type === 'mobil'
+                        ? 'Mobil'
+                        : assignModalOrder.service_type === 'paket'
+                          ? 'Paket'
+                          : 'Motor')}{' '}
+                    • {assignModalOrder.distance_km || 3.2} km
+                  </span>
+                  <span className="assign-price-val">
+                    Rp {Number(assignModalOrder.fare_amount || 15000).toLocaleString('id-ID')} •{' '}
+                    {(assignModalOrder.payment_method || 'CASH').toUpperCase()}
+                  </span>
                 </div>
 
-                {/* Route Stations Timeline */}
                 <div className="assign-route-timeline">
                   <div className="assign-station-row">
-                    <span className="assign-station-dot pickup" />
+                    <span className="assign-station-label">
+                      {assignModalOrder.service_type === 'paket' ? 'Ambil' : 'Jemput'}
+                    </span>
                     <div className="assign-station-info">
-                      <div className="assign-station-name">{assignModalOrder.pickup_name}</div>
+                      <div className="assign-station-name">{assignModalOrder.pickup_name || '-'}</div>
                       <div className="assign-station-address">{assignModalOrder.pickup_address || '-'}</div>
                     </div>
                   </div>
                   <div className="assign-station-row">
-                    <span className="assign-station-dot dropoff" />
+                    <span className="assign-station-label">
+                      {assignModalOrder.service_type === 'paket' ? 'Antar' : 'Tujuan'}
+                    </span>
                     <div className="assign-station-info">
-                      <div className="assign-station-name">{assignModalOrder.dropoff_name}</div>
+                      <div className="assign-station-name">{assignModalOrder.dropoff_name || '-'}</div>
                       <div className="assign-station-address">{assignModalOrder.dropoff_address || '-'}</div>
                     </div>
                   </div>
                 </div>
 
-                {/* Package extra details if any */}
                 {assignModalOrder.package_info && (
                   <div className="assign-package-meta">
-                    <span className="assign-package-badge">
-                      <Package size={12} strokeWidth={2.2} />
-                      <span>{assignModalOrder.package_info.itemName || assignModalOrder.package_info.category || 'Barang'} ({assignModalOrder.package_info.size || 'M'})</span>
+                    <span>
+                      Barang: {assignModalOrder.package_info.itemName || assignModalOrder.package_info.category || 'Paket'} ({assignModalOrder.package_info.size || 'M'}) • Penerima: {assignModalOrder.package_info.recipientName || '-'} ({assignModalOrder.package_info.recipientPhone || '-'})
                     </span>
-                    <span>• Penerima: <strong>{assignModalOrder.package_info.recipientName || '-'}</strong> ({assignModalOrder.package_info.recipientPhone || '-'})</span>
                   </div>
                 )}
               </div>
 
-              {/* Filter & Search Bar */}
+              {/* Filter & Pencarian Tanpa Ikon */}
               <div className="assign-filter-row">
                 <div className="assign-search-wrap">
-                  <Search size={15} className="assign-search-icon" />
                   <input
                     type="text"
-                    className="assign-search-input"
+                    className={`assign-search-input ${assignDriverSearch ? 'has-value' : ''}`}
+                    aria-label="Cari nama driver, plat, atau wilayah"
                     placeholder="Cari nama driver, plat, atau wilayah..."
                     value={assignDriverSearch}
                     onChange={(e) => setAssignDriverSearch(e.target.value)}
@@ -5807,25 +5953,24 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                       type="button"
                       className="assign-clear-btn"
                       onClick={() => setAssignDriverSearch('')}
+                      aria-label="Hapus pencarian"
                     >
-                      <X size={14} />
+                      Hapus
                     </button>
                   )}
                 </div>
-                <div className="assign-select-wrap">
-                  <select
-                    className="assign-select-filter"
-                    value={assignVehicleFilter}
-                    onChange={(e) => setAssignVehicleFilter(e.target.value)}
-                  >
-                    <option value="recommended">Sesuai Armada</option>
-                    <option value="all">Semua Armada</option>
-                  </select>
-                  <ChevronDown size={14} className="assign-select-icon" />
-                </div>
+                <select
+                  className="assign-select-filter"
+                  aria-label="Filter armada driver"
+                  value={assignVehicleFilter}
+                  onChange={(e) => setAssignVehicleFilter(e.target.value)}
+                >
+                  <option value="recommended">Sesuai Armada</option>
+                  <option value="all">Semua Armada</option>
+                </select>
               </div>
 
-              {/* Approved Drivers List */}
+              {/* Daftar Mitra Driver */}
               {(() => {
                 const approvedList = drivers.filter((d) => d.verification_status === 'approved');
                 const orderNeedsCar =
@@ -5852,7 +5997,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                   );
                 }
 
-                // Prioritaskan driver yang sedang Online (Siap Terima Order) di urutan teratas
+                // Prioritaskan driver yang sedang Siap Order di urutan teratas
                 candidateDrivers = [...candidateDrivers].sort((a, b) => {
                   const aOnline = typeof a.is_online === 'boolean' ? a.is_online : true;
                   const bOnline = typeof b.is_online === 'boolean' ? b.is_online : true;
@@ -5867,19 +6012,19 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
 
                 if (approvedList.length === 0) {
                   return (
-                    <div style={{ textAlign: 'center', padding: '24px 16px', color: '#64748B', fontSize: 13 }}>
-                      <p style={{ margin: '0 0 10px' }}>
-                        Belum ada akun Mitra Driver yang berstatus <strong>Disetujui (Approved)</strong>.
+                    <div className="assign-empty-box">
+                      <p className="assign-empty-text">
+                        Belum ada akun mitra driver yang berstatus Disetujui.
                       </p>
                       <button
                         type="button"
-                        className="btn-dialog-confirm-approve"
+                        className="btn-assign-text-outline"
                         onClick={() => {
                           setAssignModalOrder(null);
                           setMainSection('drivers');
                         }}
                       >
-                        Buka Menu Verifikasi Driver
+                        Buka Verifikasi Driver
                       </button>
                     </div>
                   );
@@ -5888,10 +6033,32 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                 if (candidateDrivers.length === 0) {
                   const expectedArmada = orderNeedsCar ? 'Mobil' : 'Motor';
                   return (
-                    <div style={{ textAlign: 'center', padding: '24px 12px', color: '#64748B', fontSize: 13, backgroundColor: '#F8FAFC', borderRadius: 10 }}>
-                      {assignDriverSearch.trim()
-                        ? `Tidak ada driver ${expectedArmada} aktif yang cocok dengan pencarian "${assignDriverSearch}".`
-                        : `Tidak ada mitra driver yang sedang aktif menggunakan armada ${expectedArmada}.`}
+                    <div className="assign-empty-box">
+                      <p className="assign-empty-text">
+                        {assignDriverSearch.trim()
+                          ? `Tidak ada driver ${expectedArmada} yang cocok dengan "${assignDriverSearch}".`
+                          : `Belum ada mitra driver aktif untuk armada ${expectedArmada}.`}
+                      </p>
+                      <div className="assign-empty-actions">
+                        {assignDriverSearch.trim() ? (
+                          <button
+                            type="button"
+                            className="btn-assign-text-outline"
+                            onClick={() => setAssignDriverSearch('')}
+                          >
+                            Reset Pencarian
+                          </button>
+                        ) : null}
+                        {assignVehicleFilter === 'recommended' ? (
+                          <button
+                            type="button"
+                            className="btn-assign-text-outline"
+                            onClick={() => setAssignVehicleFilter('all')}
+                          >
+                            Tampilkan Semua Armada
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                   );
                 }
@@ -5905,36 +6072,30 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                     )}
 
                     <div className="assign-readiness-summary">
-                      <span>Status Kesiapan Driver:</span>
-                      <div className="assign-readiness-counts">
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#059669', fontWeight: 700 }}>
-                          <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: '#10B981' }} />
-                          {onlineCount} Siap Order
-                        </span>
-                        <span style={{ color: '#CBD5E1' }}>•</span>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#64748B', fontWeight: 600 }}>
-                          <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: '#94A3B8' }} />
-                          {offlineCount} Istirahat / Off
-                        </span>
-                      </div>
+                      <span>Daftar Mitra Driver</span>
+                      <span className="assign-readiness-counts">
+                        {onlineCount} Siap Order • {offlineCount} Istirahat
+                      </span>
                     </div>
 
                     {onlineCount === 0 && offlineCount > 0 && (
                       <div className="assign-offline-notice">
-                        Semua mitra driver saat ini sedang istirahat (off / tidak aktif). Penugasan hanya dapat dilakukan ke driver yang aktif <strong>Siap Terima Order</strong>.
+                        Semua mitra pada daftar ini sedang istirahat. Penugasan hanya tersedia bagi mitra dengan status Siap Order.
                       </div>
                     )}
 
                     <div className="assign-drivers-list">
-                      {candidateDrivers.map((drv) => {
+                      {candidateDrivers.map((drv, drvIdx) => {
                         const isCurrentlyAssigned =
                           assignModalOrder.assignment_status === 'assigned' &&
                           assignModalOrder.driver_id === drv.id;
 
-                        const isBoth = (drv.vehicleType || '').toLowerCase() === 'both' || Boolean(drv.carData && drv.motorData);
+                        const isBoth =
+                          (drv.vehicleType || '').toLowerCase() === 'both' ||
+                          Boolean(drv.carData && drv.motorData);
                         const isCar = isDriverUsingCar(drv);
                         const isDrvOnline = typeof drv.is_online === 'boolean' ? drv.is_online : true;
-                        const disabledAssignTitle = 'Tidak dapat ditugaskan: driver sedang istirahat (off / tidak aktif)';
+                        const disabledAssignTitle = 'Mitra sedang istirahat / offline';
 
                         let displayPlate = drv.plateNumber || 'DD - MKS';
                         let displayModel = drv.vehicleModel || (isCar ? 'Mobil' : 'Motor');
@@ -5947,160 +6108,84 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                           if (drv.motorData.model) displayModel = drv.motorData.model;
                         }
 
+                        const vehicleLabel = isBoth
+                          ? isCar
+                            ? 'Mobil (Aktif)'
+                            : 'Motor (Aktif)'
+                          : isCar
+                            ? 'Mobil'
+                            : 'Motor';
+
                         return (
                           <div
-                            key={drv.id}
+                            key={drv.id || `${drv.phone || drv.name || 'drv'}-${drvIdx}`}
                             className={`assign-driver-card ${isCurrentlyAssigned ? 'is-assigned' : ''} ${!isDrvOnline ? 'is-offline' : ''}`}
                           >
-                            <div className="assign-driver-left">
-                              {drv.avatar ? (
-                                <img
-                                  src={drv.avatar}
-                                  alt={drv.name}
-                                  className="assign-driver-avatar"
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = 'none';
-                                  }}
-                                />
-                              ) : (
-                                <div
-                                  className="assign-driver-avatar"
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    background: 'linear-gradient(135deg, #FF337F 0%, #E11D6F 100%)',
-                                    color: '#FFFFFF',
-                                    fontWeight: 800,
-                                    fontSize: 14,
-                                    borderRadius: '50%'
-                                  }}
-                                >
-                                  {(drv.name || 'D').trim().charAt(0).toUpperCase()}
-                                </div>
-                              )}
-                              <div className="assign-driver-info">
-                                <div className="assign-driver-name-row" style={{ flexWrap: 'wrap' }}>
-                                  <span className="assign-driver-name">{drv.name}</span>
-                                  <span className={`assign-veh-badge ${isCar ? 'mobil' : 'motor'}`}>
-                                    {isBoth ? (isCar ? 'Mobil (Aktif)' : 'Motor (Aktif)') : (isCar ? 'Mobil' : 'Motor')}
-                                  </span>
-                                  <span
-                                    style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: 4,
-                                      padding: '2px 7px',
-                                      borderRadius: 999,
-                                      fontSize: 10.5,
-                                      fontWeight: 700,
-                                      backgroundColor: isDrvOnline ? '#ECFDF5' : '#F1F5F9',
-                                      color: isDrvOnline ? '#059669' : '#64748B',
-                                      border: isDrvOnline ? '1px solid #A7F3D0' : '1px solid #E2E8F0'
-                                    }}
-                                  >
-                                    <span
-                                      style={{
-                                        width: 5.5,
-                                        height: 5.5,
-                                        borderRadius: '50%',
-                                        backgroundColor: isDrvOnline ? '#10B981' : '#94A3B8'
-                                      }}
-                                    />
-                                    {isDrvOnline ? 'Siap Terima Order' : 'Istirahat · Off / Tidak Aktif'}
-                                  </span>
-                                  {isCurrentlyAssigned && (
-                                    <span className="assign-status-assigned-pill">
-                                      <Check size={11} strokeWidth={2.8} />{' '}
-                                      {!assignModalOrder.driver_step || assignModalOrder.driver_step === 'completed'
-                                        ? 'Selesai Ditugaskan'
-                                        : 'Ditugaskan'}
-                                    </span>
-                                  )}
-                                </div>
-                              <div className="assign-driver-meta-row">
-                                <span className="assign-plate-text" title={displayModel}>
-                                  {displayPlate} {displayModel ? `• ${displayModel}` : ''}
+                            <div className="assign-driver-info">
+                              <div className="assign-driver-name-row">
+                                <span className="assign-driver-name">{drv.name}</span>
+                                <span className="assign-status-text">
+                                  {isDrvOnline ? 'Siap Order' : 'Istirahat'}
                                 </span>
-                                <span className="assign-meta-divider">•</span>
-                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                  <Phone size={11} strokeWidth={2} />
-                                  {drv.phone || '-'}
+                                {isCurrentlyAssigned && (
+                                  <span className="assign-status-assigned-label">
+                                    {!assignModalOrder.driver_step || assignModalOrder.driver_step === 'completed'
+                                      ? 'Selesai Ditugaskan'
+                                      : 'Ditugaskan'}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="assign-driver-meta-row">
+                                <span>
+                                  {vehicleLabel} • {displayPlate}
+                                  {displayModel ? ` (${displayModel})` : ''} • {drv.phone || '-'}
                                 </span>
                               </div>
+
                               {drv.operationalArea && (
                                 <div className="assign-driver-area-row" title={drv.operationalArea}>
-                                  <MapPin size={11} strokeWidth={2} style={{ flexShrink: 0 }} />
-                                  <span>{drv.operationalArea}</span>
-                                </div>
-                              )}
-                              {!isDrvOnline && (
-                                <div className="assign-driver-offline-hint">
-                                  Tidak dapat ditugaskan saat driver sedang istirahat / off
+                                  Wilayah: {drv.operationalArea}
                                 </div>
                               )}
                             </div>
-                          </div>
 
-                          <div className="assign-driver-actions">
-                            {isCurrentlyAssigned ? (
-                              <>
-                                <button
-                                  type="button"
-                                  className="btn-assign-icon-secondary"
-                                  disabled={!isDrvOnline}
-                                  onClick={() => handleAssignDriverToOrder(assignModalOrder, drv, false)}
-                                  title={isDrvOnline ? 'Tugaskan Ulang driver ini' : disabledAssignTitle}
-                                  aria-label="Tugaskan Ulang"
-                                >
-                                  <RotateCw size={15} />
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn-assign-icon-wa"
-                                  disabled={!isDrvOnline}
-                                  onClick={() => handleAssignDriverToOrder(assignModalOrder, drv, true)}
-                                  title={isDrvOnline ? 'Hubungi Driver & Kirim Info Pesanan via WhatsApp' : disabledAssignTitle}
-                                  aria-label="Hubungi Driver via WhatsApp"
-                                >
-                                  <MessageCircle size={16} />
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <button
-                                  type="button"
-                                  className="btn-assign-icon-primary"
-                                  disabled={!isDrvOnline}
-                                  onClick={() => handleAssignDriverToOrder(assignModalOrder, drv, false)}
-                                  title={isDrvOnline ? 'Tugaskan pesanan ke driver ini' : disabledAssignTitle}
-                                  aria-label="Tugaskan Driver"
-                                >
-                                  <UserCheck size={16} strokeWidth={2.2} />
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn-assign-icon-wa outline"
-                                  disabled={!isDrvOnline}
-                                  onClick={() => handleAssignDriverToOrder(assignModalOrder, drv, true)}
-                                  title={isDrvOnline ? 'Tugaskan & Kirim Langsung via WhatsApp' : disabledAssignTitle}
-                                  aria-label="Tugaskan dan kirim WhatsApp"
-                                >
-                                  <MessageCircle size={15} />
-                                </button>
-                              </>
-                            )}
+                            <div className="assign-driver-actions">
+                              <button
+                                type="button"
+                                className={isCurrentlyAssigned ? 'btn-assign-text-outline' : 'btn-assign-text-primary'}
+                                disabled={!isDrvOnline}
+                                onClick={() => handleAssignDriverToOrder(assignModalOrder, drv, false)}
+                                title={
+                                  isDrvOnline
+                                    ? isCurrentlyAssigned
+                                      ? 'Tugaskan ulang mitra ini'
+                                      : 'Tugaskan pesanan ke mitra ini'
+                                    : disabledAssignTitle
+                                }
+                              >
+                                {isCurrentlyAssigned ? 'Tugaskan Ulang' : 'Tugaskan'}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-assign-text-outline"
+                                disabled={!isDrvOnline}
+                                onClick={() => handleAssignDriverToOrder(assignModalOrder, drv, true)}
+                                title={isDrvOnline ? 'Tugaskan & kirim rincian via WhatsApp' : disabledAssignTitle}
+                              >
+                                Kirim WA
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
                     </div>
                   </>
                 );
               })()}
             </div>
 
-            <div className="dialog-footer" style={{ padding: '12px 24px', backgroundColor: '#F8FAFC', borderTop: '1px solid #F1F5F9' }}>
+            <div className="assign-dialog-footer">
               <button
                 type="button"
                 className="btn-dialog-cancel"
@@ -6124,371 +6209,297 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
         const isPackage = String(ord.service_type || '').toLowerCase() === 'paket' || Boolean(ord.package_info);
         const isCar = String(ord.service_type || '').toLowerCase() === 'mobil';
         const serviceDisplayName = isCar ? 'Mobil' : isPackage ? 'Paket' : 'Motor';
-        
+
         const fare = Number(ord.fare_amount || 17000);
         const platformFee = 2000;
         const tripFare = Math.max(0, fare - platformFee);
 
-        const orderDateObj = ord.created_at ? new Date(ord.created_at) : new Date();
+        const orderDateObj = ord.created_at ? new Date(ord.created_at) : new Date(0);
         const durationMin = Number(ord.duration_minutes || (ord.distance_km ? Math.round(ord.distance_km * 2) : 15));
         const dropoffDateObj = new Date(orderDateObj.getTime() + durationMin * 60000);
 
         const formatClock = (d) =>
           d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':');
-        
+        const formatDateTime = (d, clock) =>
+          `${d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}, ${clock}`;
+
         const pickupClock = ord.timeline?.pickedUp || ord.timeline?.received || formatClock(orderDateObj);
         const dropoffClock = ord.timeline?.completed || formatClock(dropoffDateObj);
 
         const orderCode = ord.order_code || ord.booking_code || '#NP3S';
-        const orderNum = ord.order_number || ('3301447' + Date.now().toString().slice(-12));
+        const fallbackOrderSuffix = String(ord.id || orderDateObj.getTime())
+          .replace(/\D/g, '')
+          .padStart(12, '0')
+          .slice(-12);
+        const orderNum = ord.order_number || `3301447${fallbackOrderSuffix}`;
 
         const isCash = (ord.payment_method || 'cash').toLowerCase() === 'cash';
+        const isCompleted = isCustomerOrderCompleted(ord);
+        const isCancelled = isCustomerOrderCancelled(ord);
+        const statusLabel = isCompleted ? 'Selesai' : isCancelled ? 'Dibatalkan' : 'Dalam Proses';
 
-        const driverDisplay = ord.driver_name || ord.driver?.name
-          ? `${ord.driver_name || ord.driver?.name}${ord.driver_plate || ord.driver?.plateNumber ? ` • ${ord.driver_plate || ord.driver?.plateNumber}` : ''}`
-          : 'Menunggu Penugasan Admin';
+        const hasAssignedDriver = ord.assignment_status === 'assigned';
+        const matchedLiveDriver = hasAssignedDriver
+          ? drivers.find(
+              (d) =>
+                d &&
+                ((ord.driver_id && d.id === ord.driver_id) ||
+                  (ord.driver_user_id && d.user_id === ord.driver_user_id) ||
+                  (ord.driver_phone && d.phone && normalizePhone(d.phone) === normalizePhone(ord.driver_phone)))
+            )
+          : null;
+        const resolvedDriverName =
+          matchedLiveDriver?.name || ord.driver_name || ord.driver?.name || 'Mitra Driver';
+        const resolvedDriverPlate = matchedLiveDriver
+          ? matchedLiveDriver.vehicleType === 'both'
+            ? isCar
+              ? matchedLiveDriver.carData?.plateNumber || matchedLiveDriver.plateNumber
+              : matchedLiveDriver.motorData?.plateNumber || matchedLiveDriver.plateNumber
+            : matchedLiveDriver.plateNumber
+          : ord.driver_plate || ord.driver?.plateNumber;
+        const driverDisplay = hasAssignedDriver
+          ? `${resolvedDriverName}${resolvedDriverPlate ? ` (${resolvedDriverPlate})` : ''}`
+          : 'Menunggu penugasan admin';
 
         const handleCopyNumber = () => {
-          navigator.clipboard.writeText(orderNum);
+          navigator.clipboard?.writeText(orderNum)?.catch(() => {});
           setAdminCopiedOrderNum(true);
           setTimeout(() => setAdminCopiedOrderNum(false), 2000);
         };
+
+        const packageRows = isPackage && ord.package_info
+          ? [
+              ord.package_info.senderName && {
+                label: 'Pengirim',
+                value: `${ord.package_info.senderName}${ord.package_info.senderPhone ? ` (${ord.package_info.senderPhone})` : ''}`
+              },
+              ord.package_info.recipientName && {
+                label: 'Penerima',
+                value: `${ord.package_info.recipientName}${ord.package_info.recipientPhone ? ` (${ord.package_info.recipientPhone})` : ''}`
+              },
+              (ord.package_info.itemName || ord.package_info.category) && {
+                label: 'Jenis Barang',
+                value: ord.package_info.itemName || ord.package_info.category
+              },
+              {
+                label: 'Ukuran & Berat',
+                value: `${ord.package_info.size || 'M'}${ord.package_info.weight ? ` • ${ord.package_info.weight} kg` : ''}`
+              },
+              ord.package_info.notes && {
+                label: 'Catatan',
+                value: ord.package_info.notes
+              }
+            ].filter(Boolean)
+          : [];
 
         return (
           <div className="admin-modal-backdrop" onClick={() => setOrderDetailModalData(null)}>
             <div
               className="admin-modal-dialog order-detail-admin-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="order-detail-dialog-title"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header Modal */}
               <div className="order-detail-admin-header">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0F172A' }}>
-                    Rincian Pesanan
-                  </h3>
+                <div className="order-header-copy">
+                  <div className="order-header-title-row">
+                    <h3 id="order-detail-dialog-title" className="dialog-title">Rincian Pesanan</h3>
+                    <span className="order-status-pill-minimal">{statusLabel}</span>
+                  </div>
+                  <span className="dialog-sub">
+                    {orderCode} • Layanan {serviceDisplayName}
+                  </span>
                 </div>
                 <button
                   type="button"
                   className="btn-close-dialog"
                   onClick={() => setOrderDetailModalData(null)}
-                  title="Tutup"
+                  aria-label="Tutup dialog"
+                  title="Tutup dialog"
                 >
-                  <X size={18} />
+                  <X size={16} />
                 </button>
               </div>
 
-              {/* Body Modal: Exact Customer Receipt Flow matching reference */}
+              {/* Body Modal */}
               <div className="order-detail-admin-body">
-                <div className="customer-detail-flow">
-                  {/* 1. Rute Perjalanan */}
-                  <section className="customer-card-section">
-                    <div className="customer-section-header">
-                      <span className="customer-section-title">
-                        {isPackage ? 'Rute Pengambilan & Pengantaran Paket' : 'Rute Perjalanan'}
+                {/* 1. Rute Perjalanan */}
+                <section className="order-clean-section">
+                  <div className="order-clean-section-head">
+                    <h4 className="order-clean-section-title">
+                      {isPackage ? 'Rute Pengambilan & Pengantaran' : 'Rute Perjalanan'}
+                    </h4>
+                    <span className="order-clean-meta">
+                      {ord.distance_km || 3.9} km (~{durationMin} mnt)
+                    </span>
+                  </div>
+
+                  <div className="order-route-card">
+                    <div className="order-route-step">
+                      <span className="order-route-role">
+                        {isPackage ? 'Pengambilan' : 'Jemput'}
                       </span>
-                      <span className="customer-route-summary">
-                        {ord.distance_km || 3.9} km (~{durationMin} mnt)
-                      </span>
+                      <div className="order-route-head">
+                        <span className="order-route-place">{ord.pickup_name || 'Titik Jemput'}</span>
+                        <span className="order-route-time">{pickupClock}</span>
+                      </div>
+                      <p className="order-route-address">{ord.pickup_address || '-'}</p>
+                      {isPackage && ord.package_info?.senderName && (
+                        <p className="order-route-sub">
+                          Pengirim: {ord.package_info.senderName}
+                          {ord.package_info.senderPhone ? ` (${ord.package_info.senderPhone})` : ''}
+                        </p>
+                      )}
                     </div>
 
-                    <div className="customer-route-box">
-                      {/* Titik Jemput */}
-                      <div className="customer-route-item pickup-step">
-                        <div className="customer-pin-column">
-                          <div className="customer-pin-icon pickup">
-                            <MapPin size={15} strokeWidth={2.4} />
-                          </div>
-                          <div className="track-vertical-line" aria-hidden="true" />
-                        </div>
-                        <div className="customer-point-details pickup-details">
-                          {isPackage && (
-                            <span className="package-step-badge pickup">Lokasi Pengambilan (Pengirim)</span>
-                          )}
-                          <div className="point-title-row">
-                            <span className="point-title">{ord.pickup_name || 'Titik Jemput'}</span>
-                            <span className="point-time-tag">{pickupClock}</span>
-                          </div>
-                          <p className="point-address">{ord.pickup_address || '-'}</p>
-                          {isPackage && ord.package_info?.senderName && (
-                            <p className="point-contact-sub">
-                              Pengirim: <strong>{ord.package_info.senderName}</strong>
-                              {ord.package_info.senderPhone ? ` (${ord.package_info.senderPhone})` : ''}
-                            </p>
-                          )}
-                        </div>
+                    <div className="order-route-step">
+                      <span className="order-route-role">
+                        {isPackage ? 'Pengantaran' : 'Tujuan'}
+                      </span>
+                      <div className="order-route-head">
+                        <span className="order-route-place">{ord.dropoff_name || 'Titik Tujuan'}</span>
+                        <span className="order-route-time">{dropoffClock}</span>
                       </div>
+                      <p className="order-route-address">{ord.dropoff_address || '-'}</p>
+                      {isPackage && ord.package_info?.recipientName && (
+                        <p className="order-route-sub">
+                          Penerima: {ord.package_info.recipientName}
+                          {ord.package_info.recipientPhone ? ` (${ord.package_info.recipientPhone})` : ''}
+                          {ord.package_info.floorUnit ? ` • Unit: ${ord.package_info.floorUnit}` : ''}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </section>
 
-                      {/* Titik Dropoff */}
-                      <div className="customer-route-item dropoff-step">
-                        <div className="customer-pin-column">
-                          <div className="customer-pin-icon dropoff">
-                            <MapPin size={15} strokeWidth={2.4} />
-                          </div>
+                {/* 2. Detail Paket */}
+                {packageRows.length > 0 && (
+                  <section className="order-clean-section">
+                    <div className="order-clean-section-head">
+                      <h4 className="order-clean-section-title">Detail Paket</h4>
+                      <span className="order-clean-meta">{ord.package_info.category || 'Paket'}</span>
+                    </div>
+                    <div className="order-kv-list">
+                      {packageRows.map((row) => (
+                        <div key={row.label} className="order-kv-row">
+                          <span className="order-kv-label">{row.label}</span>
+                          <span className="order-kv-value">{row.value}</span>
                         </div>
-                        <div className="customer-point-details">
-                          {isPackage && (
-                            <span className="package-step-badge dropoff">Lokasi Pengantaran (Penerima)</span>
-                          )}
-                          <div className="point-title-row">
-                            <span className="point-title">{ord.dropoff_name || 'Titik Tujuan'}</span>
-                            <span className="point-time-tag completed">{dropoffClock}</span>
-                          </div>
-                          <p className="point-address">{ord.dropoff_address || '-'}</p>
-                          {isPackage && ord.package_info?.recipientName && (
-                            <p className="point-contact-sub">
-                              Penerima: <strong>{ord.package_info.recipientName}</strong>
-                              {ord.package_info.recipientPhone ? ` (${ord.package_info.recipientPhone})` : ''}
-                              {ord.package_info.floorUnit ? ` • Unit: ${ord.package_info.floorUnit}` : ''}
-                            </p>
-                          )}
-                        </div>
-                      </div>
+                      ))}
                     </div>
                   </section>
+                )}
 
-                  {/* 2. Detail Paket & Pengiriman jika Paket */}
-                  {isPackage && ord.package_info && (
-                    <>
-                      <div className="order-section-divider" />
-                      <section className="customer-card-section">
-                        <div className="customer-section-header">
-                          <div className="title-with-icon">
-                            <Package size={17} className="title-icon" />
-                            <span className="customer-section-title">Detail Paket & Pengiriman</span>
-                          </div>
-                          <span className="customer-package-type-badge">
-                            {ord.package_info.category || 'Paket'}
-                          </span>
-                        </div>
+                {/* 3. Rincian Pembayaran */}
+                <section className="order-clean-section">
+                  <div className="order-clean-section-head">
+                    <h4 className="order-clean-section-title">Rincian Pembayaran</h4>
+                    <span className="order-clean-meta">Lunas</span>
+                  </div>
 
-                        <div className="package-detail-card-list">
-                          {ord.package_info.senderName && (
-                            <div className="package-detail-row">
-                              <span className="package-detail-label">Pengirim</span>
-                              <span className="package-detail-value">
-                                <strong>{ord.package_info.senderName}</strong>
-                                {ord.package_info.senderPhone && (
-                                  <span className="package-detail-sub"> ({ord.package_info.senderPhone})</span>
-                                )}
-                              </span>
-                            </div>
-                          )}
-
-                          {ord.package_info.recipientName && (
-                            <div className="package-detail-row">
-                              <span className="package-detail-label">Penerima</span>
-                              <span className="package-detail-value">
-                                <strong>{ord.package_info.recipientName}</strong>
-                                {ord.package_info.recipientPhone && (
-                                  <span className="package-detail-sub"> ({ord.package_info.recipientPhone})</span>
-                                )}
-                              </span>
-                            </div>
-                          )}
-
-                          {(ord.package_info.itemName || ord.package_info.category) && (
-                            <div className="package-detail-row">
-                              <span className="package-detail-label">Jenis Barang</span>
-                              <span className="package-detail-value">
-                                {ord.package_info.itemName || ord.package_info.category}
-                              </span>
-                            </div>
-                          )}
-
-                          <div className="package-detail-row">
-                            <span className="package-detail-label">Ukuran & Berat</span>
-                            <span className="package-detail-value">
-                              {ord.package_info.size || 'M'}
-                              {ord.package_info.weight ? ` • ${ord.package_info.weight} kg` : ''}
-                            </span>
-                          </div>
-
-                          {ord.package_info.notes && (
-                            <div className="package-detail-note-bar">
-                              <span className="package-note-bar-label">Catatan</span>
-                              <span className="package-note-bar-val">{ord.package_info.notes}</span>
-                            </div>
-                          )}
-                        </div>
-                      </section>
-                    </>
-                  )}
-
-                  {/* Section Divider Strip */}
-                  <div className="order-section-divider" />
-
-                  {/* 3. Rincian Pembayaran */}
-                  <section className="customer-card-section">
-                    <div className="customer-section-header">
-                      <div className="title-with-icon">
-                        <Receipt size={17} className="title-icon" />
-                        <span className="customer-section-title">Rincian Pembayaran</span>
-                      </div>
-                      <span className="customer-payment-badge success">
-                        <Check size={12} strokeWidth={2.5} /> Lunas
+                  <div className="order-kv-list">
+                    <div className="order-kv-row">
+                      <span className="order-kv-label">
+                        {isPackage ? 'Ongkos Kirim Paket' : 'Tarif Perjalanan'}
+                      </span>
+                      <span className="order-kv-value num">
+                        Rp {tripFare.toLocaleString('id-ID')}
                       </span>
                     </div>
 
-                    <div className="customer-pricing-list">
-                      <div className="customer-price-row">
-                        <span className="price-item-label">
-                          {isPackage ? 'Ongkos Kirim Paket' : 'Tarif Perjalanan'}
-                        </span>
-                        <span className="price-item-value">
-                          Rp {tripFare.toLocaleString('id-ID')}
-                        </span>
-                      </div>
-
-                      <div className="customer-price-row">
-                        <span className="price-item-label">Biaya Layanan & Aplikasi</span>
-                        <span className="price-item-value">Rp {platformFee.toLocaleString('id-ID')}</span>
-                      </div>
-
-                      <div className="customer-pricing-divider" />
-
-                      <div className="customer-price-row total">
-                        <span className="price-item-label bold">Total Pembayaran</span>
-                        <span className="price-item-value total-bold">
-                          Rp {fare.toLocaleString('id-ID')}
-                        </span>
-                      </div>
-
-                      <div className="customer-payment-method-bar">
-                        <div className="method-left">
-                          {isCash ? (
-                            <Banknote size={16} color="#059669" />
-                          ) : (
-                            <QrCode size={16} color="#2563EB" />
-                          )}
-                          <span className="method-name">
-                            {isCash ? 'Tunai (Cash)' : 'QRIS / OTWPay'}
-                          </span>
-                        </div>
-                        <span className="method-status-tag">Lunas</span>
-                      </div>
-                    </div>
-                  </section>
-
-                  {/* Section Divider Strip */}
-                  <div className="order-section-divider" />
-
-                  {/* 4. Informasi Pesanan */}
-                  <section className="customer-card-section">
-                    <div className="customer-section-header">
-                      <span className="customer-section-title">Informasi Pesanan</span>
+                    <div className="order-kv-row">
+                      <span className="order-kv-label">Biaya Layanan & Aplikasi</span>
+                      <span className="order-kv-value num">
+                        Rp {platformFee.toLocaleString('id-ID')}
+                      </span>
                     </div>
 
-                    <div className="customer-info-list">
-                      <div className="customer-info-row">
-                        <span className="info-row-label">Layanan</span>
-                        <span className="order-number-val" style={{ fontWeight: 600, color: '#111827' }}>
-                          {serviceDisplayName}
-                        </span>
-                      </div>
+                    <div className="order-kv-row total">
+                      <span className="order-kv-label">Total Pembayaran</span>
+                      <span className="order-kv-value num">
+                        Rp {fare.toLocaleString('id-ID')}
+                      </span>
+                    </div>
 
-                      <div className="customer-info-row">
-                        <span className="info-row-label">Mitra Driver</span>
-                        <span
-                          className="order-number-val"
-                          style={{
-                            fontWeight: 600,
-                            color: ord.assignment_status === 'assigned' ? '#059669' : '#D97706',
-                            textAlign: 'right'
-                          }}
+                    <div className="order-kv-row">
+                      <span className="order-kv-label">Metode Pembayaran</span>
+                      <span className="order-kv-value">
+                        {isCash ? 'Tunai (Cash)' : 'QRIS / OTWPay'}
+                      </span>
+                    </div>
+                  </div>
+                </section>
+
+                {/* 4. Informasi Pesanan */}
+                <section className="order-clean-section">
+                  <div className="order-clean-section-head">
+                    <h4 className="order-clean-section-title">Informasi Pesanan</h4>
+                  </div>
+
+                  <div className="order-kv-list">
+                    <div className="order-kv-row">
+                      <span className="order-kv-label">Layanan</span>
+                      <span className="order-kv-value">{serviceDisplayName}</span>
+                    </div>
+
+                    <div className="order-kv-row">
+                      <span className="order-kv-label">Mitra Driver</span>
+                      <span className={`order-kv-value${hasAssignedDriver ? '' : ' muted'}`}>
+                        {driverDisplay}
+                      </span>
+                    </div>
+
+                    <div className="order-kv-row">
+                      <span className="order-kv-label">Kode Pesanan</span>
+                      <span className="order-kv-value mono">{orderCode}</span>
+                    </div>
+
+                    <div className="order-kv-row">
+                      <span className="order-kv-label">No. Pesanan</span>
+                      <div className="order-kv-copy-wrap">
+                        <span className="order-kv-value num">{orderNum}</span>
+                        <button
+                          type="button"
+                          className={`btn-order-copy-minimal${adminCopiedOrderNum ? ' is-copied' : ''}`}
+                          onClick={handleCopyNumber}
+                          aria-label={adminCopiedOrderNum ? 'Nomor pesanan tersalin' : 'Salin nomor pesanan'}
+                          title={adminCopiedOrderNum ? 'Tersalin' : 'Salin nomor pesanan'}
                         >
-                          {driverDisplay}
-                        </span>
-                      </div>
-
-                      <div className="customer-info-row">
-                        <span className="info-row-label">Kode Pesanan</span>
-                        <span className="order-number-val" style={{ fontWeight: 700, color: '#EE4335' }}>
-                          {orderCode}
-                        </span>
-                      </div>
-
-                      <div className="customer-info-row">
-                        <span className="info-row-label">No. Pesanan</span>
-                        <div className="info-row-right">
-                          <span className="order-number-val">{orderNum}</span>
-                          <button
-                            type="button"
-                            className="btn-copy-order-number"
-                            onClick={handleCopyNumber}
-                            aria-label="Salin nomor pesanan"
-                          >
-                            {adminCopiedOrderNum ? (
-                              <span className="copied-label">
-                                <CheckCheck size={14} /> Tersalin
-                              </span>
-                            ) : (
-                              <span>Salin</span>
-                            )}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="customer-info-row">
-                        <span className="info-row-label">Waktu Pemesanan</span>
-                        <span className="info-row-val">
-                          {orderDateObj.toLocaleDateString('id-ID', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric'
-                          })}, {pickupClock}
-                        </span>
-                      </div>
-
-                      <div className="customer-info-row">
-                        <span className="info-row-label">Waktu Tiba</span>
-                        <span className="info-row-val">
-                          {dropoffDateObj.toLocaleDateString('id-ID', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric'
-                          })}, {dropoffClock}
-                        </span>
+                          {adminCopiedOrderNum ? <CheckCheck size={14} /> : <Copy size={14} />}
+                        </button>
                       </div>
                     </div>
-                  </section>
-                </div>
+
+                    <div className="order-kv-row">
+                      <span className="order-kv-label">Waktu Pemesanan</span>
+                      <span className="order-kv-value num">{formatDateTime(orderDateObj, pickupClock)}</span>
+                    </div>
+
+                    <div className="order-kv-row">
+                      <span className="order-kv-label">Waktu Tiba</span>
+                      <span className="order-kv-value num">{formatDateTime(dropoffDateObj, dropoffClock)}</span>
+                    </div>
+                  </div>
+                </section>
               </div>
 
               {/* Modal Footer Controls */}
               <div className="order-detail-admin-footer">
                 <div className="order-detail-admin-footer-actions">
-                  {!isCustomerOrderCompleted(ord) && !isCustomerOrderCancelled(ord) && (
+                  {!isCompleted && !isCancelled && (
                     <>
                       <button
                         type="button"
-                        style={{
-                          height: 34,
-                          padding: '0 12px',
-                          borderRadius: 8,
-                          border: 'none',
-                          backgroundColor: '#10B981',
-                          color: '#FFFFFF',
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor: 'pointer'
-                        }}
+                        className="btn-order-complete-minimal"
                         onClick={() => handleUpdateOrderStatus(ord.id, 'completed', 'Diselesaikan oleh Admin')}
                       >
                         Tandai Selesai
                       </button>
                       <button
                         type="button"
-                        style={{
-                          height: 34,
-                          padding: '0 12px',
-                          borderRadius: 8,
-                          border: '1px solid #FECACA',
-                          backgroundColor: '#FFFFFF',
-                          color: '#DC2626',
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor: 'pointer'
-                        }}
+                        className="btn-order-cancel-minimal"
                         onClick={() => handleUpdateOrderStatus(ord.id, 'cancelled', 'Dibatalkan oleh Admin')}
                       >
                         Batalkan Pesanan
