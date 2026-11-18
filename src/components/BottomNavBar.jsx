@@ -6,7 +6,7 @@ import {
 } from './BottomNavIcons.jsx';
 import { Bell, X, Volume2, ChevronRight } from 'lucide-react';
 import dbService, { normalizePhone } from '../services/dbService.js';
-import { formatRupiah } from '../utils/fareCalculator.js';
+import { formatRupiah, resolveBookingFeeBreakdown } from '../utils/fareCalculator.js';
 
 const NOTIFIED_TASKS_STORAGE_KEY = 'otwjek_driver_notified_tasks_v1';
 
@@ -252,10 +252,7 @@ export default function BottomNavBar({ activeTab, onChangeTab, currentUser, isDr
       newTaskAlert.order_code ||
       (newTaskAlert.booking_code ? `#${newTaskAlert.booking_code.replace('RIDE-', '')}` : '#ORD');
 
-    const fare = Number(newTaskAlert.fare_amount || 15000);
-    const netEarnings = Number(
-      newTaskAlert.total_earnings || newTaskAlert.delivery_fee || Math.round((fare * 0.85) / 100) * 100
-    );
+    const { totalEarnings: netEarnings } = resolveBookingFeeBreakdown(newTaskAlert);
     const paymentLabel =
       String(newTaskAlert.payment_method || 'cash').toLowerCase() === 'qris' ? 'QRIS' : 'Tunai';
 

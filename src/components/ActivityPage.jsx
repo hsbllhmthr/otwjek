@@ -12,7 +12,7 @@ import {
   ShoppingBag,
   Inbox
 } from 'lucide-react';
-import { formatRupiah } from '../utils/fareCalculator.js';
+import { formatRupiah, resolveBookingFeeBreakdown } from '../utils/fareCalculator.js';
 import dbService, { normalizePhone } from '../services/dbService.js';
 import ActivityOrderDetailView from './ActivityOrderDetailView.jsx';
 
@@ -48,31 +48,29 @@ function formatBookingToOrder(b) {
     ? createdAtDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
     : '11 Okt 2026';
 
-  const fare = Number(b.fare_amount || 15000);
-  const deliveryFee =
-    b.delivery_fee !== undefined && b.delivery_fee !== null
-      ? Number(b.delivery_fee)
-      : b.booking_status === 'cancelled'
-      ? 0
-      : Math.round((fare * 0.85) / 100) * 100;
-  const totalEarnings =
-    b.total_earnings !== undefined && b.total_earnings !== null
-      ? Number(b.total_earnings)
-      : deliveryFee;
-  const driverPlatformFee =
-    b.booking_status === 'cancelled' ? 0 : Math.max(0, fare - totalEarnings);
+  const {
+    fare,
+    isCancelled: isCancelledBooking,
+    deliveryFee,
+    totalEarnings,
+    driverPlatformFee,
+    customerPlatformFee: platformFee,
+    customerTripFare: tripFare
+  } = resolveBookingFeeBreakdown(b);
 
   const isQris = String(b.payment_method || 'cash').toLowerCase() === 'qris';
-  const cashVal = isQris
-    ? 0
-    : b.cash_collected !== undefined
-    ? Number(b.cash_collected)
-    : -fare;
-  const adjVal = isQris
-    ? 0
-    : b.adjustment !== undefined
-    ? Number(b.adjustment)
-    : -fare;
+  const cashVal =
+    isQris || isCancelledBooking
+      ? 0
+      : b.cash_collected !== undefined
+      ? Number(b.cash_collected)
+      : -fare;
+  const adjVal =
+    isQris || isCancelledBooking
+      ? 0
+      : b.adjustment !== undefined
+      ? Number(b.adjustment)
+      : -fare;
 
   const code =
     b.order_code ||
@@ -102,9 +100,6 @@ function formatBookingToOrder(b) {
         phone: ''
       };
 
-  const platformFee = 2000;
-  const tripFare = Math.max(0, fare - platformFee);
-
   const realPickupName =
     b.pickup_name ||
     b.package_info?.pickupName ||
@@ -128,6 +123,31 @@ function formatBookingToOrder(b) {
     b.dropoff_address ||
     b.package_info?.dropoffAddress ||
     realDropoffName;
+
+  const isOrderCancelled =
+    b.booking_status === 'cancelled' || b.driver_step === 'cancelled';
+  const isOrderCompleted =
+    !isOrderCancelled &&
+    (b.driver_step
+      ? b.driver_step === 'completed'
+      : b.assignment_status === 'assigned'
+      ? b.booking_status === 'completed'
+      : Boolean(b.status_note && b.booking_status === 'completed'));
+  const resolvedStatus = isOrderCancelled
+    ? 'cancelled'
+    : isOrderCompleted
+    ? 'completed'
+    : 'in_progress';
+  const resolvedDriverStep = isOrderCancelled
+    ? 'cancelled'
+    : b.driver_step ||
+      (isAssignedDriver
+        ? b.booking_status === 'completed'
+          ? 'completed'
+          : 'assigned'
+        : isOrderCompleted
+        ? 'completed'
+        : 'waiting_admin');
 
   return {
     id: b.id || b.booking_code || code,
@@ -166,20 +186,33 @@ function formatBookingToOrder(b) {
     driver: driverObj,
     assignmentStatus: b.assignment_status || 'unassigned',
     assignedBy: b.assigned_by || null,
+    selectedAdminId: b.selected_admin_id || null,
+    selectedAdminName: b.selected_admin_name || null,
+    selectedAdminPhone: b.selected_admin_phone || null,
+    waDispatchedAt: b.wa_dispatched_at || null,
     customerName: b.customer_name || 'Pelanggan OTWJek',
     customerPhone: b.customer_phone || '',
     customerNotes: b.customer_notes || '',
     distanceKm: b.distance_km || 3.2,
     durationMinutes: b.duration_minutes || 18,
-    status: b.booking_status === 'cancelled' ? 'cancelled' : 'completed',
-    driverStep: b.driver_step || (b.booking_status === 'cancelled' ? 'cancelled' : 'completed'),
+    status: resolvedStatus,
+    driverStep: resolvedDriverStep,
     cancelReason: b.cancel_reason || 'Dibatalkan oleh Pelanggan',
-    timeline: b.timeline || {
-      received: '13:31',
-      arrived: '13:45',
-      pickedUp: '13:47',
-      completed: timeStr
-    },
+    timeline:
+      b.timeline ||
+      (resolvedStatus === 'completed'
+        ? {
+            received: '13:31',
+            arrived: '13:45',
+            pickedUp: '13:47',
+            completed: timeStr
+          }
+        : {
+            received: timeStr,
+            arrived: '--:--',
+            pickedUp: '--:--',
+            completed: '--:--'
+          }),
     incentives: b.incentives || [
       { name: 'Bonus Harian - Makassar', points: 100 },
       { name: 'MISI SIGAP', points: 100 }
@@ -205,8 +238,98 @@ function formatBookingToOrder(b) {
   };
 }
 
-export default function ActivityPage({ onBack, currentUser, isDriver }) {
-  const [activeTab, setActiveTab] = useState('selesai'); // 'selesai' | 'dibatalkan'
+function resolvePendingOpenOrderId(initialOrderId, isDriverView) {
+  if (initialOrderId) return initialOrderId;
+  if (isDriverView || typeof sessionStorage === 'undefined') return null;
+  try {
+    return sessionStorage.getItem('otwjek_customer_open_order_id');
+  } catch {
+    return null;
+  }
+}
+
+function getOrderTabForStatus(status) {
+  if (status === 'cancelled') return 'dibatalkan';
+  if (status === 'completed') return 'selesai';
+  return 'proses';
+}
+
+function resolveActivityBookings(currentUser, isDriverView, shouldMarkAsRead = false) {
+  try {
+    const resolvedUser = currentUser || dbService.session.getCurrentUser();
+    if (!resolvedUser && isDriverView) {
+      return [];
+    }
+
+    let queryAccount = resolvedUser;
+
+    if (isDriverView && resolvedUser) {
+      const allDrivers = dbService.drivers.getAll();
+      const matchedDriver =
+        dbService.drivers.getDriverByUserId(resolvedUser.id) ||
+        allDrivers.find(
+          (d) =>
+            d &&
+            ((resolvedUser.driver?.id && d.id === resolvedUser.driver.id) ||
+              (resolvedUser.phone &&
+                d.phone &&
+                normalizePhone(d.phone) === normalizePhone(resolvedUser.phone)))
+        ) ||
+        resolvedUser.driver ||
+        null;
+
+      queryAccount = {
+        ...resolvedUser,
+        role: 'driver',
+        driver: matchedDriver || resolvedUser.driver
+      };
+    }
+
+    if (shouldMarkAsRead && queryAccount) {
+      dbService.bookings.markAllAsRead(queryAccount);
+    }
+    const items = dbService.bookings.getAll(queryAccount);
+    return Array.isArray(items) ? items : [];
+  } catch {
+    return [];
+  }
+}
+
+export default function ActivityPage({
+  onBack,
+  currentUser,
+  isDriver,
+  initialOrderId = null,
+  onClearInitialOrder
+}) {
+  const fallbackSessionUser = currentUser || dbService.session.getCurrentUser();
+  const isDriverView =
+    typeof isDriver === 'boolean'
+      ? isDriver
+      : Boolean(fallbackSessionUser?.role === 'driver');
+
+  const [rawBookings, setRawBookings] = useState(() =>
+    resolveActivityBookings(currentUser, isDriverView)
+  );
+  const [selectedOrder, setSelectedOrder] = useState(() => {
+    const pendingId = resolvePendingOpenOrderId(initialOrderId, isDriverView);
+    if (!pendingId) return null;
+    const matched = resolveActivityBookings(currentUser, isDriverView).find(
+      (b) => b && b.id === pendingId
+    );
+    return matched ? formatBookingToOrder(matched) : null;
+  });
+  const [activeTab, setActiveTab] = useState(() => {
+    const initialList = resolveActivityBookings(currentUser, isDriverView).map(formatBookingToOrder);
+    const pendingId = resolvePendingOpenOrderId(initialOrderId, isDriverView);
+    if (pendingId) {
+      const target = initialList.find((o) => o.id === pendingId);
+      if (target) {
+        return getOrderTabForStatus(target.status);
+      }
+    }
+    return initialList.some((o) => o.status === 'in_progress') ? 'proses' : 'selesai';
+  }); // 'proses' | 'selesai' | 'dibatalkan'
   const [selectedDate, setSelectedDate] = useState('all');
   const [customStartDate, setCustomStartDate] = useState(() => {
     const d = new Date();
@@ -215,66 +338,21 @@ export default function ActivityPage({ onBack, currentUser, isDriver }) {
   });
   const [customEndDate, setCustomEndDate] = useState(() => toLocalDateKey(new Date()));
   const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState(null);
-  const [rawBookings, setRawBookings] = useState([]);
   const dropdownRef = useRef(null);
-
-  const activeUser = currentUser || dbService.session.getCurrentUser();
-  const isDriverView = typeof isDriver === 'boolean' ? isDriver : Boolean(activeUser?.role === 'driver');
+  const hasAutoSelectedTabRef = useRef(rawBookings.length > 0);
 
   // Ambil data pesanan dinamis langsung dari dbService khusus untuk akun yang aktif
   const loadBookings = useCallback(() => {
-    try {
-      if (!activeUser) {
-        setRawBookings([]);
-        return;
-      }
-
-      let queryAccount = activeUser;
-
-      if (isDriverView) {
-        const allDrivers = dbService.drivers.getAll();
-        const matchedDriver =
-          dbService.drivers.getDriverByUserId(activeUser.id) ||
-          allDrivers.find(
-            (d) =>
-              d &&
-              ((activeUser.driver?.id && d.id === activeUser.driver.id) ||
-                (activeUser.phone && d.phone && normalizePhone(d.phone) === normalizePhone(activeUser.phone)))
-          ) ||
-          activeUser.driver ||
-          null;
-
-        queryAccount = {
-          ...activeUser,
-          role: 'driver',
-          driver: matchedDriver || activeUser.driver
-        };
-      }
-
-      dbService.bookings.markAllAsRead(queryAccount);
-      const items = dbService.bookings.getAll(queryAccount);
-      setRawBookings(Array.isArray(items) ? items : []);
-    } catch {
-      setRawBookings([]);
-    }
-  }, [activeUser, isDriverView]);
+    setRawBookings(resolveActivityBookings(currentUser, isDriverView, true));
+  }, [currentUser, isDriverView]);
 
   useEffect(() => {
     loadBookings();
-
-    const handleDbChange = (e) => {
-      if (!e?.detail?.key || e.detail.key === 'otwjek_db_ride_bookings' || e.detail.key === 'all') {
-        loadBookings();
-      }
-    };
-
-    window.addEventListener('otwjek_db_change', handleDbChange);
-    window.addEventListener('storage', loadBookings);
-
+    const unsubscribe = dbService.subscribe(() => {
+      loadBookings();
+    });
     return () => {
-      window.removeEventListener('otwjek_db_change', handleDbChange);
-      window.removeEventListener('storage', loadBookings);
+      if (typeof unsubscribe === 'function') unsubscribe();
     };
   }, [loadBookings]);
 
@@ -289,10 +367,48 @@ export default function ActivityPage({ onBack, currentUser, isDriver }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Konversi semua pesanan mentah menjadi format riwayat pesanan dinamis
+  // Konversi semua pesanan mentah menjadi format riwayat pesanan dinamis (terbaru di atas)
   const allOrders = useMemo(() => {
-    return rawBookings.map((b) => formatBookingToOrder(b));
+    return (rawBookings || [])
+      .map((b) => formatBookingToOrder(b))
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }, [rawBookings]);
+
+  const inProgressCount = useMemo(
+    () => allOrders.filter((ord) => ord.status === 'in_progress').length,
+    [allOrders]
+  );
+
+  // Buka tab & detail pesanan otomatis jika berasal dari checkout WhatsApp atau ada order berlangsung
+  useEffect(() => {
+    const pendingOpenId = resolvePendingOpenOrderId(initialOrderId, isDriverView);
+
+    if (pendingOpenId && allOrders.length > 0) {
+      const targetOrder = allOrders.find((o) => o.id === pendingOpenId);
+      if (targetOrder) {
+        hasAutoSelectedTabRef.current = true;
+        const targetTab = getOrderTabForStatus(targetOrder.status);
+        setActiveTab((prev) => (prev === targetTab ? prev : targetTab));
+        setSelectedOrder((prev) => (prev?.id === targetOrder.id ? prev : targetOrder));
+        if (!isDriverView) {
+          try {
+            sessionStorage.removeItem('otwjek_customer_open_order_id');
+          } catch {
+            // ignore
+          }
+        }
+        if (onClearInitialOrder) onClearInitialOrder();
+        return;
+      }
+    }
+
+    if (!hasAutoSelectedTabRef.current && allOrders.length > 0) {
+      hasAutoSelectedTabRef.current = true;
+      if (allOrders.some((o) => o.status === 'in_progress')) {
+        setActiveTab('proses');
+      }
+    }
+  }, [allOrders, initialOrderId, isDriverView, onClearInitialOrder]);
 
   // Kumpulan opsi tanggal unik yang diekstrak secara dinamis dari database + preset periode
   const availableDates = useMemo(() => {
@@ -311,11 +427,13 @@ export default function ActivityPage({ onBack, currentUser, isDriver }) {
     ];
   }, [allOrders]);
 
-  // Filter pesanan berdasarkan tab aktif ('selesai' | 'dibatalkan') dan filter tanggal
+  // Filter pesanan berdasarkan tab aktif ('proses' | 'selesai' | 'dibatalkan') dan filter tanggal
   const displayedOrders = useMemo(() => {
-    const filteredByTab = allOrders.filter((ord) =>
-      activeTab === 'selesai' ? ord.status === 'completed' : ord.status === 'cancelled'
-    );
+    const filteredByTab = allOrders.filter((ord) => {
+      if (activeTab === 'proses') return ord.status === 'in_progress';
+      if (activeTab === 'selesai') return ord.status === 'completed';
+      return ord.status === 'cancelled';
+    });
 
     if (selectedDate === 'all') {
       return filteredByTab;
@@ -414,7 +532,7 @@ export default function ActivityPage({ onBack, currentUser, isDriver }) {
       <ActivityOrderDetailView
         order={liveSelectedOrder}
         onBack={() => setSelectedOrder(null)}
-        currentUser={activeUser}
+        currentUser={fallbackSessionUser}
         isDriver={isDriverView}
         onReorder={() => {
           setSelectedOrder(null);
@@ -440,8 +558,17 @@ export default function ActivityPage({ onBack, currentUser, isDriver }) {
         </h1>
       </header>
 
-      {/* 2. Tabs Bar (Selesai | Dibatalkan) */}
+      {/* 2. Tabs Bar (Dalam Proses | Selesai | Dibatalkan) */}
       <nav className="activity-tabs-row" role="tablist">
+        <button
+          className={`activity-tab-btn ${activeTab === 'proses' ? 'active' : ''}`}
+          onClick={() => setActiveTab('proses')}
+          role="tab"
+          aria-selected={activeTab === 'proses'}
+        >
+          <span>Dalam Proses{inProgressCount > 0 ? ` (${inProgressCount})` : ''}</span>
+          {activeTab === 'proses' && <div className="activity-tab-indicator" />}
+        </button>
         <button
           className={`activity-tab-btn ${activeTab === 'selesai' ? 'active' : ''}`}
           onClick={() => setActiveTab('selesai')}
@@ -698,6 +825,19 @@ export default function ActivityPage({ onBack, currentUser, isDriver }) {
                       </span>
                     </div>
 
+                    {/* Live progress pill when order is in_progress */}
+                    {order.status === 'in_progress' && (
+                      <div className="activity-progress-badge">
+                        {order.assignmentStatus === 'assigned'
+                          ? order.driverStep === 'picked_up'
+                            ? `Dalam Perjalanan · ${order.driver?.name || 'Mitra Driver'}`
+                            : order.driverStep === 'arrived'
+                            ? `Driver Tiba di Jemput · ${order.driver?.name || 'Mitra Driver'}`
+                            : `Menuju Titik Jemput · ${order.driver?.name || 'Mitra Driver'}`
+                          : `Menunggu Penugasan Admin${order.selectedAdminName ? ` (${order.selectedAdminName})` : ''}`}
+                      </div>
+                    )}
+
                     {/* Cancelled badge if on cancelled tab */}
                     {order.status === 'cancelled' && order.cancelReason && (
                       <div className="activity-cancelled-badge">
@@ -733,8 +873,10 @@ export default function ActivityPage({ onBack, currentUser, isDriver }) {
                 ? isDriverView
                   ? 'Pesanan yang ditugaskan oleh Admin Dispatch kepada Anda akan otomatis tercatat di halaman riwayat ini.'
                   : 'Riwayat pesanan Motor, Mobil, atau Paket Anda akan muncul di sini setelah Anda melakukan pemesanan.'
+                : activeTab === 'proses'
+                ? 'Belum ada pesanan yang sedang berlangsung.'
                 : activeTab === 'selesai'
-                ? `Belum ada pesanan selesai pada tanggal ${selectedDate === 'all' ? '' : selectedDate}.`
+                ? `Belum ada pesanan selesai${selectedDate === 'all' ? '' : ` pada ${selectedDateLabel}`}.`
                 : 'Belum ada pesanan yang dibatalkan.'}
             </p>
           </div>

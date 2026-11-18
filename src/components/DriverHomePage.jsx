@@ -14,7 +14,11 @@ import {
   QrCode
 } from 'lucide-react';
 import dbService, { normalizePhone } from '../services/dbService.js';
-import { formatRupiah } from '../utils/fareCalculator.js';
+import {
+  FLAT_PLATFORM_FEE,
+  formatRupiah,
+  resolveBookingFeeBreakdown
+} from '../utils/fareCalculator.js';
 import ActivityOrderDetailView from './ActivityOrderDetailView.jsx';
 
 function toLocalDateKey(dateInput) {
@@ -61,31 +65,29 @@ function formatDriverBookingToOrder(b) {
     ? createdAtDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
     : 'Hari ini';
 
-  const fare = Number(b.fare_amount || 15000);
-  const deliveryFee =
-    b.delivery_fee !== undefined && b.delivery_fee !== null
-      ? Number(b.delivery_fee)
-      : b.booking_status === 'cancelled'
-      ? 0
-      : Math.round((fare * 0.85) / 100) * 100;
-  const totalEarnings =
-    b.total_earnings !== undefined && b.total_earnings !== null
-      ? Number(b.total_earnings)
-      : deliveryFee;
-  const driverPlatformFee =
-    b.booking_status === 'cancelled' ? 0 : Math.max(0, fare - totalEarnings);
+  const {
+    fare,
+    isCancelled: isCancelledBooking,
+    deliveryFee,
+    totalEarnings,
+    driverPlatformFee,
+    customerPlatformFee: platformFee,
+    customerTripFare: tripFare
+  } = resolveBookingFeeBreakdown(b);
 
   const isQris = String(b.payment_method || 'cash').toLowerCase() === 'qris';
-  const cashVal = isQris
-    ? 0
-    : b.cash_collected !== undefined
-    ? Number(b.cash_collected)
-    : -fare;
-  const adjVal = isQris
-    ? 0
-    : b.adjustment !== undefined
-    ? Number(b.adjustment)
-    : -fare;
+  const cashVal =
+    isQris || isCancelledBooking
+      ? 0
+      : b.cash_collected !== undefined
+      ? Number(b.cash_collected)
+      : -fare;
+  const adjVal =
+    isQris || isCancelledBooking
+      ? 0
+      : b.adjustment !== undefined
+      ? Number(b.adjustment)
+      : -fare;
 
   const code =
     b.order_code ||
@@ -113,9 +115,6 @@ function formatDriverBookingToOrder(b) {
     b.dropoff_address ||
     b.package_info?.dropoffAddress ||
     realDropoffName;
-
-  const platformFee = 2000;
-  const tripFare = Math.max(0, fare - platformFee);
 
   return {
     id: b.id || b.booking_code || code,
@@ -972,11 +971,11 @@ export default function DriverHomePage({ currentUser, onNavigate }) {
                   <span className="commission-val">{formatRupiah(recapStats.totalGross)}</span>
                 </div>
                 <div className="commission-row deduction">
-                  <span>Potongan Komisi Platform (15%)</span>
+                  <span>Biaya Layanan &amp; Aplikasi ({formatRupiah(FLAT_PLATFORM_FEE)}/Order)</span>
                   <span className="commission-val">-{formatRupiah(recapStats.totalCommission)}</span>
                 </div>
                 <div className="commission-row net-total">
-                  <span>Pendapatan Bersih Periode (85%)</span>
+                  <span>Pendapatan Bersih Periode</span>
                   <span className="commission-val">{formatRupiah(recapStats.totalNet)}</span>
                 </div>
               </div>

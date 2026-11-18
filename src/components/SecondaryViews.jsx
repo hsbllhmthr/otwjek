@@ -22,8 +22,16 @@ function MinimalEmptyState({ onBack, icon: IconComponent, title, subtitle }) {
   );
 }
 
-export function ActivityView({ onBack, currentUser, isDriver }) {
-  return <ActivityPage onBack={onBack} currentUser={currentUser} isDriver={isDriver} />;
+export function ActivityView({ onBack, currentUser, isDriver, initialOrderId, onClearInitialOrder }) {
+  return (
+    <ActivityPage
+      onBack={onBack}
+      currentUser={currentUser}
+      isDriver={isDriver}
+      initialOrderId={initialOrderId}
+      onClearInitialOrder={onClearInitialOrder}
+    />
+  );
 }
 
 export function PaymentView({ onBack }) {

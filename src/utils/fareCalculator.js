@@ -4,7 +4,7 @@
  */
 
 export const PRICING_CONFIG = {
-  platformFee: 2000, // Sisterhood Safety & Admin Maintenance Fee
+  platformFee: 2000, // Biaya layanan & aplikasi Rp 2.000 flat per transaksi (motor, mobil, paket)
   rideMotor: {
     baseFare: 15000,
     baseKm: 4,
@@ -26,6 +26,80 @@ export const PRICING_CONFIG = {
     }
   }
 };
+
+export const FLAT_PLATFORM_FEE = PRICING_CONFIG.platformFee;
+
+/**
+ * Calculates driver earnings and flat application fee per transaction (motor, mobil, paket).
+ * Every non-cancelled transaction allocates a flat Rp 2.000 fee to the application.
+ * @param {number} fareAmount
+ * @param {boolean} [isCancelled=false]
+ * @returns {{ grossFare: number, platformFee: number, netEarnings: number }}
+ */
+export function calculateDriverEarnings(fareAmount, isCancelled = false) {
+  const grossFare = Math.max(0, Number(fareAmount || 0));
+  if (isCancelled || grossFare <= 0) {
+    return {
+      grossFare,
+      platformFee: 0,
+      netEarnings: 0
+    };
+  }
+
+  const platformFee = Math.min(grossFare, FLAT_PLATFORM_FEE);
+  const netEarnings = Math.max(0, grossFare - platformFee);
+
+  return {
+    grossFare,
+    platformFee,
+    netEarnings
+  };
+}
+
+/**
+ * Resolves unified flat Rp 2.000 fee breakdown for both customer receipt and driver earnings
+ * from a stored or formatted booking object (safe against stale 15% records).
+ * @param {Object} booking
+ */
+export function resolveBookingFeeBreakdown(booking) {
+  const fare = Number(booking?.fare_amount || booking?.price || 15000);
+  const isCancelled =
+    booking?.booking_status === 'cancelled' ||
+    booking?.status === 'cancelled' ||
+    booking?.driver_step === 'cancelled';
+  const { platformFee: calcFee, netEarnings: calcNet } = calculateDriverEarnings(
+    fare,
+    isCancelled
+  );
+  const hasMatchingFlatFee = Number(booking?.platform_fee) === calcFee;
+
+  const totalEarnings = isCancelled
+    ? 0
+    : hasMatchingFlatFee &&
+      booking?.total_earnings !== undefined &&
+      booking?.total_earnings !== null
+    ? Number(booking.total_earnings)
+    : calcNet;
+  const deliveryFee = isCancelled
+    ? 0
+    : hasMatchingFlatFee &&
+      booking?.delivery_fee !== undefined &&
+      booking?.delivery_fee !== null
+    ? Number(booking.delivery_fee)
+    : totalEarnings;
+  const driverPlatformFee = isCancelled ? 0 : calcFee;
+  const customerTripFare = Math.max(0, fare - FLAT_PLATFORM_FEE);
+
+  return {
+    fare,
+    isCancelled,
+    deliveryFee,
+    totalEarnings,
+    driverPlatformFee,
+    customerPlatformFee: FLAT_PLATFORM_FEE,
+    customerTripFare
+  };
+}
 
 /**
  * Calculates fare based on service type, distance, and options

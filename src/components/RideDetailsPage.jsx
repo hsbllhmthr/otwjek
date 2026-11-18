@@ -28,7 +28,8 @@ export default function RideDetailsPage({
   currentUser = null,
   bookingId: initialBookingId = null,
   onBack,
-  onCancelRide
+  onCancelRide,
+  onBookingSubmitted
 }) {
   const [copiedField, setCopiedField] = useState(null);
   const [selectedAdminId, setSelectedAdminId] = useState(ADMINS[0]?.id || 'admin-1');
@@ -103,8 +104,8 @@ export default function RideDetailsPage({
     // Target selected WhatsApp Admin Dispatcher
     const BOOK_NOW_PHONE = selectedAdmin?.phone || '62882021942470';
 
-    const shareLat = gpsCoords?.lat || pickup?.lat;
-    const shareLng = gpsCoords?.lng || pickup?.lng;
+    const shareLat = pickup?.lat || gpsCoords?.lat;
+    const shareLng = pickup?.lng || gpsCoords?.lng;
 
     const sessionUser = currentUser || dbService?.session?.getCurrentUser();
     const resolvedCustomerName =
@@ -131,27 +132,42 @@ export default function RideDetailsPage({
       dropoffCoords: dropoff?.lat && dropoff?.lng ? { lat: dropoff.lat, lng: dropoff.lng } : null
     });
 
+    let createdBooking = null;
     try {
       const pickupAddr = pickup?.address || pickup?.fullAddress || pickupTitle;
       const dropoffAddr = dropoff?.address || dropoff?.fullAddress || dropoffTitle;
-      const created = dbService?.bookings?.create({
+      createdBooking = dbService?.bookings?.create({
         id: savedRecordId || initialBookingId || undefined,
         customerId: sessionUser?.id || null,
         customerPhone: sessionUser?.phone || resolvedCustomerPhone || null,
         customerName: resolvedCustomerName,
         driver: selectedDriver || null,
         customerNotes: driverNotes || '',
-        pickup: { name: pickupTitle, address: pickupAddr },
-        dropoff: { name: dropoffTitle, address: dropoffAddr },
+        pickup: {
+          name: pickupTitle,
+          address: pickupAddr,
+          lat: shareLat || null,
+          lng: shareLng || null
+        },
+        dropoff: {
+          name: dropoffTitle,
+          address: dropoffAddr,
+          lat: dropoff?.lat || null,
+          lng: dropoff?.lng || null
+        },
         serviceType: isCar ? 'mobil' : 'motor',
         distanceKm,
         durationMinutes: durationMinutes || (isCar ? 25 : 15),
         fareAmount: currentPrice,
         paymentMethod,
-        bookingStatus: 'completed'
+        selectedAdminId: selectedAdmin?.id || 'admin-1',
+        selectedAdminName: selectedAdmin?.name || 'Admin 1',
+        selectedAdminPhone: BOOK_NOW_PHONE,
+        waDispatchedAt: new Date().toISOString(),
+        bookingStatus: 'in_progress'
       });
-      if (created?.id) {
-        setSavedRecordId(created.id);
+      if (createdBooking?.id) {
+        setSavedRecordId(createdBooking.id);
       }
     } catch {
       // ignore
@@ -159,6 +175,26 @@ export default function RideDetailsPage({
 
     const url = buildWhatsAppLink(BOOK_NOW_PHONE, message);
     openWhatsApp(url);
+    if (onBookingSubmitted) {
+      onBookingSubmitted(createdBooking);
+    }
+  };
+
+  const handleCancelOrder = () => {
+    const targetId = savedRecordId || initialBookingId;
+    if (targetId) {
+      try {
+        dbService?.bookings?.updateBookingStatus(
+          targetId,
+          'cancelled',
+          'Dibatalkan oleh Pelanggan'
+        );
+      } catch {
+        // ignore
+      }
+    }
+    if (onCancelRide) onCancelRide();
+    else if (onBack) onBack();
   };
 
 
@@ -462,7 +498,7 @@ export default function RideDetailsPage({
           <button
             type="button"
             className="btn-cancel-ride"
-            onClick={() => { if (onCancelRide) onCancelRide(); else if (onBack) onBack(); }}
+            onClick={handleCancelOrder}
           >
             Batalkan Pesanan
           </button>

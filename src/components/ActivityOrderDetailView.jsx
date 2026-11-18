@@ -7,13 +7,13 @@ import {
   User,
   Info,
   Banknote,
-  Hexagon,
   FileText,
   RotateCcw,
   Clock,
   Check,
   X,
   CheckCheck,
+  Copy,
   Bike,
   Car,
   Package,
@@ -22,9 +22,21 @@ import {
   Receipt,
   QrCode,
   CheckCircle2,
-  RefreshCw
+  RefreshCw,
+  MessageCircle
 } from 'lucide-react';
-import { formatRupiah } from '../utils/fareCalculator.js';
+import {
+  FLAT_PLATFORM_FEE,
+  calculateDriverEarnings,
+  formatRupiah
+} from '../utils/fareCalculator.js';
+import {
+  buildWhatsAppLink,
+  formatBookingMessage,
+  openWhatsApp,
+  sanitizeWhatsAppPhone
+} from '../utils/whatsappTemplate.js';
+import { ADMINS } from '../data/admins.js';
 import dbService from '../services/dbService.js';
 
 export default function ActivityOrderDetailView({
@@ -64,8 +76,11 @@ export default function ActivityOrderDetailView({
   const orderCode = order.orderCode || (order.id ? `#${String(order.id).slice(-4).toUpperCase()}` : '#8L9A');
   const orderNumber = order.orderNumber || '3301447308559872213';
   const isDelivered = order.status !== 'cancelled';
+  const isOrderFullyCompleted = order.status === 'completed';
   const currentDriverStep =
-    order.status === 'cancelled' ? 'cancelled' : order.driverStep || 'completed';
+    order.status === 'cancelled'
+      ? 'cancelled'
+      : order.driverStep || (isOrderFullyCompleted ? 'completed' : 'waiting_admin');
   const activeStepIndex =
     currentDriverStep === 'assigned'
       ? 0
@@ -73,33 +88,40 @@ export default function ActivityOrderDetailView({
       ? 1
       : currentDriverStep === 'picked_up'
       ? 2
-      : 3;
-  const fare = Number(order.price || 15000);
-  const deliveryFeeStr = order.deliveryFee || order.formattedPrice || formatRupiah(order.price || 9600);
-  const totalEarningsStr = order.totalEarnings || order.formattedPrice || deliveryFeeStr;
+      : currentDriverStep === 'completed'
+      ? 3
+      : -1;
+  const fare = Number(order.price || order.fare_amount || 15000);
   const isQrisPayment = String(order.paymentMethod || 'cash').toLowerCase() === 'qris';
   const fareAmountStr = order.formattedPrice || formatRupiah(fare);
 
+  const { platformFee: flatDriverFee, netEarnings: flatNetEarnings } =
+    calculateDriverEarnings(fare, !isDelivered);
   const netEarningsAmount = !isDelivered
     ? 0
     : order.totalEarningsAmount !== undefined
     ? Number(order.totalEarningsAmount)
-    : Math.round((fare * 0.85) / 100) * 100;
+    : flatNetEarnings;
   const driverPlatformFeeAmount = !isDelivered
     ? 0
     : order.driverPlatformFee !== undefined
     ? Number(order.driverPlatformFee)
-    : Math.max(0, fare - netEarningsAmount);
+    : flatDriverFee;
+  const totalEarningsStr = !isDelivered
+    ? formatRupiah(0)
+    : order.totalEarnings || formatRupiah(netEarningsAmount);
   const driverPlatformFeeStr =
     driverPlatformFeeAmount > 0 ? `-${formatRupiah(driverPlatformFeeAmount)}` : formatRupiah(0);
 
   // Tagihan tunai / Penyesuaian Driver matching format reference
-  const cashCollectedStr = isQrisPayment
-    ? formatRupiah(0)
-    : order.cashCollected || (order.price ? `-${formatRupiah(order.price)}` : '-Rp282.062');
-  const adjustmentStr = isQrisPayment
-    ? formatRupiah(0)
-    : order.adjustment || cashCollectedStr;
+  const cashCollectedStr =
+    !isDelivered || isQrisPayment
+      ? formatRupiah(0)
+      : order.cashCollected || `-${formatRupiah(fare)}`;
+  const adjustmentStr =
+    !isDelivered || isQrisPayment
+      ? formatRupiah(0)
+      : order.adjustment || cashCollectedStr;
 
   // Timeline stations
   const timeline = order.timeline || {
@@ -121,10 +143,10 @@ export default function ActivityOrderDetailView({
 
   // Customer pricing breakdown
   const customerPricing = order.customerPricing || {
-    tripFare: Math.max(0, fare - 2000),
-    formattedTripFare: formatRupiah(Math.max(0, fare - 2000)),
-    platformFee: 2000,
-    formattedPlatformFee: formatRupiah(2000),
+    tripFare: Math.max(0, fare - FLAT_PLATFORM_FEE),
+    formattedTripFare: formatRupiah(Math.max(0, fare - FLAT_PLATFORM_FEE)),
+    platformFee: FLAT_PLATFORM_FEE,
+    formattedPlatformFee: formatRupiah(FLAT_PLATFORM_FEE),
     discount: 0,
     formattedDiscount: null,
     totalPayment: fare,
@@ -188,7 +210,7 @@ export default function ActivityOrderDetailView({
     const waUrl = `https://wa.me/6285255655084?text=${encodeURIComponent(
       `Halo CS OTWJek, saya sebagai ${roleText} ingin menanyakan rincian pesanan ${serviceDisplayName} ${orderCode} (No: ${orderNumber}).`
     )}`;
-    window.open(waUrl, '_blank');
+    openWhatsApp(waUrl);
   };
 
 
@@ -221,6 +243,47 @@ export default function ActivityOrderDetailView({
     if (toastMessage) {
       showToast(toastMessage);
     }
+  };
+
+  const targetAdminObj =
+    ADMINS.find((a) => a.id === order.selectedAdminId) || ADMINS[0];
+  const targetAdminName = order.selectedAdminName || targetAdminObj?.name || 'Admin 1';
+  const targetAdminPhone = order.selectedAdminPhone || targetAdminObj?.phone || '62882021942470';
+
+  const handleResendAdminWhatsApp = () => {
+    const msg = formatBookingMessage({
+      serviceType: isPackage ? 'send' : 'ride',
+      vehicleType: isCar ? 'mobil' : 'motor',
+      pickupAddress: pickupLoc?.name || pickupLoc?.address || 'Titik Jemput',
+      dropoffAddress: dropoffLoc?.name || dropoffLoc?.address || 'Titik Tujuan',
+      distanceKm: order.distanceKm || 3.2,
+      formattedFare: fareAmountStr,
+      customerName: order.customerName || 'Pelanggan OTWJek',
+      customerPhone: order.customerPhone || '',
+      customerNotes: order.customerNotes || order.packageInfo?.notes || '',
+      driverName:
+        order.assignmentStatus === 'assigned'
+          ? driverInfo?.name || 'Mitra Driver'
+          : 'Acak (Dicarikan Admin)',
+      packageDetails: isPackage ? order.packageInfo?.itemName || 'Paket / Makanan' : '',
+      packageInfo: isPackage ? order.packageInfo : null,
+      paymentMethod: order.paymentMethod || 'cash',
+      pickupCoords:
+        pickupLoc?.lat && pickupLoc?.lng ? { lat: pickupLoc.lat, lng: pickupLoc.lng } : null,
+      dropoffCoords:
+        dropoffLoc?.lat && dropoffLoc?.lng ? { lat: dropoffLoc.lat, lng: dropoffLoc.lng } : null
+    });
+    openWhatsApp(buildWhatsAppLink(targetAdminPhone, msg));
+  };
+
+  const handleCustomerCancelOrder = () => {
+    if (!order?.id) return;
+    dbService.bookings.updateBookingStatus(
+      order.id,
+      'cancelled',
+      'Dibatalkan oleh Pelanggan'
+    );
+    showToast('Pesanan berhasil dibatalkan.');
   };
 
   const handleReorderClick = () => {
@@ -272,8 +335,16 @@ export default function ActivityOrderDetailView({
               <div className="order-detail-badge-row">
                 <span className="order-detail-code">{orderCode}</span>
 
-                {/* Rubber Stamp Badge (Delivered or Cancelled) */}
-                <div className={`order-stamp-badge ${isDelivered ? 'stamp-delivered' : 'stamp-cancelled'}`}>
+                {/* Rubber Stamp Badge (Delivered / On Progress / Cancelled) */}
+                <div
+                  className={`order-stamp-badge ${
+                    order.status === 'cancelled'
+                      ? 'stamp-cancelled'
+                      : isOrderFullyCompleted
+                      ? 'stamp-delivered'
+                      : 'stamp-progress'
+                  }`}
+                >
                   <svg width="86" height="38" viewBox="0 0 86 38" className="stamp-svg">
                     <ellipse
                       cx="43"
@@ -299,12 +370,16 @@ export default function ActivityOrderDetailView({
                       y="23"
                       textAnchor="middle"
                       fill="currentColor"
-                      fontSize="12"
+                      fontSize="11.5"
                       fontWeight="700"
                       fontFamily="inherit"
                       letterSpacing="0.4"
                     >
-                      {isDelivered ? 'Delivered' : 'Cancelled'}
+                      {order.status === 'cancelled'
+                        ? 'Cancelled'
+                        : isOrderFullyCompleted
+                        ? 'Delivered'
+                        : 'On Progress'}
                     </text>
                   </svg>
                 </div>
@@ -519,7 +594,7 @@ export default function ActivityOrderDetailView({
                 </div>
 
                 <div className="section-data-row">
-                  <span className="data-row-label">Biaya Platform</span>
+                  <span className="data-row-label">Biaya Layanan &amp; Aplikasi</span>
                   <span
                     className={`data-row-value ${
                       driverPlatformFeeAmount > 0 ? 'deduction' : ''
@@ -535,34 +610,6 @@ export default function ActivityOrderDetailView({
                   <span className="data-row-label bold">Total Pendapatan</span>
                   <span className="data-row-value bold">{totalEarningsStr}</span>
                 </div>
-              </div>
-            </section>
-
-            {/* Section Divider Strip */}
-            <div className="order-section-divider" />
-
-            {/* Section: Insentif Driver */}
-            <section className="order-detail-card-section">
-              <div className="section-title-row">
-                <Hexagon size={18} className="section-header-icon" strokeWidth={2.2} />
-                <h2 className="section-title-text">Insentif</h2>
-              </div>
-
-              <div className="section-content-list">
-                {(order.incentives && order.incentives.length > 0
-                  ? order.incentives
-                  : [
-                      { name: 'Bonus Harian - Makassar', points: 100 },
-                      { name: 'MISI SIGAP', points: 100 }
-                    ]
-                ).map((inc, i) => (
-                  <div key={i} className="section-data-row">
-                    <span className="data-row-label">{inc.name || inc.title}</span>
-                    <span className="data-row-value">
-                      {typeof inc.points === 'number' ? `${inc.points} Poin` : inc.points}
-                    </span>
-                  </div>
-                ))}
               </div>
             </section>
 
@@ -690,6 +737,101 @@ export default function ActivityOrderDetailView({
               TAMPILAN 2: KHUSUS AKUN PELANGGAN / CUSTOMER (Data & Desain Baru)
               =================================================================== */
           <div className="customer-detail-flow">
+            {/* 0. Status Pesanan Langsung (Live Order Tracking) */}
+            {(order.status === 'in_progress' || order.status === 'cancelled') && (
+              <>
+                <section className="customer-card-section customer-live-status-section">
+                  <div
+                    className={`customer-live-status-card ${
+                      order.status === 'cancelled'
+                        ? 'is-cancelled'
+                        : order.assignmentStatus === 'assigned'
+                        ? 'is-assigned'
+                        : 'is-waiting'
+                    }`}
+                  >
+                    <div className="customer-live-status-top">
+                      <span className="customer-live-status-pill">
+                        <span className="customer-live-status-dot" aria-hidden="true" />
+                        <span>
+                          {order.status === 'cancelled'
+                            ? 'Dibatalkan'
+                            : order.assignmentStatus === 'assigned'
+                            ? currentDriverStep === 'picked_up'
+                              ? 'Dalam Perjalanan'
+                              : currentDriverStep === 'arrived'
+                              ? 'Driver di Titik Jemput'
+                              : 'Driver Menuju Jemput'
+                            : 'Menunggu Admin'}
+                        </span>
+                      </span>
+                      <span className="customer-live-status-code">{orderCode}</span>
+                    </div>
+
+                    <div className="customer-live-status-body">
+                      <h3 className="customer-live-status-title">
+                        {order.status === 'cancelled'
+                          ? 'Pesanan dibatalkan'
+                          : order.assignmentStatus === 'assigned'
+                          ? currentDriverStep === 'picked_up'
+                            ? 'Mitra driver sedang mengantar Anda ke tujuan'
+                            : currentDriverStep === 'arrived'
+                            ? 'Mitra driver sudah tiba di titik jemput'
+                            : 'Mitra driver sedang menuju ke titik jemput'
+                          : 'Menunggu penugasan driver'}
+                      </h3>
+
+                      <p className="customer-live-status-desc">
+                        {order.status === 'cancelled'
+                          ? order.cancelReason || 'Pesanan ini telah dibatalkan.'
+                          : order.assignmentStatus === 'assigned'
+                          ? `${driverInfo.name}${driverInfo.vehicleModel ? ` · ${driverInfo.vehicleModel}` : ''}${driverInfo.plateNumber ? ` (${driverInfo.plateNumber})` : ''}`
+                          : `Pesanan sudah dikirim ke ${targetAdminName}. Buka WhatsApp jika chat belum terkirim.`}
+                      </p>
+                    </div>
+
+                    {order.status === 'in_progress' && (
+                      <div className="customer-live-status-actions">
+                        {order.assignmentStatus === 'assigned' && driverInfo?.phone ? (
+                          <a
+                            href={`https://wa.me/${sanitizeWhatsAppPhone(driverInfo.phone)}?text=${encodeURIComponent(
+                              `Halo Kak ${driverInfo.name}, saya pelanggan OTWJek untuk pesanan ${orderCode}.`
+                            )}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn-live-wa"
+                          >
+                            <MessageCircle size={16} strokeWidth={2} />
+                            <span>Chat Driver (WA)</span>
+                          </a>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn-live-wa"
+                            onClick={handleResendAdminWhatsApp}
+                          >
+                            <MessageCircle size={16} strokeWidth={2} />
+                            <span>Chat {targetAdminName} (WA)</span>
+                          </button>
+                        )}
+
+                        {order.assignmentStatus !== 'assigned' && (
+                          <button
+                            type="button"
+                            className="btn-live-cancel"
+                            onClick={handleCustomerCancelOrder}
+                          >
+                            Batalkan
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </section>
+                <div className="order-section-divider" />
+              </>
+            )}
+
             {/* 1. Detail Rute Perjalanan & Titik Jemput - Tujuan (Unmasked untuk Pelanggan) */}
             <section className="customer-card-section">
               <div className="customer-section-header">
@@ -716,7 +858,13 @@ export default function ActivityOrderDetailView({
                     )}
                     <div className="point-title-row">
                       <span className="point-title">{pickupLoc.name}</span>
-                      <span className="point-time-tag">{timeline.pickedUp || '13:47'}</span>
+                      <span className="point-time-tag">
+                        {isOrderFullyCompleted
+                          ? timeline.pickedUp || '13:47'
+                          : timeline.pickedUp && timeline.pickedUp !== '--:--'
+                          ? timeline.pickedUp
+                          : timeline.received || '--:--'}
+                      </span>
                     </div>
                     <p className="point-address">{pickupLoc.address}</p>
                     {isPackage && order.packageInfo?.senderName && (
@@ -741,7 +889,15 @@ export default function ActivityOrderDetailView({
                     )}
                     <div className="point-title-row">
                       <span className="point-title">{dropoffLoc.name}</span>
-                      <span className="point-time-tag completed">{timeline.completed || '14:00'}</span>
+                      <span
+                        className={`point-time-tag ${isOrderFullyCompleted ? 'completed' : ''}`}
+                      >
+                        {isOrderFullyCompleted
+                          ? timeline.completed || '14:00'
+                          : order.status === 'cancelled'
+                          ? 'Dibatalkan'
+                          : 'Dalam Proses'}
+                      </span>
                     </div>
                     <p className="point-address">{dropoffLoc.address}</p>
                     {isPackage && order.packageInfo?.recipientName && (
@@ -863,8 +1019,24 @@ export default function ActivityOrderDetailView({
                   <Receipt size={17} className="title-icon" />
                   <span className="customer-section-title">Rincian Pembayaran</span>
                 </div>
-                <span className="customer-payment-badge success">
-                  <Check size={12} strokeWidth={2.5} /> Lunas
+                <span
+                  className={`customer-payment-badge ${
+                    isOrderFullyCompleted
+                      ? 'success'
+                      : order.status === 'cancelled'
+                      ? 'cancelled'
+                      : 'pending'
+                  }`}
+                >
+                  {isOrderFullyCompleted ? (
+                    <>
+                      <Check size={12} strokeWidth={2.5} /> Lunas
+                    </>
+                  ) : order.status === 'cancelled' ? (
+                    'Dibatalkan'
+                  ) : (
+                    'Dalam Proses'
+                  )}
                 </span>
               </div>
 
@@ -898,13 +1070,29 @@ export default function ActivityOrderDetailView({
                 <div className="customer-payment-method-bar">
                   <div className="method-left">
                     {(order.paymentMethod || 'cash').toLowerCase() === 'cash' ? (
-                      <Banknote size={16} color="#059669" />
+                      <Banknote size={16} color="#111827" />
                     ) : (
-                      <QrCode size={16} color="#2563EB" />
+                      <QrCode size={16} color="#111827" />
                     )}
                     <span className="method-name">{customerPricing.paymentMethodLabel}</span>
                   </div>
-                  <span className="method-status-tag">Lunas</span>
+                  <span
+                    className={`method-status-tag ${
+                      isOrderFullyCompleted
+                        ? ''
+                        : order.status === 'cancelled'
+                        ? 'is-cancelled'
+                        : 'is-pending'
+                    }`}
+                  >
+                    {isOrderFullyCompleted
+                      ? 'Lunas'
+                      : order.status === 'cancelled'
+                      ? 'Dibatalkan'
+                      : (order.paymentMethod || 'cash').toLowerCase() === 'cash'
+                      ? 'Bayar Saat Tiba'
+                      : 'Menunggu Konfirmasi'}
+                  </span>
                 </div>
               </div>
             </section>
@@ -932,7 +1120,7 @@ export default function ActivityOrderDetailView({
                     className="order-number-val"
                     style={{
                       fontWeight: 600,
-                      color: order.assignmentStatus === 'assigned' ? '#059669' : '#D97706',
+                      color: '#111827',
                       textAlign: 'right'
                     }}
                   >
@@ -944,7 +1132,7 @@ export default function ActivityOrderDetailView({
 
                 <div className="customer-info-row">
                   <span className="info-row-label">Kode Pesanan</span>
-                  <span className="order-number-val" style={{ fontWeight: 700, color: '#EE4335' }}>
+                  <span className="order-number-val" style={{ fontWeight: 700, color: '#111827' }}>
                     {orderCode}
                   </span>
                 </div>
@@ -955,16 +1143,15 @@ export default function ActivityOrderDetailView({
                     <span className="order-number-val">{orderNumber}</span>
                     <button
                       type="button"
-                      className="btn-copy-order-number"
+                      className="btn-copy-order-number is-icon-only"
                       onClick={handleCopyOrderNumber}
-                      aria-label="Salin nomor pesanan"
+                      title={copied ? 'Tersalin' : 'Salin nomor pesanan'}
+                      aria-label={copied ? 'Nomor pesanan tersalin' : 'Salin nomor pesanan'}
                     >
                       {copied ? (
-                        <span className="copied-label">
-                          <CheckCheck size={14} /> Tersalin
-                        </span>
+                        <CheckCheck size={15} strokeWidth={2.2} aria-hidden="true" />
                       ) : (
-                        <span>Salin</span>
+                        <Copy size={15} strokeWidth={2} aria-hidden="true" />
                       )}
                     </button>
                   </div>
@@ -972,63 +1159,73 @@ export default function ActivityOrderDetailView({
 
                 <div className="customer-info-row">
                   <span className="info-row-label">Waktu Pemesanan</span>
-                  <span className="info-row-val">{order.date || '11 Okt 2026'}, {timeline.received || '13:31'}</span>
+                  <span className="info-row-val">{order.date || '11 Okt 2026'}, {timeline.received || '--:--'}</span>
                 </div>
 
                 <div className="customer-info-row">
                   <span className="info-row-label">Waktu Tiba</span>
-                  <span className="info-row-val">{order.date || '11 Okt 2026'}, {timeline.completed || '14:00'}</span>
+                  <span className="info-row-val">
+                    {isOrderFullyCompleted
+                      ? `${order.date || '11 Okt 2026'}, ${timeline.completed || '--:--'}`
+                      : order.status === 'cancelled'
+                      ? 'Dibatalkan'
+                      : 'Dalam Proses'}
+                  </span>
                 </div>
               </div>
             </section>
 
-            {/* Section Divider Strip */}
-            <div className="order-section-divider" />
+            {isOrderFullyCompleted && (
+              <>
+                {/* Section Divider Strip */}
+                <div className="order-section-divider" />
 
-            {/* 6. Ulasan / Penilaian Pengemudi oleh Pelanggan */}
-            <section className="customer-card-section customer-rating-widget-card">
-              <span className="customer-section-title">Nilai Pengemudi Anda</span>
-              <p className="customer-rating-desc">
-                Bagaimana pengalaman perjalanan dan layanan pesanan Anda?
-              </p>
+                {/* 6. Ulasan / Penilaian Pengemudi oleh Pelanggan */}
+                <section className="customer-card-section customer-rating-widget-card">
+                  <span className="customer-section-title">Nilai Pengemudi Anda</span>
+                  <p className="customer-rating-desc">
+                    Bagaimana pengalaman perjalanan dan layanan pesanan Anda?
+                  </p>
 
-              <div className="customer-interactive-stars">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    type="button"
-                    className={`customer-star-btn ${star <= customerRating ? 'active' : ''}`}
-                    onClick={() => handleSubmitCustomerRating(star)}
-                    title={`Beri ${star} bintang`}
-                  >
-                    ★
-                  </button>
-                ))}
-              </div>
+                  <div className="customer-interactive-stars">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        className={`customer-star-btn ${star <= customerRating ? 'active' : ''}`}
+                        onClick={() => handleSubmitCustomerRating(star)}
+                        title={`Beri ${star} bintang`}
+                      >
+                        ★
+                      </button>
+                    ))}
+                  </div>
 
-              <div className="customer-rating-tags">
-                {['Ramah & Sopan', 'Tepat Waktu', 'Kendaraan Bersih', 'Mengemudi Aman'].map((tag) => (
-                  <button
-                    key={tag}
-                    type="button"
-                    className={`rating-pill-tag ${selectedTag === tag ? 'selected' : ''}`}
-                    onClick={() => {
-                      setSelectedTag(tag);
-                      showToast(`Ulasan: "${tag}" dipilih.`);
-                    }}
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
+                  <div className="customer-rating-tags">
+                    {['Ramah & Sopan', 'Tepat Waktu', 'Kendaraan Bersih', 'Mengemudi Aman'].map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        className={`rating-pill-tag ${selectedTag === tag ? 'selected' : ''}`}
+                        onClick={() => {
+                          setSelectedTag(tag);
+                          showToast(`Ulasan: "${tag}" dipilih.`);
+                        }}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
 
-              {customerRatingSubmitted && (
-                <div className="customer-rating-thankyou">
-                  <CheckCircle2 size={16} color="#10B981" />
-                  <span>Ulasan Anda telah tersimpan. Terima kasih!</span>
-                </div>
-              )}
-            </section>
+                  {customerRatingSubmitted && (
+                    <div className="customer-rating-thankyou">
+                      <CheckCircle2 size={16} color="#10B981" />
+                      <span>Ulasan Anda telah tersimpan. Terima kasih!</span>
+                    </div>
+                  )}
+                </section>
+              </>
+            )}
 
             <div className="customer-action-footer-spacer" />
           </div>
@@ -1102,23 +1299,46 @@ export default function ActivityOrderDetailView({
       {/* Customer Action Bottom Bar (constrained inside order-detail-viewport) */}
       {!isDriverView && (
         <div className="customer-action-footer">
-          <button
-            type="button"
-            className="btn-customer-cs-help"
-            onClick={handleContactCS}
-          >
-            <Headphones size={17} />
-            <span>Bantuan</span>
-          </button>
+          {order.status === 'in_progress' && order.assignmentStatus !== 'assigned' ? (
+            <>
+              <button
+                type="button"
+                className="btn-customer-cs-help"
+                onClick={handleCustomerCancelOrder}
+              >
+                <span>Batalkan Pesanan</span>
+              </button>
 
-          <button
-            type="button"
-            className="btn-customer-reorder"
-            onClick={handleReorderClick}
-          >
-            <RefreshCw size={17} />
-            <span>Pesan Lagi</span>
-          </button>
+              <button
+                type="button"
+                className="btn-customer-reorder"
+                onClick={handleResendAdminWhatsApp}
+              >
+                <MessageCircle size={17} />
+                <span>Chat {targetAdminName}</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="btn-customer-cs-help"
+                onClick={handleContactCS}
+              >
+                <Headphones size={17} />
+                <span>Bantuan</span>
+              </button>
+
+              <button
+                type="button"
+                className="btn-customer-reorder"
+                onClick={handleReorderClick}
+              >
+                <RefreshCw size={17} />
+                <span>Pesan Lagi</span>
+              </button>
+            </>
+          )}
         </div>
       )}
 

@@ -13,6 +13,7 @@
 
 import { ADMINS } from '../data/admins.js';
 import { FOOD_MERCHANTS } from '../data/foodMerchants.js';
+import { calculateDriverEarnings } from '../utils/fareCalculator.js';
 
 const STORAGE_KEYS = {
   USERS: 'otwjek_db_users',
@@ -1211,9 +1212,18 @@ export const dbService = {
           : 'motor');
       const sName = sType === 'mobil' ? 'Mobil' : (sType === 'paket' ? 'Paket' : 'Motor');
       
+      const existingIdx = rideData.id ? bookings.findIndex((b) => b.id === rideData.id) : -1;
+      const existingBooking = existingIdx !== -1 ? bookings[existingIdx] : null;
+
       const fare = Number(rideData.fareAmount || rideData.fare || 15000);
-      const deliveryFee = Math.round((fare * 0.85) / 100) * 100;
       const isCash = (rideData.paymentMethod || 'cash').toLowerCase() === 'cash';
+      const initialBookingStatus =
+        rideData.bookingStatus || existingBooking?.booking_status || 'in_progress';
+      const isInitialCancelled = initialBookingStatus === 'cancelled';
+      const { platformFee, netEarnings: deliveryFee } = calculateDriverEarnings(
+        fare,
+        isInitialCancelled
+      );
 
       // Hitung timeline perjalanan realistis berdasarkan durasi
       const duration = Number(rideData.durationMinutes || 15);
@@ -1234,9 +1244,6 @@ export const dbService = {
         sessionUser?.full_name ||
         sessionUser?.name ||
         'Pelanggan OTWJek';
-
-      const existingIdx = rideData.id ? bookings.findIndex((b) => b.id === rideData.id) : -1;
-      const existingBooking = existingIdx !== -1 ? bookings[existingIdx] : null;
 
       const hasExplicitDriver = Boolean(
         rideData.driver?.id ||
@@ -1318,30 +1325,55 @@ export const dbService = {
         service_name: sName,
         pickup_name: resolvedPickupName,
         pickup_address: resolvedPickupAddress,
+        pickup_lat: rideData.pickup?.lat ?? rideData.pickupLat ?? existingBooking?.pickup_lat ?? null,
+        pickup_lng: rideData.pickup?.lng ?? rideData.pickupLng ?? existingBooking?.pickup_lng ?? null,
         dropoff_name: resolvedDropoffName,
         dropoff_address: resolvedDropoffAddress,
+        dropoff_lat: rideData.dropoff?.lat ?? rideData.dropoffLat ?? existingBooking?.dropoff_lat ?? null,
+        dropoff_lng: rideData.dropoff?.lng ?? rideData.dropoffLng ?? existingBooking?.dropoff_lng ?? null,
         distance_km: rideData.distanceKm || 3.2,
         duration_minutes: duration,
         fare_amount: fare,
+        platform_fee: platformFee,
         delivery_fee: deliveryFee,
         total_earnings: deliveryFee,
         payment_method: isCash ? 'cash' : 'qris',
-        cash_collected: isCash ? -fare : 0,
-        adjustment: isCash ? -fare : 0,
+        cash_collected: isInitialCancelled ? 0 : (isCash ? -fare : 0),
+        adjustment: isInitialCancelled ? 0 : (isCash ? -fare : 0),
         discount: rideData.discount || 0,
         customer_notes: rideData.customerNotes || existingBooking?.customer_notes || '',
         package_info: rideData.packageInfo || existingBooking?.package_info || null,
+        selected_admin_id: rideData.selectedAdminId || existingBooking?.selected_admin_id || null,
+        selected_admin_name: rideData.selectedAdminName || existingBooking?.selected_admin_name || null,
+        selected_admin_phone: rideData.selectedAdminPhone || existingBooking?.selected_admin_phone || null,
+        wa_dispatched_at: rideData.waDispatchedAt || existingBooking?.wa_dispatched_at || null,
         incentives: [
           { name: 'Bonus Harian - Makassar', points: 100 },
           { name: 'MISI SIGAP', points: 100 }
         ],
-        timeline: existingBooking?.timeline || {
-          received: formatTime(receivedTime),
-          arrived: formatTime(arrivalTime),
-          pickedUp: formatTime(pickupTime),
-          completed: formatTime(completionTime)
-        },
-        booking_status: rideData.bookingStatus || existingBooking?.booking_status || 'completed',
+        timeline: existingBooking?.timeline || (
+          initialBookingStatus === 'completed'
+            ? {
+                received: formatTime(receivedTime),
+                arrived: formatTime(arrivalTime),
+                pickedUp: formatTime(pickupTime),
+                completed: formatTime(completionTime)
+              }
+            : {
+                received: formatTime(now),
+                arrived: '--:--',
+                pickedUp: '--:--',
+                completed: '--:--'
+              }
+        ),
+        driver_step: existingBooking?.driver_step ?? (
+          isInitialCancelled
+            ? 'cancelled'
+            : hasExplicitDriver && assignedDriver
+            ? (initialBookingStatus === 'completed' ? 'completed' : 'assigned')
+            : null
+        ),
+        booking_status: initialBookingStatus,
         is_read: rideData.isRead !== undefined ? Boolean(rideData.isRead) : (existingBooking?.is_read ?? false),
         is_read_driver: rideData.isReadDriver !== undefined ? Boolean(rideData.isReadDriver) : (existingBooking?.is_read_driver ?? false),
         created_at: existingBooking?.created_at || now.toISOString()
@@ -1383,6 +1415,19 @@ export const dbService = {
       if (idx === -1) return null;
 
       const existing = bookings[idx];
+      const isOrderCancelled =
+        existing.booking_status === 'cancelled' ||
+        existing.status === 'cancelled' ||
+        existing.driver_step === 'cancelled';
+      const isOrderCompleted =
+        existing.booking_status === 'completed' ||
+        existing.status === 'completed' ||
+        existing.driver_step === 'completed';
+
+      if (isOrderCancelled || isOrderCompleted) {
+        return null;
+      }
+
       const prevDriverId = existing.driver_id;
 
       const isBoth = driver.vehicleType === 'both';
@@ -1438,8 +1483,8 @@ export const dbService = {
         driver_rating: assignedDriverObj.rating,
         driver: assignedDriverObj,
         assignment_status: 'assigned',
-        driver_step: existing.booking_status === 'cancelled' ? 'cancelled' : 'assigned',
-        booking_status: existing.booking_status === 'cancelled' ? 'cancelled' : 'in_progress',
+        driver_step: 'assigned',
+        booking_status: 'in_progress',
         assigned_by: reviewerName,
         assigned_at: new Date().toISOString(),
         timeline: {
@@ -1476,22 +1521,44 @@ export const dbService = {
       return updatedBooking;
     },
 
+    _buildFlatFinancialFields(booking, statusOverride = null) {
+      const effectiveStatus = statusOverride || booking?.booking_status;
+      const isCancelled =
+        effectiveStatus === 'cancelled' || booking?.driver_step === 'cancelled';
+      const fare = Number(booking?.fare_amount || 15000);
+      const { platformFee, netEarnings } = calculateDriverEarnings(fare, isCancelled);
+      return {
+        platform_fee: platformFee,
+        delivery_fee: netEarnings,
+        total_earnings: netEarnings
+      };
+    },
+
     updateBookingStatus(bookingId, status, note = '') {
       if (!bookingId || !status) return null;
       const bookings = getStoredArray(STORAGE_KEYS.BOOKINGS, []);
       const idx = bookings.findIndex((b) => b && b.id === bookingId);
       if (idx === -1) return null;
 
+      const existing = bookings[idx];
+      const nextStep =
+        status === 'completed'
+          ? 'completed'
+          : status === 'cancelled'
+          ? 'cancelled'
+          : existing.driver_step;
+      const isCancelled = status === 'cancelled' || nextStep === 'cancelled';
+      const isCash = String(existing.payment_method || 'cash').toLowerCase() === 'cash';
+      const fare = Number(existing.fare_amount || 15000);
+
       const updated = {
-        ...bookings[idx],
+        ...existing,
         booking_status: status,
-        driver_step:
-          status === 'completed'
-            ? 'completed'
-            : status === 'cancelled'
-            ? 'cancelled'
-            : bookings[idx].driver_step,
-        status_note: note || bookings[idx].status_note || null,
+        driver_step: nextStep,
+        ...this._buildFlatFinancialFields({ ...existing, driver_step: nextStep }, status),
+        cash_collected: isCancelled ? 0 : (isCash ? -fare : 0),
+        adjustment: isCancelled ? 0 : (isCash ? -fare : 0),
+        status_note: note || existing.status_note || null,
         updated_at: new Date().toISOString()
       };
 
@@ -1544,15 +1611,23 @@ export const dbService = {
         };
       }
 
+      const nextBookingStatus =
+        nextStep === 'cancelled'
+          ? 'cancelled'
+          : nextStep === 'completed'
+          ? 'completed'
+          : 'in_progress';
+      const isCancelled = nextStep === 'cancelled' || nextBookingStatus === 'cancelled';
+      const isCash = String(existing.payment_method || 'cash').toLowerCase() === 'cash';
+      const fare = Number(existing.fare_amount || 15000);
+
       const updated = {
         ...existing,
         driver_step: nextStep,
-        booking_status:
-          nextStep === 'cancelled'
-            ? 'cancelled'
-            : nextStep === 'completed'
-            ? 'completed'
-            : 'in_progress',
+        booking_status: nextBookingStatus,
+        ...this._buildFlatFinancialFields({ ...existing, driver_step: nextStep }, nextBookingStatus),
+        cash_collected: isCancelled ? 0 : (isCash ? -fare : 0),
+        adjustment: isCancelled ? 0 : (isCash ? -fare : 0),
         timeline: nextTimeline,
         updated_at: new Date().toISOString()
       };
@@ -1575,11 +1650,17 @@ export const dbService = {
           return true;
         })
         .map((b) => {
+          // Normalisasi biaya layanan & aplikasi flat Rp 2.000 pada seluruh transaksi (motor, mobil, paket)
+          const normalizedBase = {
+            ...b,
+            ...this._buildFlatFinancialFields(b)
+          };
+
           const isPlaceholderDriver =
-            b.driver_id === 'drv-calya-01' || b.driver_id === 'drv-vario-01';
-          if (b.assignment_status !== 'assigned' || isPlaceholderDriver) {
+            normalizedBase.driver_id === 'drv-calya-01' || normalizedBase.driver_id === 'drv-vario-01';
+          if (normalizedBase.assignment_status !== 'assigned' || isPlaceholderDriver) {
             return {
-              ...b,
+              ...normalizedBase,
               assignment_status: 'unassigned',
               driver_id: null,
               driver_user_id: null,
@@ -1595,32 +1676,32 @@ export const dbService = {
           const liveDriver = storedDrivers.find(
             (d) =>
               d &&
-              ((b.driver_id && d.id === b.driver_id) ||
-                (b.driver_user_id && d.user_id === b.driver_user_id) ||
-                (b.driver_phone && d.phone && normalizePhone(d.phone) === normalizePhone(b.driver_phone)))
+              ((normalizedBase.driver_id && d.id === normalizedBase.driver_id) ||
+                (normalizedBase.driver_user_id && d.user_id === normalizedBase.driver_user_id) ||
+                (normalizedBase.driver_phone && d.phone && normalizePhone(d.phone) === normalizePhone(normalizedBase.driver_phone)))
           );
-          if (!liveDriver) return b;
+          if (!liveDriver) return normalizedBase;
 
           const livePlate =
             liveDriver.vehicleType === 'both'
-              ? b.service_type === 'mobil'
+              ? normalizedBase.service_type === 'mobil'
                 ? liveDriver.carData?.plateNumber || liveDriver.plateNumber
                 : liveDriver.motorData?.plateNumber || liveDriver.plateNumber
               : liveDriver.plateNumber;
 
           return {
-            ...b,
-            driver_name: liveDriver.name || b.driver_name,
-            driver_plate: livePlate || b.driver_plate,
-            driver_phone: liveDriver.phone || b.driver_phone,
-            driver: b.driver
+            ...normalizedBase,
+            driver_name: liveDriver.name || normalizedBase.driver_name,
+            driver_plate: livePlate || normalizedBase.driver_plate,
+            driver_phone: liveDriver.phone || normalizedBase.driver_phone,
+            driver: normalizedBase.driver
               ? {
-                  ...b.driver,
-                  name: liveDriver.name || b.driver.name,
-                  plateNumber: livePlate || b.driver.plateNumber,
-                  phone: liveDriver.phone || b.driver.phone
+                  ...normalizedBase.driver,
+                  name: liveDriver.name || normalizedBase.driver.name,
+                  plateNumber: livePlate || normalizedBase.driver.plateNumber,
+                  phone: liveDriver.phone || normalizedBase.driver.phone
                 }
-              : b.driver
+              : normalizedBase.driver
           };
         });
     },
@@ -1743,8 +1824,9 @@ export const dbService = {
           distance_km: 3.2,
           duration_minutes: 18,
           fare_amount: 15200,
-          delivery_fee: 9600,
-          total_earnings: 9600,
+          platform_fee: 2000,
+          delivery_fee: 13200,
+          total_earnings: 13200,
           payment_method: 'cash',
           cash_collected: -282062,
           adjustment: -282062,
@@ -1775,8 +1857,9 @@ export const dbService = {
           distance_km: 4.8,
           duration_minutes: 20,
           fare_amount: 17000,
-          delivery_fee: 14000,
-          total_earnings: 14000,
+          platform_fee: 2000,
+          delivery_fee: 15000,
+          total_earnings: 15000,
           payment_method: 'cash',
           cash_collected: -17000,
           adjustment: -17000,
@@ -1807,8 +1890,9 @@ export const dbService = {
           distance_km: 21.5,
           duration_minutes: 38,
           fare_amount: 58000,
-          delivery_fee: 48000,
-          total_earnings: 48000,
+          platform_fee: 2000,
+          delivery_fee: 56000,
+          total_earnings: 56000,
           payment_method: 'qris',
           cash_collected: 0,
           adjustment: -48000,
@@ -1839,6 +1923,7 @@ export const dbService = {
           distance_km: 7.1,
           duration_minutes: 24,
           fare_amount: 24500,
+          platform_fee: 0,
           delivery_fee: 0,
           total_earnings: 0,
           payment_method: 'cash',

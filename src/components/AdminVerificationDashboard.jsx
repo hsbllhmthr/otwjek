@@ -26,8 +26,6 @@ import {
   ArrowUpDown,
   Check,
   Package,
-  Car,
-  MapPin,
   Receipt,
   FileText,
   Copy,
@@ -38,6 +36,7 @@ import dbService, { normalizePhone } from '../services/dbService.js';
 import driverPlaceholder from '../assets/driver_placeholder.svg';
 import otwjekLogo from '../assets/otwjek_logo.png';
 import { compressImageFile } from '../utils/imageCompressor.js';
+import { FLAT_PLATFORM_FEE } from '../utils/fareCalculator.js';
 
 export const isDriverUsingCar = (driver) => {
   if (!driver) return false;
@@ -251,6 +250,103 @@ function MobileCardActionMenu({ menuKey, activeKey, onToggle, onClose, items = [
   );
 }
 
+/**
+ * Normalizes order display metadata shared across order tables and cards.
+ */
+function getOrderDisplayMeta(ord) {
+  const sType = String(ord.service_type || '').toLowerCase();
+  const isCar = sType === 'mobil' || sType === 'car';
+  const isSend = sType === 'paket' || sType === 'send' || sType === 'package' || sType === 'food';
+  const serviceLabel = isCar ? 'Mobil' : isSend ? 'Paket' : 'Motor';
+  const orderCode = ord.order_code || ord.booking_code || '#ORD';
+  const fareFormatted = `Rp ${Number(ord.fare_amount || 15000).toLocaleString('id-ID')}`;
+  const createdDateStr = ord.created_at
+    ? new Date(ord.created_at).toLocaleString('id-ID', {
+        day: 'numeric',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    : 'Baru saja';
+
+  return { isCar, isSend, serviceLabel, orderCode, fareFormatted, createdDateStr };
+}
+
+/**
+ * Icon-free order card/row header showing code, service label, and secondary timestamp/meta.
+ */
+function OrderTitleMeta({ orderCode, serviceLabel, secondaryText }) {
+  return (
+    <div className="table-cell-meta">
+      <div className="assignment-order-title-row">
+        <span className="assignment-order-code">{orderCode}</span>
+        <span className="assignment-order-sep" aria-hidden="true">•</span>
+        <span className="assignment-order-service">{serviceLabel}</span>
+      </div>
+      <span className="table-secondary-text">{secondaryText}</span>
+    </div>
+  );
+}
+
+/**
+ * Shared customer contact cell for order tables and mobile cards.
+ */
+function OrderCustomerCell({ order, isSend }) {
+  return (
+    <td className="tailadmin-td" data-label="Pelanggan">
+      <div className="table-cell-meta">
+        <span className="table-primary-text">
+          {order.customer_name || 'Pelanggan OTWJek'}
+        </span>
+        <span className="table-secondary-text">
+          {order.customer_phone || '-'}
+          {isSend && order.package_info?.recipientName
+            ? ` → Penerima: ${order.package_info.recipientName}`
+            : ''}
+        </span>
+      </div>
+    </td>
+  );
+}
+
+/**
+ * Shared two-part route cell (Lokasi & Tujuan) without icons, matching the assignment card layout.
+ */
+function OrderRouteCell({ order }) {
+  return (
+    <td className="tailadmin-td route-td assignment-route-td" data-label="Rute">
+      <div className="assignment-route-columns">
+        <div
+          className="assignment-route-col"
+          title={`Lokasi: ${order.pickup_name || '-'} (${order.pickup_address || ''})`}
+        >
+          <span className="assignment-route-label">Lokasi</span>
+          <div className="assignment-route-val-group">
+            <span className="assignment-route-value">
+              {order.pickup_name || 'Titik Jemput'}
+            </span>
+          </div>
+        </div>
+        <div className="assignment-route-divider" aria-hidden="true" />
+        <div
+          className="assignment-route-col"
+          title={`Tujuan: ${order.dropoff_name || '-'} (${order.dropoff_address || ''})`}
+        >
+          <span className="assignment-route-label">Tujuan</span>
+          <div className="assignment-route-val-group">
+            <span className="assignment-route-value">
+              {order.dropoff_name || 'Titik Tujuan'}
+            </span>
+            <span className="assignment-route-distance">
+              {order.distance_km || 3.2} km
+            </span>
+          </div>
+        </div>
+      </div>
+    </td>
+  );
+}
+
 export default function AdminVerificationDashboard({ admin, onLogout, onGoToCustomerApp }) {
   // Navigation Section: 'overview' | 'drivers' | 'customers'
   const [mainSection, setMainSection] = useState('overview');
@@ -306,7 +402,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
   // =========================================================================
   // STATE PESANAN & PENUGASAN DRIVER (ORDER DISPATCH)
   // =========================================================================
-  const [orderTab, setOrderTab] = useState('all'); // 'all' | 'unassigned' | 'assigned'
+  const [orderTab, setOrderTab] = useState('all'); // 'all' | 'unassigned' | 'assigned' | 'cancelled'
   const [orderServiceFilter, setOrderServiceFilter] = useState('all');
 
   // =========================================================================
@@ -916,38 +1012,81 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
   // =========================================================================
   // ORDERS / DISPATCH COUNTS, FILTERS & HANDLERS
   // =========================================================================
-  const isOrderDispatchCompleted = useCallback((b) => {
+  const isCustomerOrderCompleted = useCallback((b) => {
+    if (!b) return false;
+    if (b.booking_status === 'cancelled' || b.status === 'cancelled' || b.driver_step === 'cancelled') return false;
+    if (b.driver_step) return b.driver_step === 'completed';
+    if (b.assignment_status === 'assigned') return b.booking_status === 'completed';
+    return Boolean(b.status_note && b.booking_status === 'completed');
+  }, []);
+
+  const isCustomerOrderCancelled = useCallback((b) => {
     if (!b) return false;
     return (
-      b.assignment_status === 'assigned' &&
-      b.booking_status !== 'cancelled' &&
-      (!b.driver_step || b.driver_step === 'completed')
+      b.booking_status === 'cancelled' ||
+      b.status === 'cancelled' ||
+      b.driver_step === 'cancelled'
     );
   }, []);
+
+  const isOrderDispatchCompleted = useCallback(
+    (b) => {
+      if (!b || isCustomerOrderCancelled(b)) return false;
+      return (
+        b.assignment_status === 'assigned' &&
+        (!b.driver_step || b.driver_step === 'completed')
+      );
+    },
+    [isCustomerOrderCancelled]
+  );
 
   const orderCounts = useMemo(() => {
     const list = Array.isArray(bookings) ? bookings : [];
     const completedAssigned = list.filter((b) => isOrderDispatchCompleted(b)).length;
-    const activeDispatch = list.filter((b) => !isOrderDispatchCompleted(b)).length;
-    const unassigned = list.filter((b) => b.assignment_status !== 'assigned').length;
+    const cancelled = list.filter((b) => isCustomerOrderCancelled(b)).length;
+    const activeDispatch = list.filter(
+      (b) =>
+        !isOrderDispatchCompleted(b) &&
+        !isCustomerOrderCancelled(b) &&
+        !isCustomerOrderCompleted(b)
+    ).length;
+    const unassigned = list.filter(
+      (b) =>
+        b.assignment_status !== 'assigned' &&
+        !isCustomerOrderCancelled(b) &&
+        !isCustomerOrderCompleted(b)
+    ).length;
     return {
       total: activeDispatch,
       assigned: completedAssigned,
-      unassigned
+      unassigned,
+      cancelled
     };
-  }, [bookings, isOrderDispatchCompleted]);
+  }, [bookings, isOrderDispatchCompleted, isCustomerOrderCancelled, isCustomerOrderCompleted]);
 
   const filteredOrders = useMemo(() => {
     let result = Array.isArray(bookings) ? [...bookings] : [];
 
     if (orderTab === 'unassigned') {
-      result = result.filter((b) => b.assignment_status !== 'assigned');
+      result = result.filter(
+        (b) =>
+          b.assignment_status !== 'assigned' &&
+          !isCustomerOrderCancelled(b) &&
+          !isCustomerOrderCompleted(b)
+      );
     } else if (orderTab === 'assigned') {
       result = result.filter((b) => isOrderDispatchCompleted(b));
+    } else if (orderTab === 'cancelled') {
+      result = result.filter((b) => isCustomerOrderCancelled(b));
     } else {
-      // Tab "Semua Pesanan" hanya menampilkan pesanan yang belum selesai ditugaskan;
-      // begitu selesai ditugaskan, item otomatis berpindah ke tab "Sudah Ditugaskan".
-      result = result.filter((b) => !isOrderDispatchCompleted(b));
+      // Tab "Semua Pesanan" hanya menampilkan pesanan aktif yang belum selesai ditugaskan dan belum dibatalkan;
+      // begitu selesai ditugaskan pindah ke tab "Sudah Ditugaskan", dan jika dibatalkan pindah ke tab "Dibatalkan".
+      result = result.filter(
+        (b) =>
+          !isOrderDispatchCompleted(b) &&
+          !isCustomerOrderCancelled(b) &&
+          !isCustomerOrderCompleted(b)
+      );
     }
 
     if (orderServiceFilter !== 'all') {
@@ -975,7 +1114,15 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
     }
 
     return result;
-  }, [bookings, orderTab, orderServiceFilter, orderSearchQuery, isOrderDispatchCompleted]);
+  }, [
+    bookings,
+    orderTab,
+    orderServiceFilter,
+    orderSearchQuery,
+    isOrderDispatchCompleted,
+    isCustomerOrderCancelled,
+    isCustomerOrderCompleted
+  ]);
 
   useEffect(() => {
     setOrdersViewPage(1);
@@ -986,18 +1133,6 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
   // =========================================================================
   // MEMO: METRIK & FILTER SEMUA PESANAN PELANGGAN
   // =========================================================================
-  const isCustomerOrderCompleted = useCallback((b) => {
-    if (!b) return false;
-    if (b.booking_status === 'cancelled' || b.driver_step === 'cancelled') return false;
-    if (b.driver_step) return b.driver_step === 'completed';
-    if (b.assignment_status === 'assigned') return b.booking_status === 'completed';
-    return Boolean(b.status_note && b.booking_status === 'completed');
-  }, []);
-
-  const isCustomerOrderCancelled = useCallback((b) => {
-    if (!b) return false;
-    return b.booking_status === 'cancelled' || b.driver_step === 'cancelled';
-  }, []);
 
   const allOrdersMetrics = useMemo(() => {
     const list = Array.isArray(bookings) ? bookings : [];
@@ -1121,6 +1256,32 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
 
   const handleAssignDriverToOrder = (booking, driver, sendWa = false) => {
     if (!booking || !driver) return;
+
+    const liveBooking =
+      dbService.bookings.getAllAdmin().find((b) => b && b.id === booking.id) ||
+      bookings.find((b) => b && b.id === booking.id) ||
+      booking;
+
+    if (isCustomerOrderCancelled(liveBooking)) {
+      loadBookings();
+      const errMsg = `Penugasan ditolak: pesanan ${liveBooking.order_code || liveBooking.booking_code || ''} telah dibatalkan dan tidak dapat ditugaskan ke driver.`;
+      setAssignErrorMessage(errMsg);
+      setAssignModalOrder(liveBooking);
+      setToastMessage(errMsg);
+      setTimeout(() => setToastMessage(null), 4000);
+      return;
+    }
+
+    if (isCustomerOrderCompleted(liveBooking)) {
+      loadBookings();
+      const errMsg = `Penugasan ditolak: pesanan ${liveBooking.order_code || liveBooking.booking_code || ''} sudah selesai dan tidak dapat ditugaskan ulang.`;
+      setAssignErrorMessage(errMsg);
+      setAssignModalOrder(liveBooking);
+      setToastMessage(errMsg);
+      setTimeout(() => setToastMessage(null), 4000);
+      return;
+    }
+
     const liveDriver =
       dbService.drivers.getDriverById(driver.id) ||
       drivers.find((d) => d.id === driver.id) ||
@@ -1139,11 +1300,17 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
     }
 
     const reviewerName = admin?.name || 'Admin OTWJEK';
-    const updated = dbService.bookings.assignDriver(booking.id, liveDriver, reviewerName);
+    const updated = dbService.bookings.assignDriver(liveBooking.id, liveDriver, reviewerName);
     if (!updated) {
+      loadBookings();
       loadDrivers();
-      const errMsg = `Penugasan dibatalkan: driver ${liveDriver.name || driver.name} sedang istirahat atau belum aktif.`;
+      const latestAfter =
+        dbService.bookings.getAllAdmin().find((b) => b && b.id === liveBooking.id) || liveBooking;
+      const errMsg = isCustomerOrderCancelled(latestAfter)
+        ? `Penugasan ditolak: pesanan ${latestAfter.order_code || latestAfter.booking_code || ''} telah dibatalkan.`
+        : `Penugasan dibatalkan: driver ${liveDriver.name || driver.name} sedang istirahat atau pesanan sudah ditutup.`;
       setAssignErrorMessage(errMsg);
+      setAssignModalOrder(latestAfter);
       setToastMessage(errMsg);
       setTimeout(() => setToastMessage(null), 4000);
       return;
@@ -1154,7 +1321,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
     setAssignErrorMessage(null);
     setAssignModalOrder(null);
     setAssignDriverSearch('');
-    setToastMessage(`Driver ${liveDriver.name} berhasil ditugaskan untuk pesanan ${booking.order_code || booking.booking_code}!`);
+    setToastMessage(`Driver ${liveDriver.name} berhasil ditugaskan untuk pesanan ${liveBooking.order_code || liveBooking.booking_code}!`);
     setTimeout(() => setToastMessage(null), 4000);
 
     if (sendWa && updated) {
@@ -3641,15 +3808,15 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
             <section className="dash-customer-list-section">
               <div className="overview-split-card tailadmin-table-card">
                 <div className="tailadmin-table-responsive">
-                  <table className="tailadmin-project-table mobile-hide-thead">
+                  <table className="tailadmin-project-table mobile-hide-thead assignment-orders-table">
                     <thead>
                       <tr className="tailadmin-th-row">
-                        <th className="tailadmin-th text-left">Kode & Waktu</th>
+                        <th className="tailadmin-th text-left">Kode & Layanan</th>
                         <th className="tailadmin-th text-left">Pelanggan</th>
-                        <th className="tailadmin-th text-left">Rute & Layanan</th>
+                        <th className="tailadmin-th text-left">Lokasi & Tujuan</th>
                         <th className="tailadmin-th text-left">Mitra Driver</th>
                         <th className="tailadmin-th text-left">Tarif & Bayar</th>
-                        <th className="tailadmin-th text-center">Status</th>
+                        <th className="tailadmin-th text-left">Status</th>
                         <th className="tailadmin-th text-right">Rincian</th>
                       </tr>
                     </thead>
@@ -3669,20 +3836,8 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                         </tr>
                       ) : (
                         paginatedAllOrdersView.map((ord, idx) => {
-                          const sType = String(ord.service_type || '').toLowerCase();
-                          const isCar = sType === 'mobil' || sType === 'car';
-                          const isSend = sType === 'paket' || sType === 'send' || sType === 'package' || sType === 'food';
-                          const sLabel = isCar ? 'Mobil' : isSend ? 'Paket' : 'Motor';
-                          const orderCode = ord.order_code || ord.booking_code || '#ORD';
-                          const fareFormatted = `Rp ${Number(ord.fare_amount || 15000).toLocaleString('id-ID')}`;
-                          const createdDateStr = ord.created_at
-                            ? new Date(ord.created_at).toLocaleString('id-ID', {
-                                day: 'numeric',
-                                month: 'short',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })
-                            : 'Baru saja';
+                          const { isSend, serviceLabel, orderCode, fareFormatted, createdDateStr } =
+                            getOrderDisplayMeta(ord);
 
                           const isCancelled = isCustomerOrderCancelled(ord);
                           const isCompleted = isCustomerOrderCompleted(ord);
@@ -3690,31 +3845,12 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
 
                           return (
                             <tr key={ord.id || `${orderCode}-${ord.created_at || idx}`} className="tailadmin-tr">
-                              <td className="tailadmin-td user-td user-td--has-actions" data-label="Pesanan">
-                                <div className="table-cell-meta">
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                                    <span style={{ fontWeight: 800, color: '#0F172A', fontSize: 13.5 }}>
-                                      {orderCode}
-                                    </span>
-                                    <span
-                                      style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: 4,
-                                        fontSize: 11,
-                                        fontWeight: 700,
-                                        padding: '1px 7px',
-                                        borderRadius: 6,
-                                        backgroundColor: isCar ? '#ECFDF5' : isSend ? '#FFF7ED' : '#FDF2F8',
-                                        color: isCar ? '#059669' : isSend ? '#EA580C' : '#DB2777'
-                                      }}
-                                    >
-                                      {isCar ? <Car size={11} /> : isSend ? <Package size={11} /> : <Bike size={11} />}
-                                      {sLabel}
-                                    </span>
-                                  </div>
-                                  <span className="table-secondary-text">{createdDateStr}</span>
-                                </div>
+                              <td className="tailadmin-td user-td user-td--has-actions" data-label="Kode & Layanan">
+                                <OrderTitleMeta
+                                  orderCode={orderCode}
+                                  serviceLabel={serviceLabel}
+                                  secondaryText={createdDateStr}
+                                />
                                 <MobileCardActionMenu
                                   menuKey={`order-list-${ord.id || orderCode || idx}`}
                                   activeKey={activeCardMenuKey}
@@ -3731,33 +3867,11 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 />
                               </td>
 
-                              <td className="tailadmin-td" data-label="Pelanggan">
-                                <div className="table-cell-meta">
-                                  <span className="table-primary-text">{ord.customer_name || 'Pelanggan OTWJek'}</span>
-                                  <span className="table-secondary-text">{ord.customer_phone || '-'}</span>
-                                </div>
-                              </td>
+                              <OrderCustomerCell order={ord} isSend={isSend} />
 
-                              <td className="tailadmin-td route-td" data-label="Rute" style={{ maxWidth: 260 }}>
-                                <div className="table-cell-meta">
-                                  <span
-                                    className="table-primary-text route-line-text"
-                                    title={`Jemput: ${ord.pickup_name || '-'} (${ord.pickup_address || ''})`}
-                                  >
-                                    <MapPin size={12} color="#10B981" strokeWidth={2.5} style={{ flexShrink: 0, marginRight: 4 }} />
-                                    {ord.pickup_name || 'Titik Jemput'}
-                                  </span>
-                                  <span
-                                    className="table-secondary-text route-line-text"
-                                    title={`Tujuan: ${ord.dropoff_name || '-'} (${ord.dropoff_address || ''})`}
-                                  >
-                                    <MapPin size={12} color="#EF4444" strokeWidth={2.5} style={{ flexShrink: 0, marginRight: 4 }} />
-                                    {ord.dropoff_name || 'Titik Tujuan'} ({ord.distance_km || 3.2} km)
-                                  </span>
-                                </div>
-                              </td>
+                              <OrderRouteCell order={ord} />
 
-                              <td className="tailadmin-td" data-label="Driver">
+                              <td className="tailadmin-td" data-label="Mitra Driver">
                                 {isAssigned ? (
                                   <div className="table-cell-meta">
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -3797,6 +3911,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                     </div>
                                     <span className="table-secondary-text">
                                       {ord.driver_plate || ord.driver?.plateNumber || 'DD - MKS'}
+                                      {(ord.driver_vehicle || ord.driver?.vehicleModel)
+                                        ? ` • ${ord.driver_vehicle || ord.driver?.vehicleModel}`
+                                        : ''}
                                     </span>
                                   </div>
                                 ) : (
@@ -3817,35 +3934,38 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 </div>
                               </td>
 
-                              <td className="tailadmin-td text-center" data-label="Status">
+                              <td className="tailadmin-td status-td" data-label="Status">
                                 {isCompleted ? (
-                                  <span className="table-status-pill active" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                    <Check size={11} strokeWidth={2.5} /> Selesai
-                                  </span>
+                                  <span className="table-status-pill active">Selesai</span>
                                 ) : isCancelled ? (
-                                  <span className="table-status-pill inactive" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, backgroundColor: '#FEF2F2', color: '#DC2626' }}>
-                                    <X size={11} strokeWidth={2.5} /> Dibatalkan
-                                  </span>
+                                  <span className="table-status-pill cancel">Dibatalkan</span>
                                 ) : isAssigned ? (
-                                  <span className="table-status-pill active" style={{ backgroundColor: '#EFF6FF', color: '#2563EB', borderColor: '#BFDBFE' }}>
+                                  <span
+                                    className="table-status-pill active"
+                                    style={{ backgroundColor: '#EFF6FF', color: '#2563EB', borderColor: '#BFDBFE' }}
+                                  >
                                     Berjalan
                                   </span>
                                 ) : (
-                                  <span className="table-status-pill pending">
-                                    Menunggu
-                                  </span>
+                                  <span className="table-status-pill pending">Menunggu</span>
                                 )}
                               </td>
 
                               <td className="tailadmin-td action-td text-right" data-label="Rincian">
-                                <button
-                                  type="button"
-                                  className="btn-table-icon-action"
-                                  onClick={() => setOrderDetailModalData(ord)}
-                                  title="Lihat Rincian Lengkap Pesanan"
-                                >
-                                  <Eye size={15} />
-                                </button>
+                                <div className="table-action-group table-action-icons-row">
+                                  <button
+                                    type="button"
+                                    className="btn-table-icon-action btn-icon-detail"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOrderDetailModalData(ord);
+                                    }}
+                                    title="Lihat Rincian Lengkap Pesanan"
+                                    aria-label="Lihat Rincian Lengkap Pesanan"
+                                  >
+                                    <Eye size={15} />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );
@@ -4529,6 +4649,12 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                 >
                   Sudah Ditugaskan ({orderCounts.assigned})
                 </button>
+                <button
+                  className={`dash-tab-btn ${orderTab === 'cancelled' ? 'active' : ''}`}
+                  onClick={() => setOrderTab('cancelled')}
+                >
+                  Dibatalkan ({orderCounts.cancelled})
+                </button>
               </div>
 
               <div className="dash-filter-right-controls">
@@ -4592,6 +4718,10 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                   ? `Tidak ditemukan pesanan yang cocok dengan "${orderSearchQuery}".`
                                   : orderTab === 'assigned'
                                   ? 'Belum ada pesanan yang selesai ditugaskan.'
+                                  : orderTab === 'cancelled'
+                                  ? 'Belum ada pesanan yang dibatalkan.'
+                                  : orderTab === 'unassigned'
+                                  ? 'Tidak ada pesanan aktif yang menunggu penugasan driver.'
                                   : 'Semua pesanan aktif telah selesai ditugaskan (lihat di tab Sudah Ditugaskan).'}
                               </span>
                             </div>
@@ -4599,52 +4729,33 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                         </tr>
                       ) : (
                         paginatedOrdersView.map((ord, idx) => {
-                          const sType = String(ord.service_type || '').toLowerCase();
-                          const isCar = sType === 'mobil' || sType === 'car';
-                          const isSend = sType === 'paket' || sType === 'send' || sType === 'package' || sType === 'food';
-                          const sLabel = isCar ? 'Mobil' : isSend ? 'Paket' : 'Motor';
+                          const { isSend, serviceLabel, orderCode, fareFormatted, createdDateStr } =
+                            getOrderDisplayMeta(ord);
                           const isAssigned = ord.assignment_status === 'assigned';
                           const isTaskCompleted = isOrderDispatchCompleted(ord);
-                          const isTaskCancelled =
-                            ord.booking_status === 'cancelled' || ord.driver_step === 'cancelled';
-                          const orderCode = ord.order_code || ord.booking_code || '#ORD';
-                          const fareFormatted = `Rp ${Number(ord.fare_amount || 15000).toLocaleString('id-ID')}`;
-                          const createdDateStr = ord.created_at
-                            ? new Date(ord.created_at).toLocaleString('id-ID', {
-                                day: 'numeric',
-                                month: 'short',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })
-                            : 'Baru saja';
+                          const isOrderCompleted = isCustomerOrderCompleted(ord);
+                          const isTaskCancelled = isCustomerOrderCancelled(ord);
+                          const isTaskActionable =
+                            !isTaskCompleted && !isOrderCompleted && !isTaskCancelled;
 
                           return (
                             <tr key={ord.id || `${orderCode}-${ord.created_at || idx}`} className="tailadmin-tr">
                               <td
-                                className={`tailadmin-td user-td ${!isTaskCompleted ? 'user-td--has-actions' : ''}`}
+                                className={`tailadmin-td user-td ${isTaskActionable ? 'user-td--has-actions' : ''}`}
                                 data-label="Kode & Layanan"
                               >
-                                <div className="table-cell-meta">
-                                  <div className="assignment-order-title-row">
-                                    <span className="assignment-order-code">
-                                      {orderCode}
-                                    </span>
-                                    <span className="assignment-order-sep" aria-hidden="true">•</span>
-                                    <span className="assignment-order-service">
-                                      {sLabel}
-                                    </span>
-                                  </div>
-                                  <span className="table-secondary-text">
-                                    {createdDateStr} • {fareFormatted} ({(ord.payment_method || 'cash').toUpperCase()})
-                                  </span>
-                                </div>
+                                <OrderTitleMeta
+                                  orderCode={orderCode}
+                                  serviceLabel={serviceLabel}
+                                  secondaryText={`${createdDateStr} • ${fareFormatted} (${(ord.payment_method || 'cash').toUpperCase()})`}
+                                />
                                 <MobileCardActionMenu
                                   menuKey={`assignment-list-${ord.id || orderCode || idx}`}
                                   activeKey={activeCardMenuKey}
                                   onToggle={handleToggleCardMenu}
                                   onClose={() => setActiveCardMenuKey(null)}
                                   items={
-                                    !isTaskCompleted
+                                    isTaskActionable
                                       ? [
                                           {
                                             key: 'assign',
@@ -4673,50 +4784,9 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                 />
                               </td>
 
-                              <td className="tailadmin-td" data-label="Pelanggan">
-                                <div className="table-cell-meta">
-                                  <span className="table-primary-text">
-                                    {ord.customer_name || 'Pelanggan OTWJek'}
-                                  </span>
-                                  <span className="table-secondary-text">
-                                    {ord.customer_phone || '-'}
-                                    {isSend && ord.package_info?.recipientName
-                                      ? ` → Penerima: ${ord.package_info.recipientName}`
-                                      : ''}
-                                  </span>
-                                </div>
-                              </td>
+                              <OrderCustomerCell order={ord} isSend={isSend} />
 
-                              <td className="tailadmin-td route-td assignment-route-td" data-label="Rute">
-                                <div className="assignment-route-columns">
-                                  <div
-                                    className="assignment-route-col"
-                                    title={`Lokasi: ${ord.pickup_name || '-'} (${ord.pickup_address || ''})`}
-                                  >
-                                    <span className="assignment-route-label">Lokasi</span>
-                                    <div className="assignment-route-val-group">
-                                      <span className="assignment-route-value">
-                                        {ord.pickup_name || 'Titik Jemput'}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <div className="assignment-route-divider" aria-hidden="true" />
-                                  <div
-                                    className="assignment-route-col"
-                                    title={`Tujuan: ${ord.dropoff_name || '-'} (${ord.dropoff_address || ''})`}
-                                  >
-                                    <span className="assignment-route-label">Tujuan</span>
-                                    <div className="assignment-route-val-group">
-                                      <span className="assignment-route-value">
-                                        {ord.dropoff_name || 'Titik Tujuan'}
-                                      </span>
-                                      <span className="assignment-route-distance">
-                                        {ord.distance_km || 3.2} km
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </td>
+                              <OrderRouteCell order={ord} />
 
                               <td className="tailadmin-td" data-label="Mitra Driver">
                                 {isAssigned ? (
@@ -4763,6 +4833,24 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                       {ord.driver_plate || ord.driver?.plateNumber || 'DD - MKS'} • {ord.driver_vehicle || ord.driver?.vehicleModel || 'Mitra Resmi'}
                                     </span>
                                   </div>
+                                ) : isTaskCancelled ? (
+                                  <div className="table-cell-meta">
+                                    <span className="table-status-pill cancel">
+                                      Dibatalkan
+                                    </span>
+                                    <span className="table-secondary-text assignment-empty-driver-hint">
+                                      {ord.status_note || 'Pesanan dibatalkan'} · tidak dapat ditugaskan
+                                    </span>
+                                  </div>
+                                ) : isOrderCompleted ? (
+                                  <div className="table-cell-meta">
+                                    <span className="table-status-pill active">
+                                      Selesai
+                                    </span>
+                                    <span className="table-secondary-text assignment-empty-driver-hint">
+                                      Pesanan telah diselesaikan
+                                    </span>
+                                  </div>
                                 ) : (
                                   <div className="table-cell-meta">
                                     <span className="table-status-pill pending">
@@ -4776,7 +4864,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                               </td>
 
                               <td className="tailadmin-td action-td text-right" data-label="Aksi Penugasan">
-                                {!isTaskCompleted && (
+                                {isTaskActionable ? (
                                   <div className="table-action-group" style={{ justifyContent: 'flex-end', gap: 6 }}>
                                     <button
                                       type="button"
@@ -4828,7 +4916,32 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
                                       </a>
                                     )}
                                   </div>
-                                )}
+                                ) : isTaskCancelled ? (
+                                  <div className="table-action-group" style={{ justifyContent: 'flex-end' }}>
+                                    <button
+                                      type="button"
+                                      disabled
+                                      title="Pesanan dibatalkan dan tidak dapat ditugaskan ke driver"
+                                      aria-label="Pesanan dibatalkan, tidak dapat ditugaskan"
+                                      style={{
+                                        backgroundColor: '#F1F5F9',
+                                        color: '#94A3B8',
+                                        border: '1px solid #E2E8F0',
+                                        borderRadius: 8,
+                                        padding: '6px 12px',
+                                        fontSize: 12,
+                                        fontWeight: 700,
+                                        cursor: 'not-allowed',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 5
+                                      }}
+                                    >
+                                      <XCircle size={14} />
+                                      <span>Dibatalkan</span>
+                                    </button>
+                                  </div>
+                                ) : null}
                               </td>
                             </tr>
                           );
@@ -5845,361 +5958,381 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
       {/* ================================================================= */}
       {/* MODAL 8: PILIH & TUGASKAN MITRA DRIVER PADA PESANAN PELANGGAN     */}
       {/* ================================================================= */}
-      {assignModalOrder && (
-        <div
-          className="admin-modal-backdrop"
-          onClick={() => {
-            setAssignModalOrder(null);
-            setAssignErrorMessage(null);
-          }}
-        >
+      {assignModalOrder && (() => {
+        const liveAssignOrder =
+          bookings.find((b) => b && b.id === assignModalOrder.id) || assignModalOrder;
+        const isAssignOrderCancelled = isCustomerOrderCancelled(liveAssignOrder);
+        const isAssignOrderCompleted = isCustomerOrderCompleted(liveAssignOrder);
+        const isAssignOrderLocked = isAssignOrderCancelled || isAssignOrderCompleted;
+
+        return (
           <div
-            className="admin-modal-dialog assign-dialog-clean"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="assign-driver-dialog-title"
-            onClick={(e) => e.stopPropagation()}
+            className="admin-modal-backdrop"
+            onClick={() => {
+              setAssignModalOrder(null);
+              setAssignErrorMessage(null);
+            }}
           >
-            <div className="assign-dialog-header">
-              <div className="assign-header-left">
-                <h3 id="assign-driver-dialog-title" className="assign-header-title">
-                  Tugaskan Mitra Driver
-                </h3>
-                <p className="assign-header-sub">
-                  Pelanggan: {assignModalOrder.customer_name || 'Pelanggan OTWJek'} • Layanan{' '}
-                  {assignModalOrder.service_name ||
-                    (assignModalOrder.service_type === 'mobil'
-                      ? 'Mobil'
-                      : assignModalOrder.service_type === 'paket'
-                        ? 'Paket'
-                        : 'Motor')}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="assign-close-text-btn"
-                onClick={() => {
-                  setAssignModalOrder(null);
-                  setAssignErrorMessage(null);
-                }}
-                aria-label="Tutup dialog penugasan"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="assign-body-clean">
-              {/* Ringkasan Pesanan & Rute Minimalis */}
-              <div className="assign-order-card">
-                <div className="assign-order-card-header">
-                  <span className="assign-order-service-summary">
-                    {assignModalOrder.service_name ||
-                      (assignModalOrder.service_type === 'mobil'
+            <div
+              className="admin-modal-dialog assign-dialog-clean"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="assign-driver-dialog-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="assign-dialog-header">
+                <div className="assign-header-left">
+                  <h3 id="assign-driver-dialog-title" className="assign-header-title">
+                    Tugaskan Mitra Driver
+                  </h3>
+                  <p className="assign-header-sub">
+                    Pelanggan: {liveAssignOrder.customer_name || 'Pelanggan OTWJek'} • Layanan{' '}
+                    {liveAssignOrder.service_name ||
+                      (liveAssignOrder.service_type === 'mobil'
                         ? 'Mobil'
-                        : assignModalOrder.service_type === 'paket'
+                        : liveAssignOrder.service_type === 'paket'
                           ? 'Paket'
-                          : 'Motor')}{' '}
-                    • {assignModalOrder.distance_km || 3.2} km
-                  </span>
-                  <span className="assign-price-val">
-                    Rp {Number(assignModalOrder.fare_amount || 15000).toLocaleString('id-ID')} •{' '}
-                    {(assignModalOrder.payment_method || 'CASH').toUpperCase()}
-                  </span>
+                          : 'Motor')}
+                  </p>
                 </div>
+                <button
+                  type="button"
+                  className="assign-close-text-btn"
+                  onClick={() => {
+                    setAssignModalOrder(null);
+                    setAssignErrorMessage(null);
+                  }}
+                  aria-label="Tutup dialog penugasan"
+                >
+                  ×
+                </button>
+              </div>
 
-                <div className="assign-route-timeline">
-                  <div className="assign-station-row">
-                    <span className="assign-station-label">
-                      {assignModalOrder.service_type === 'paket' ? 'Ambil' : 'Jemput'}
+              <div className="assign-body-clean">
+                {/* Ringkasan Pesanan & Rute Minimalis */}
+                <div className="assign-order-card">
+                  <div className="assign-order-card-header">
+                    <span className="assign-order-service-summary">
+                      {liveAssignOrder.service_name ||
+                        (liveAssignOrder.service_type === 'mobil'
+                          ? 'Mobil'
+                          : liveAssignOrder.service_type === 'paket'
+                            ? 'Paket'
+                            : 'Motor')}{' '}
+                      • {liveAssignOrder.distance_km || 3.2} km
                     </span>
-                    <div className="assign-station-info">
-                      <div className="assign-station-name">{assignModalOrder.pickup_name || '-'}</div>
-                      <div className="assign-station-address">{assignModalOrder.pickup_address || '-'}</div>
+                    <span className="assign-price-val">
+                      Rp {Number(liveAssignOrder.fare_amount || 15000).toLocaleString('id-ID')} •{' '}
+                      {(liveAssignOrder.payment_method || 'CASH').toUpperCase()}
+                    </span>
+                  </div>
+
+                  <div className="assign-route-timeline">
+                    <div className="assign-station-row">
+                      <span className="assign-station-label">
+                        {liveAssignOrder.service_type === 'paket' ? 'Ambil' : 'Jemput'}
+                      </span>
+                      <div className="assign-station-info">
+                        <div className="assign-station-name">{liveAssignOrder.pickup_name || '-'}</div>
+                        <div className="assign-station-address">{liveAssignOrder.pickup_address || '-'}</div>
+                      </div>
+                    </div>
+                    <div className="assign-station-row">
+                      <span className="assign-station-label">
+                        {liveAssignOrder.service_type === 'paket' ? 'Antar' : 'Tujuan'}
+                      </span>
+                      <div className="assign-station-info">
+                        <div className="assign-station-name">{liveAssignOrder.dropoff_name || '-'}</div>
+                        <div className="assign-station-address">{liveAssignOrder.dropoff_address || '-'}</div>
+                      </div>
                     </div>
                   </div>
-                  <div className="assign-station-row">
-                    <span className="assign-station-label">
-                      {assignModalOrder.service_type === 'paket' ? 'Antar' : 'Tujuan'}
-                    </span>
-                    <div className="assign-station-info">
-                      <div className="assign-station-name">{assignModalOrder.dropoff_name || '-'}</div>
-                      <div className="assign-station-address">{assignModalOrder.dropoff_address || '-'}</div>
+
+                  {liveAssignOrder.package_info && (
+                    <div className="assign-package-meta">
+                      <span>
+                        Barang: {liveAssignOrder.package_info.itemName || liveAssignOrder.package_info.category || 'Paket'} ({liveAssignOrder.package_info.size || 'M'}) • Penerima: {liveAssignOrder.package_info.recipientName || '-'} ({liveAssignOrder.package_info.recipientPhone || '-'})
+                      </span>
                     </div>
-                  </div>
+                  )}
                 </div>
 
-                {assignModalOrder.package_info && (
-                  <div className="assign-package-meta">
+                {isAssignOrderLocked && (
+                  <div className="assign-error-banner" role="alert">
                     <span>
-                      Barang: {assignModalOrder.package_info.itemName || assignModalOrder.package_info.category || 'Paket'} ({assignModalOrder.package_info.size || 'M'}) • Penerima: {assignModalOrder.package_info.recipientName || '-'} ({assignModalOrder.package_info.recipientPhone || '-'})
+                      {isAssignOrderCancelled
+                        ? 'Pesanan ini telah dibatalkan dan tidak dapat lagi ditugaskan ke mitra driver.'
+                        : 'Pesanan ini sudah selesai dan tidak dapat ditugaskan ulang.'}
                     </span>
                   </div>
                 )}
-              </div>
 
-              {/* Filter & Pencarian Tanpa Ikon */}
-              <div className="assign-filter-row">
-                <div className="assign-search-wrap">
-                  <input
-                    type="text"
-                    className={`assign-search-input ${assignDriverSearch ? 'has-value' : ''}`}
-                    aria-label="Cari nama driver, plat, atau wilayah"
-                    placeholder="Cari nama driver, plat, atau wilayah..."
-                    value={assignDriverSearch}
-                    onChange={(e) => setAssignDriverSearch(e.target.value)}
-                  />
-                  {assignDriverSearch && (
-                    <button
-                      type="button"
-                      className="assign-clear-btn"
-                      onClick={() => setAssignDriverSearch('')}
-                      aria-label="Hapus pencarian"
-                    >
-                      Hapus
-                    </button>
-                  )}
-                </div>
-                <select
-                  className="assign-select-filter"
-                  aria-label="Filter armada driver"
-                  value={assignVehicleFilter}
-                  onChange={(e) => setAssignVehicleFilter(e.target.value)}
-                >
-                  <option value="recommended">Sesuai Armada</option>
-                  <option value="all">Semua Armada</option>
-                </select>
-              </div>
-
-              {/* Daftar Mitra Driver */}
-              {(() => {
-                const approvedList = drivers.filter((d) => d.verification_status === 'approved');
-                const orderNeedsCar =
-                  assignModalOrder.service_type === 'mobil' ||
-                  assignModalOrder.service_type === 'car' ||
-                  String(assignModalOrder.package_info?.vehicleType || '').toLowerCase().includes('mobil');
-
-                let candidateDrivers = approvedList.filter((d) => {
-                  const dIsCar = isDriverUsingCar(d);
-                  if (assignVehicleFilter === 'recommended') {
-                    return orderNeedsCar ? dIsCar : !dIsCar;
-                  }
-                  return true;
-                });
-
-                if (assignDriverSearch.trim()) {
-                  const q = assignDriverSearch.toLowerCase().trim();
-                  candidateDrivers = candidateDrivers.filter(
-                    (d) =>
-                      d.name?.toLowerCase().includes(q) ||
-                      d.plateNumber?.toLowerCase().includes(q) ||
-                      d.phone?.toLowerCase().includes(q) ||
-                      d.operationalArea?.toLowerCase().includes(q)
-                  );
-                }
-
-                // Prioritaskan driver yang sedang Siap Order di urutan teratas
-                candidateDrivers = [...candidateDrivers].sort((a, b) => {
-                  const aOnline = typeof a.is_online === 'boolean' ? a.is_online : true;
-                  const bOnline = typeof b.is_online === 'boolean' ? b.is_online : true;
-                  if (aOnline !== bOnline) return aOnline ? -1 : 1;
-                  return 0;
-                });
-
-                const onlineCount = candidateDrivers.filter((d) =>
-                  typeof d.is_online === 'boolean' ? d.is_online : true
-                ).length;
-                const offlineCount = Math.max(0, candidateDrivers.length - onlineCount);
-
-                if (approvedList.length === 0) {
-                  return (
-                    <div className="assign-empty-box">
-                      <p className="assign-empty-text">
-                        Belum ada akun mitra driver yang berstatus Disetujui.
-                      </p>
+                {/* Filter & Pencarian Tanpa Ikon */}
+                <div className="assign-filter-row">
+                  <div className="assign-search-wrap">
+                    <input
+                      type="text"
+                      className={`assign-search-input ${assignDriverSearch ? 'has-value' : ''}`}
+                      aria-label="Cari nama driver, plat, atau wilayah"
+                      placeholder="Cari nama driver, plat, atau wilayah..."
+                      value={assignDriverSearch}
+                      onChange={(e) => setAssignDriverSearch(e.target.value)}
+                    />
+                    {assignDriverSearch && (
                       <button
                         type="button"
-                        className="btn-assign-text-outline"
-                        onClick={() => {
-                          setAssignModalOrder(null);
-                          setMainSection('drivers');
-                        }}
+                        className="assign-clear-btn"
+                        onClick={() => setAssignDriverSearch('')}
+                        aria-label="Hapus pencarian"
                       >
-                        Buka Verifikasi Driver
+                        Hapus
                       </button>
-                    </div>
-                  );
-                }
+                    )}
+                  </div>
+                  <select
+                    className="assign-select-filter"
+                    aria-label="Filter armada driver"
+                    value={assignVehicleFilter}
+                    onChange={(e) => setAssignVehicleFilter(e.target.value)}
+                  >
+                    <option value="recommended">Sesuai Armada</option>
+                    <option value="all">Semua Armada</option>
+                  </select>
+                </div>
 
-                if (candidateDrivers.length === 0) {
-                  const expectedArmada = orderNeedsCar ? 'Mobil' : 'Motor';
+                {/* Daftar Mitra Driver */}
+                {(() => {
+                  const approvedList = drivers.filter((d) => d.verification_status === 'approved');
+                  const orderNeedsCar =
+                    liveAssignOrder.service_type === 'mobil' ||
+                    liveAssignOrder.service_type === 'car' ||
+                    String(liveAssignOrder.package_info?.vehicleType || '').toLowerCase().includes('mobil');
+
+                  let candidateDrivers = approvedList.filter((d) => {
+                    const dIsCar = isDriverUsingCar(d);
+                    if (assignVehicleFilter === 'recommended') {
+                      return orderNeedsCar ? dIsCar : !dIsCar;
+                    }
+                    return true;
+                  });
+
+                  if (assignDriverSearch.trim()) {
+                    const q = assignDriverSearch.toLowerCase().trim();
+                    candidateDrivers = candidateDrivers.filter(
+                      (d) =>
+                        d.name?.toLowerCase().includes(q) ||
+                        d.plateNumber?.toLowerCase().includes(q) ||
+                        d.motorData?.plateNumber?.toLowerCase().includes(q) ||
+                        d.carData?.plateNumber?.toLowerCase().includes(q) ||
+                        d.vehicleModel?.toLowerCase().includes(q) ||
+                        d.phone?.toLowerCase().includes(q) ||
+                        d.operationalArea?.toLowerCase().includes(q)
+                    );
+                  }
+
+                  // Prioritaskan driver yang sedang Siap Order di urutan teratas
+                  candidateDrivers = [...candidateDrivers].sort((a, b) => {
+                    const aOnline = typeof a.is_online === 'boolean' ? a.is_online : true;
+                    const bOnline = typeof b.is_online === 'boolean' ? b.is_online : true;
+                    if (aOnline !== bOnline) return aOnline ? -1 : 1;
+                    return 0;
+                  });
+
+                  const onlineCount = candidateDrivers.filter((d) =>
+                    typeof d.is_online === 'boolean' ? d.is_online : true
+                  ).length;
+                  const offlineCount = Math.max(0, candidateDrivers.length - onlineCount);
+
+                  if (approvedList.length === 0) {
+                    return (
+                      <div className="assign-empty-box">
+                        <p className="assign-empty-text">
+                          Belum ada akun mitra driver yang berstatus Disetujui.
+                        </p>
+                        <button
+                          type="button"
+                          className="btn-assign-text-outline"
+                          onClick={() => {
+                            setAssignModalOrder(null);
+                            setMainSection('drivers');
+                          }}
+                        >
+                          Buka Verifikasi Driver
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  if (candidateDrivers.length === 0) {
+                    const expectedArmada = orderNeedsCar ? 'Mobil' : 'Motor';
+                    return (
+                      <div className="assign-empty-box">
+                        <p className="assign-empty-text">
+                          {assignDriverSearch.trim()
+                            ? `Tidak ada driver ${expectedArmada} yang cocok dengan "${assignDriverSearch}".`
+                            : `Belum ada mitra driver aktif untuk armada ${expectedArmada}.`}
+                        </p>
+                        <div className="assign-empty-actions">
+                          {assignDriverSearch.trim() ? (
+                            <button
+                              type="button"
+                              className="btn-assign-text-outline"
+                              onClick={() => setAssignDriverSearch('')}
+                            >
+                              Reset Pencarian
+                            </button>
+                          ) : null}
+                          {assignVehicleFilter === 'recommended' ? (
+                            <button
+                              type="button"
+                              className="btn-assign-text-outline"
+                              onClick={() => setAssignVehicleFilter('all')}
+                            >
+                              Tampilkan Semua Armada
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  }
+
                   return (
-                    <div className="assign-empty-box">
-                      <p className="assign-empty-text">
-                        {assignDriverSearch.trim()
-                          ? `Tidak ada driver ${expectedArmada} yang cocok dengan "${assignDriverSearch}".`
-                          : `Belum ada mitra driver aktif untuk armada ${expectedArmada}.`}
-                      </p>
-                      <div className="assign-empty-actions">
-                        {assignDriverSearch.trim() ? (
-                          <button
-                            type="button"
-                            className="btn-assign-text-outline"
-                            onClick={() => setAssignDriverSearch('')}
-                          >
-                            Reset Pencarian
-                          </button>
-                        ) : null}
-                        {assignVehicleFilter === 'recommended' ? (
-                          <button
-                            type="button"
-                            className="btn-assign-text-outline"
-                            onClick={() => setAssignVehicleFilter('all')}
-                          >
-                            Tampilkan Semua Armada
-                          </button>
-                        ) : null}
+                    <>
+                      {assignErrorMessage && !isAssignOrderLocked && (
+                        <div className="assign-error-banner" role="alert">
+                          <span>{assignErrorMessage}</span>
+                        </div>
+                      )}
+
+                      <div className="assign-readiness-summary">
+                        <span>Daftar Mitra Driver</span>
+                        <span className="assign-readiness-counts">
+                          {onlineCount} Siap Order • {offlineCount} Istirahat
+                        </span>
                       </div>
-                    </div>
-                  );
-                }
 
-                return (
-                  <>
-                    {assignErrorMessage && (
-                      <div className="assign-error-banner" role="alert">
-                        <span>{assignErrorMessage}</span>
-                      </div>
-                    )}
+                      {onlineCount === 0 && offlineCount > 0 && (
+                        <div className="assign-offline-notice">
+                          Semua mitra pada daftar ini sedang istirahat. Penugasan hanya tersedia bagi mitra dengan status Siap Order.
+                        </div>
+                      )}
 
-                    <div className="assign-readiness-summary">
-                      <span>Daftar Mitra Driver</span>
-                      <span className="assign-readiness-counts">
-                        {onlineCount} Siap Order • {offlineCount} Istirahat
-                      </span>
-                    </div>
+                      <div className="assign-drivers-list">
+                        {candidateDrivers.map((drv, drvIdx) => {
+                          const isCurrentlyAssigned =
+                            liveAssignOrder.assignment_status === 'assigned' &&
+                            liveAssignOrder.driver_id === drv.id;
 
-                    {onlineCount === 0 && offlineCount > 0 && (
-                      <div className="assign-offline-notice">
-                        Semua mitra pada daftar ini sedang istirahat. Penugasan hanya tersedia bagi mitra dengan status Siap Order.
-                      </div>
-                    )}
+                          const isCar = isDriverUsingCar(drv);
+                          const isDrvOnline = typeof drv.is_online === 'boolean' ? drv.is_online : true;
+                          const isBtnDisabled = !isDrvOnline || isAssignOrderLocked;
+                          const disabledAssignTitle = isAssignOrderCancelled
+                            ? 'Pesanan dibatalkan dan tidak dapat ditugaskan ke driver'
+                            : isAssignOrderCompleted
+                              ? 'Pesanan sudah selesai'
+                              : 'Mitra sedang istirahat / offline';
 
-                    <div className="assign-drivers-list">
-                      {candidateDrivers.map((drv, drvIdx) => {
-                        const isCurrentlyAssigned =
-                          assignModalOrder.assignment_status === 'assigned' &&
-                          assignModalOrder.driver_id === drv.id;
+                          let displayPlate = drv.plateNumber || 'DD - MKS';
+                          let displayModel = drv.vehicleModel || '';
 
-                        const isBoth =
-                          (drv.vehicleType || '').toLowerCase() === 'both' ||
-                          Boolean(drv.carData && drv.motorData);
-                        const isCar = isDriverUsingCar(drv);
-                        const isDrvOnline = typeof drv.is_online === 'boolean' ? drv.is_online : true;
-                        const disabledAssignTitle = 'Mitra sedang istirahat / offline';
+                          if (isCar && drv.carData) {
+                            if (drv.carData.plateNumber) displayPlate = drv.carData.plateNumber;
+                            if (drv.carData.model) displayModel = drv.carData.model;
+                          } else if (!isCar && drv.motorData) {
+                            if (drv.motorData.plateNumber) displayPlate = drv.motorData.plateNumber;
+                            if (drv.motorData.model) displayModel = drv.motorData.model;
+                          }
 
-                        let displayPlate = drv.plateNumber || 'DD - MKS';
-                        let displayModel = drv.vehicleModel || (isCar ? 'Mobil' : 'Motor');
+                          const vehicleLabel = isCar ? 'Mobil' : 'Motor';
+                          const cleanedModel =
+                            displayModel && displayModel.toLowerCase().trim() !== vehicleLabel.toLowerCase()
+                              ? displayModel.trim()
+                              : '';
+                          const driverMetaText = [vehicleLabel, cleanedModel, displayPlate]
+                            .filter(Boolean)
+                            .join(' · ');
 
-                        if (isCar && drv.carData) {
-                          if (drv.carData.plateNumber) displayPlate = drv.carData.plateNumber;
-                          if (drv.carData.model) displayModel = drv.carData.model;
-                        } else if (!isCar && drv.motorData) {
-                          if (drv.motorData.plateNumber) displayPlate = drv.motorData.plateNumber;
-                          if (drv.motorData.model) displayModel = drv.motorData.model;
-                        }
-
-                        const vehicleLabel = isBoth
-                          ? isCar
-                            ? 'Mobil (Aktif)'
-                            : 'Motor (Aktif)'
-                          : isCar
-                            ? 'Mobil'
-                            : 'Motor';
-
-                        return (
-                          <div
-                            key={drv.id || `${drv.phone || drv.name || 'drv'}-${drvIdx}`}
-                            className={`assign-driver-card ${isCurrentlyAssigned ? 'is-assigned' : ''} ${!isDrvOnline ? 'is-offline' : ''}`}
-                          >
-                            <div className="assign-driver-info">
-                              <div className="assign-driver-name-row">
-                                <span className="assign-driver-name">{drv.name}</span>
-                                <span className="assign-status-text">
-                                  {isDrvOnline ? 'Siap Order' : 'Istirahat'}
-                                </span>
-                                {isCurrentlyAssigned && (
-                                  <span className="assign-status-assigned-label">
-                                    {!assignModalOrder.driver_step || assignModalOrder.driver_step === 'completed'
-                                      ? 'Selesai Ditugaskan'
-                                      : 'Ditugaskan'}
-                                  </span>
-                                )}
-                              </div>
-
-                              <div className="assign-driver-meta-row">
-                                <span>
-                                  {vehicleLabel} • {displayPlate}
-                                  {displayModel ? ` (${displayModel})` : ''} • {drv.phone || '-'}
-                                </span>
-                              </div>
-
-                              {drv.operationalArea && (
-                                <div className="assign-driver-area-row" title={drv.operationalArea}>
-                                  Wilayah: {drv.operationalArea}
+                          return (
+                            <div
+                              key={drv.id || `${drv.phone || drv.name || 'drv'}-${drvIdx}`}
+                              className={`assign-driver-card ${isCurrentlyAssigned ? 'is-assigned' : ''} ${!isDrvOnline ? 'is-offline' : ''}`}
+                              title={drv.operationalArea ? `Wilayah: ${drv.operationalArea}` : undefined}
+                            >
+                              <div className="assign-driver-info">
+                                <div className="assign-driver-name-row">
+                                  <span className="assign-driver-name">{drv.name}</span>
+                                  <div className="assign-driver-badges">
+                                    <span className={`assign-status-text ${isDrvOnline ? 'is-online' : 'is-offline'}`}>
+                                      {isDrvOnline ? 'Siap Order' : 'Istirahat'}
+                                    </span>
+                                    {isCurrentlyAssigned && (
+                                      <span className="assign-status-assigned-label">
+                                        {isAssignOrderCancelled
+                                          ? 'Dibatalkan'
+                                          : !liveAssignOrder.driver_step || liveAssignOrder.driver_step === 'completed'
+                                            ? 'Selesai Ditugaskan'
+                                            : 'Ditugaskan'}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
-                              )}
-                            </div>
 
-                            <div className="assign-driver-actions">
-                              <button
-                                type="button"
-                                className={isCurrentlyAssigned ? 'btn-assign-text-outline' : 'btn-assign-text-primary'}
-                                disabled={!isDrvOnline}
-                                onClick={() => handleAssignDriverToOrder(assignModalOrder, drv, false)}
-                                title={
-                                  isDrvOnline
-                                    ? isCurrentlyAssigned
-                                      ? 'Tugaskan ulang mitra ini'
-                                      : 'Tugaskan pesanan ke mitra ini'
-                                    : disabledAssignTitle
-                                }
-                              >
-                                {isCurrentlyAssigned ? 'Tugaskan Ulang' : 'Tugaskan'}
-                              </button>
-                              <button
-                                type="button"
-                                className="btn-assign-text-outline"
-                                disabled={!isDrvOnline}
-                                onClick={() => handleAssignDriverToOrder(assignModalOrder, drv, true)}
-                                title={isDrvOnline ? 'Tugaskan & kirim rincian via WhatsApp' : disabledAssignTitle}
-                              >
-                                Kirim WA
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </>
-                );
-              })()}
-            </div>
+                                <div className="assign-driver-meta-row">
+                                  {driverMetaText}
+                                </div>
+                              </div>
 
-            <div className="assign-dialog-footer">
-              <button
-                type="button"
-                className="btn-dialog-cancel"
-                onClick={() => {
-                  setAssignModalOrder(null);
-                  setAssignErrorMessage(null);
-                }}
-              >
-                Tutup
-              </button>
+                              <div className="assign-driver-actions">
+                                <button
+                                  type="button"
+                                  className={isCurrentlyAssigned ? 'btn-assign-text-outline' : 'btn-assign-text-primary'}
+                                  disabled={isBtnDisabled}
+                                  onClick={() => handleAssignDriverToOrder(liveAssignOrder, drv, false)}
+                                  title={
+                                    !isBtnDisabled
+                                      ? isCurrentlyAssigned
+                                        ? 'Tugaskan ulang mitra ini'
+                                        : 'Tugaskan pesanan ke mitra ini'
+                                      : disabledAssignTitle
+                                  }
+                                >
+                                  {isCurrentlyAssigned ? 'Tugaskan Ulang' : 'Tugaskan'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-assign-text-outline"
+                                  disabled={isBtnDisabled}
+                                  onClick={() => handleAssignDriverToOrder(liveAssignOrder, drv, true)}
+                                  title={!isBtnDisabled ? 'Tugaskan & kirim rincian via WhatsApp' : disabledAssignTitle}
+                                >
+                                  Kirim WA
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+
+              <div className="assign-dialog-footer">
+                <button
+                  type="button"
+                  className="btn-dialog-cancel"
+                  onClick={() => {
+                    setAssignModalOrder(null);
+                    setAssignErrorMessage(null);
+                  }}
+                >
+                  Tutup
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ================================================================= */}
       {/* MODAL 9: DETAIL LENGKAP PESANAN PELANGGAN (SESUAI REFERENSI RECEIPT) */}
@@ -6211,7 +6344,7 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
         const serviceDisplayName = isCar ? 'Mobil' : isPackage ? 'Paket' : 'Motor';
 
         const fare = Number(ord.fare_amount || 17000);
-        const platformFee = 2000;
+        const platformFee = FLAT_PLATFORM_FEE;
         const tripFare = Math.max(0, fare - platformFee);
 
         const orderDateObj = ord.created_at ? new Date(ord.created_at) : new Date(0);

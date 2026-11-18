@@ -327,6 +327,20 @@
   font-weight: 400;
 }
 
+/* In-Progress Status Tag */
+.activity-progress-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #BE185D;
+  background-color: #FDF2F8;
+  border: 1px solid #FBCFE8;
+  border-radius: 6px;
+  padding: 3px 9px;
+  margin-top: 10px;
+  align-self: flex-start;
+}
+
 /* Cancelled Reason / Status Tag */
 .activity-cancelled-badge {
   display: inline-block;

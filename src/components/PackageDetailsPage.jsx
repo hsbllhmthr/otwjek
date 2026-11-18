@@ -33,7 +33,8 @@ export default function PackageDetailsPage({
   bookingId: initialBookingId = null,
   currentUser = null,
   onBack,
-  onCancelDelivery
+  onCancelDelivery,
+  onBookingSubmitted
 }) {
   const [copiedField, setCopiedField] = useState(null);
   const [gpsCoords, setGpsCoords] = useState(null);
@@ -124,8 +125,8 @@ export default function PackageDetailsPage({
   };
 
   const handleShareToWhatsApp = () => {
-    const shareLat = gpsCoords?.lat || pickup?.lat;
-    const shareLng = gpsCoords?.lng || pickup?.lng;
+    const shareLat = pickup?.lat || gpsCoords?.lat;
+    const shareLng = pickup?.lng || gpsCoords?.lng;
 
     const BOOK_NOW_PHONE = selectedAdmin?.phone || '62882021942470';
 
@@ -156,23 +157,38 @@ export default function PackageDetailsPage({
       dropoffCoords: dropoff?.lat && dropoff?.lng ? { lat: dropoff.lat, lng: dropoff.lng } : null
     });
 
+    let createdBooking = null;
     try {
       const estimatedDuration = deliverySpeed === 'hemat' ? 45 : 20;
       const pickupAddr = pickup?.address || pickup?.fullAddress || pickupTitle;
       const dropoffAddr = dropoff?.address || dropoff?.fullAddress || dropoffTitle;
 
-      const created = dbService?.bookings?.create({
+      createdBooking = dbService?.bookings?.create({
         id: savedRecordId || initialBookingId || undefined,
         customerId: sessionUser?.id || null,
         customerPhone: sessionUser?.phone || effectiveSenderPhone || null,
         customerName: effectiveSenderName,
-        pickup: { name: pickupTitle, address: pickupAddr },
-        dropoff: { name: dropoffTitle, address: dropoffAddr },
+        pickup: {
+          name: pickupTitle,
+          address: pickupAddr,
+          lat: shareLat || null,
+          lng: shareLng || null
+        },
+        dropoff: {
+          name: dropoffTitle,
+          address: dropoffAddr,
+          lat: dropoff?.lat || null,
+          lng: dropoff?.lng || null
+        },
         serviceType: 'paket',
         distanceKm,
         durationMinutes: estimatedDuration,
         fareAmount: currentPrice,
         paymentMethod,
+        selectedAdminId: selectedAdmin?.id || 'admin-1',
+        selectedAdminName: selectedAdmin?.name || 'Admin 1',
+        selectedAdminPhone: BOOK_NOW_PHONE,
+        waDispatchedAt: new Date().toISOString(),
         packageInfo: {
           itemName: itemInfo?.itemName || itemInfo?.category || 'Paket / Makanan',
           category: itemInfo?.category || 'Food',
@@ -193,10 +209,10 @@ export default function PackageDetailsPage({
           dropoffName: dropoffTitle,
           dropoffAddress: dropoffAddr
         },
-        bookingStatus: 'completed'
+        bookingStatus: 'in_progress'
       });
-      if (created?.id) {
-        setSavedRecordId(created.id);
+      if (createdBooking?.id) {
+        setSavedRecordId(createdBooking.id);
       }
     } catch (err) {
       console.error('Error saving package booking:', err);
@@ -204,6 +220,26 @@ export default function PackageDetailsPage({
 
     const url = buildWhatsAppLink(BOOK_NOW_PHONE, message);
     openWhatsApp(url);
+    if (onBookingSubmitted) {
+      onBookingSubmitted(createdBooking);
+    }
+  };
+
+  const handleCancelOrder = () => {
+    const targetId = savedRecordId || initialBookingId;
+    if (targetId) {
+      try {
+        dbService?.bookings?.updateBookingStatus(
+          targetId,
+          'cancelled',
+          'Dibatalkan oleh Pelanggan'
+        );
+      } catch {
+        // ignore
+      }
+    }
+    if (onCancelDelivery) onCancelDelivery();
+    else if (onBack) onBack();
   };
 
   return (
@@ -554,12 +590,9 @@ export default function PackageDetailsPage({
           <button
             type="button"
             className="btn-cancel-ride"
-            onClick={() => {
-              if (onBack) onBack();
-              else if (onCancelDelivery) onCancelDelivery();
-            }}
+            onClick={handleCancelOrder}
           >
-            Ubah / Kembali ke Detail Paket
+            Batalkan Pesanan
           </button>
         </div>
       </div>

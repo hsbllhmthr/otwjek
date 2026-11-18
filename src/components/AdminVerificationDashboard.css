@@ -4713,15 +4713,14 @@
 }
 
 .assign-driver-card.is-offline .assign-driver-name,
-.assign-driver-card.is-offline .assign-driver-meta-row,
-.assign-driver-card.is-offline .assign-driver-area-row {
+.assign-driver-card.is-offline .assign-driver-meta-row {
   color: #475569;
 }
 
 .assign-driver-info {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
   min-width: 0;
   flex: 1;
 }
@@ -4733,46 +4732,60 @@
   flex-wrap: wrap;
 }
 
+.assign-driver-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
 .assign-driver-name {
   font-size: 13.5px;
   font-weight: 600;
   color: #0F172A;
   line-height: 1.3;
+  min-width: 0;
 }
 
 .assign-status-text {
-  font-size: 11.5px;
-  font-weight: 500;
+  font-size: 11px;
+  font-weight: 600;
   color: #475569;
   background-color: #F1F5F9;
   border: 1px solid #E2E8F0;
-  padding: 1px 7px;
-  border-radius: 4px;
-  line-height: 1.35;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  line-height: 1.3;
+}
+
+.assign-status-text.is-online {
+  color: #047857;
+  background-color: #ECFDF5;
+  border-color: #D1FAE5;
+}
+
+.assign-status-text.is-offline {
+  color: #64748B;
+  background-color: #F1F5F9;
+  border-color: #E2E8F0;
 }
 
 .assign-status-assigned-label {
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 600;
   color: #0F172A;
   background-color: #FFFFFF;
-  border: 1px solid #0F172A;
-  padding: 1px 7px;
-  border-radius: 4px;
-  line-height: 1.35;
+  border: 1px solid #CBD5E1;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  line-height: 1.3;
 }
 
 .assign-driver-meta-row {
   font-size: 12px;
-  color: #475569;
+  color: #64748B;
   line-height: 1.4;
-  word-break: break-word;
-}
-
-.assign-driver-area-row {
-  font-size: 11.5px;
-  color: #475569;
-  line-height: 1.35;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4781,21 +4794,22 @@
 .assign-driver-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-shrink: 0;
 }
 
 .btn-assign-text-primary {
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 7px;
   background-color: #0F172A;
   color: #FFFFFF;
   border: 1px solid #0F172A;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  transition: background-color 0.15s ease;
 }
 
 .btn-assign-text-primary:hover:not(:disabled) {
@@ -4803,16 +4817,17 @@
 }
 
 .btn-assign-text-outline {
-  height: 32px;
-  padding: 0 11px;
-  border-radius: 6px;
+  height: 34px;
+  padding: 0 13px;
+  border-radius: 7px;
   background-color: #FFFFFF;
-  color: #0F172A;
+  color: #334155;
   border: 1px solid #CBD5E1;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .btn-assign-text-outline:hover:not(:disabled) {
@@ -5883,26 +5898,33 @@
   .assign-driver-card {
     flex-direction: column;
     align-items: stretch;
-    gap: 10px;
-    padding: 12px;
+    gap: 12px;
+    padding: 14px;
   }
 
-  .assign-driver-area-row {
-    white-space: normal;
+  .assign-driver-name-row {
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: nowrap;
+  }
+
+  .assign-driver-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .assign-driver-actions {
     justify-content: stretch;
-    border-top: 1px solid #E2E8F0;
-    padding-top: 10px;
     gap: 8px;
   }
 
   .btn-assign-text-primary,
   .btn-assign-text-outline {
     flex: 1 1 0;
-    min-height: 44px;
-    font-size: 13px;
+    height: 38px;
+    font-size: 12.5px;
+    border-radius: 8px;
   }
 
   .cust-detail-row {

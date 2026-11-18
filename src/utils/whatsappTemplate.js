@@ -138,30 +138,47 @@ export function buildWhatsAppLink(phone, messageText) {
 }
 
 /**
- * Reliably opens WhatsApp link across all browsers and devices without getting blocked
- * - On Mobile: navigates via window.location.href to invoke native WhatsApp app immediately
- * - On Desktop: attempts window.open with fallback to window.location.href if blocked
+ * Opens WhatsApp link in a separate window/tab without ever navigating the
+ * original app tab away (even on mobile user-agents or strict popup settings),
+ * so the caller page can stay intact and transition to live order tracking.
+ * Returns true if opening a new tab/window was triggered.
  */
 export function openWhatsApp(url) {
-  if (!url || typeof window === 'undefined') return;
+  if (!url || typeof window === 'undefined') return false;
 
-  const isMobile =
-    typeof navigator !== 'undefined' &&
-    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '');
-
-  if (isMobile) {
-    window.location.href = url;
-    return;
+  try {
+    // Omit 'noopener' from features so spec-compliant browsers return a
+    // Window handle instead of null, then clear opener manually.
+    const newWin = window.open(url, '_blank');
+    if (newWin && !newWin.closed) {
+      try {
+        newWin.opener = null;
+      } catch {
+        // Ignore cross-origin opener restrictions
+      }
+      return true;
+    }
+  } catch {
+    // Fall through to anchor dispatch without replacing current tab
   }
 
   try {
-    const newWin = window.open(url, '_blank', 'noopener,noreferrer');
-    if (!newWin || newWin.closed || typeof newWin.closed === 'undefined') {
-      window.location.href = url;
+    if (typeof document !== 'undefined' && document.body) {
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.target = '_blank';
+      anchor.rel = 'noopener noreferrer';
+      anchor.style.display = 'none';
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      return true;
     }
-  } catch (err) {
-    window.location.href = url;
+  } catch {
+    // Ignore anchor fallback failure; never hijack window.location.href
   }
+
+  return false;
 }
 
 /**
