@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import './AdminVerificationDashboard.css';
 import './ActivityOrderDetailView.css';
 import {
@@ -30,9 +30,11 @@ import {
   FileText,
   Copy,
   CheckCheck,
-  MoreVertical
+  MoreVertical,
+  Bell
 } from 'lucide-react';
 import dbService, { normalizePhone } from '../services/dbService.js';
+import { playDriverTaskSound } from './BottomNavBar.jsx';
 import driverPlaceholder from '../assets/driver_placeholder.svg';
 import otwjekLogo from '../assets/otwjek_logo.png';
 import { compressImageFile } from '../utils/imageCompressor.js';
@@ -383,6 +385,11 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
   const [isSavingDriver, setIsSavingDriver] = useState(false);
   const [editAvatarError, setEditAvatarError] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
+  const [cloudSyncStatus, setCloudSyncStatus] = useState(() => dbService.cloud.getStatus());
+
+  useEffect(() => {
+    return dbService.cloud.subscribeStatus(setCloudSyncStatus);
+  }, []);
 
   // =========================================================================
   // STATE CUSTOMER
@@ -449,9 +456,47 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
     });
   };
 
-  const loadBookings = () => {
+  const knownOrderIdsRef = useRef(null);
+  const incomingAlertsArmedRef = useRef(
+    !dbService.cloud.isConfigured() || dbService.cloud.getStatus().hydrated
+  );
+  const [incomingOrderAlert, setIncomingOrderAlert] = useState(null);
+
+  const checkIncomingOrders = (allOrders) => {
+    if (!incomingAlertsArmedRef.current || !knownOrderIdsRef.current) return;
+    const newlyArrived = [];
+    for (const b of allOrders) {
+      if (!b?.id || knownOrderIdsRef.current.has(b.id)) continue;
+      knownOrderIdsRef.current.add(b.id);
+      const isCancelled =
+        b.booking_status === 'cancelled' || b.status === 'cancelled' || b.driver_step === 'cancelled';
+      const isCompleted =
+        b.booking_status === 'completed' || b.status === 'completed' || b.driver_step === 'completed';
+      if (!isCancelled && !isCompleted && b.assignment_status !== 'assigned') {
+        newlyArrived.push(b);
+      }
+    }
+    if (newlyArrived.length > 0) {
+      const latest = newlyArrived[0];
+      const meta = getOrderDisplayMeta(latest);
+      setIncomingOrderAlert({
+        id: latest.id,
+        count: newlyArrived.length,
+        orderCode: meta.orderCode,
+        serviceName: meta.serviceLabel,
+        customerName: meta.customerName,
+        routeSummary: `${meta.pickupName} → ${meta.dropoffName}`
+      });
+      playDriverTaskSound();
+    }
+  };
+
+  const loadBookings = (detectIncoming = false) => {
     try {
       const allOrders = dbService.bookings.getAllAdmin();
+      if (detectIncoming) {
+        checkIncomingOrders(allOrders);
+      }
       setBookings((prev) => {
         if (prev.length !== allOrders.length) return [...allOrders];
         const hasChanged = allOrders.some((b, idx) => {
@@ -474,27 +519,43 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
   };
 
   useEffect(() => {
+    const armKnownOrders = () => {
+      const current = dbService.bookings.getAllAdmin() || [];
+      knownOrderIdsRef.current = new Set(current.map((b) => b?.id).filter(Boolean));
+      incomingAlertsArmedRef.current = true;
+    };
+
     loadDrivers();
     loadCustomers();
-    loadBookings();
+    loadBookings(false);
 
-    // 1. Subscribe to instant reactive updates from dbService (intra-tab and cross-tab storage events)
+    let hydrateFallbackTimer = null;
+    if (incomingAlertsArmedRef.current) {
+      armKnownOrders();
+    } else {
+      window.addEventListener('otwjek_cloud_hydrated', armKnownOrders);
+      hydrateFallbackTimer = setTimeout(armKnownOrders, 3500);
+    }
+
+    // 1. Subscribe to instant reactive updates from dbService (intra-tab, cross-tab, dan Supabase Realtime)
     const unsubscribe = dbService.subscribe(() => {
       loadDrivers();
       loadCustomers();
-      loadBookings();
+      loadBookings(true);
     });
 
     // 2. Real-time background sync interval (heartbeat every 1500ms)
     const pollInterval = setInterval(() => {
       loadDrivers();
       loadCustomers();
-      loadBookings();
+      loadBookings(true);
     }, 1500);
 
     return () => {
       unsubscribe();
       clearInterval(pollInterval);
+      window.removeEventListener('otwjek_cloud_hydrated', armKnownOrders);
+      if (hydrateFallbackTimer) clearTimeout(hydrateFallbackTimer);
     };
   }, []);
 
@@ -1063,6 +1124,12 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
       cancelled
     };
   }, [bookings, isOrderDispatchCompleted, isCustomerOrderCancelled, isCustomerOrderCompleted]);
+
+  useEffect(() => {
+    if (!incomingOrderAlert) return undefined;
+    const timer = setTimeout(() => setIncomingOrderAlert(null), 12000);
+    return () => clearTimeout(timer);
+  }, [incomingOrderAlert]);
 
   const filteredOrders = useMemo(() => {
     let result = Array.isArray(bookings) ? [...bookings] : [];
@@ -1790,6 +1857,45 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
           </div>
 
           <div className="topbar-right">
+            <button
+              type="button"
+              className={`topbar-sync-pill is-${cloudSyncStatus.status}`}
+              onClick={async () => {
+                if (!cloudSyncStatus.configured) {
+                  setToastMessage(
+                    'Mode lokal aktif. Tambahkan VITE_SUPABASE_URL & VITE_SUPABASE_ANON_KEY untuk sinkronisasi online.'
+                  );
+                  setTimeout(() => setToastMessage(null), 4000);
+                  return;
+                }
+                const ok = await dbService.cloud.syncNow();
+                setToastMessage(
+                  ok ? 'Data berhasil disinkronkan dari Supabase.' : 'Gagal menyinkronkan data dari Supabase.'
+                );
+                setTimeout(() => setToastMessage(null), 3500);
+              }}
+              title={
+                cloudSyncStatus.status === 'live'
+                  ? 'Sinkronisasi real-time Supabase aktif (klik untuk refresh)'
+                  : cloudSyncStatus.status === 'error'
+                  ? cloudSyncStatus.lastError || 'Gagal terhubung ke Supabase (klik untuk coba lagi)'
+                  : cloudSyncStatus.configured
+                  ? 'Menghubungkan sinkronisasi Supabase...'
+                  : 'Mode Lokal: data tersimpan di browser perangkat ini saja'
+              }
+            >
+              <span className="topbar-sync-dot" aria-hidden="true" />
+              <span className="topbar-sync-label">
+                {cloudSyncStatus.status === 'live'
+                  ? 'Live Sync'
+                  : cloudSyncStatus.status === 'connecting'
+                  ? 'Syncing...'
+                  : cloudSyncStatus.status === 'error'
+                  ? 'Sync Error'
+                  : 'Mode Lokal'}
+              </span>
+            </button>
+
             {/* User Profile Capsule */}
             <div className="topbar-user-profile" title="Admin OTWJEK">
               <div className="topbar-user-avatar">
@@ -6653,6 +6759,51 @@ export default function AdminVerificationDashboard({ admin, onLogout, onGoToCust
           </div>
         );
       })()}
+
+      {/* Notifikasi Pesanan Baru Masuk Real-time */}
+      {incomingOrderAlert && (
+        <div className="admin-incoming-order-alert" role="status" aria-live="polite">
+          <div className="incoming-order-icon-wrap" aria-hidden="true">
+            <Bell size={17} />
+          </div>
+          <div className="incoming-order-body">
+            <div className="incoming-order-title-row">
+              <span className="incoming-order-title">
+                {incomingOrderAlert.count > 1
+                  ? `${incomingOrderAlert.count} Pesanan Baru Masuk`
+                  : 'Pesanan Baru Masuk'}
+              </span>
+              <span className="incoming-order-code">
+                {incomingOrderAlert.orderCode} · {incomingOrderAlert.serviceName}
+              </span>
+            </div>
+            <p className="incoming-order-meta">
+              {incomingOrderAlert.customerName} — {incomingOrderAlert.routeSummary}
+            </p>
+          </div>
+          <div className="incoming-order-actions">
+            <button
+              type="button"
+              className="btn-incoming-order-view"
+              onClick={() => {
+                setMainSection('orders');
+                setOrderTab('unassigned');
+                setIncomingOrderAlert(null);
+              }}
+            >
+              Lihat
+            </button>
+            <button
+              type="button"
+              className="btn-incoming-order-close"
+              onClick={() => setIncomingOrderAlert(null)}
+              aria-label="Tutup notifikasi pesanan baru"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Floating Toast Notification */}
       {toastMessage && (

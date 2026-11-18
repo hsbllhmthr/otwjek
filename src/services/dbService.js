@@ -14,6 +14,17 @@
 import { ADMINS } from '../data/admins.js';
 import { FOOD_MERCHANTS } from '../data/foodMerchants.js';
 import { calculateDriverEarnings } from '../utils/fareCalculator.js';
+import { isSupabaseConfigured } from './supabaseClient.js';
+import {
+  getCloudSyncStatus,
+  hydrateAllFromCloud,
+  initCloudSync,
+  pushClearTable,
+  pushDelete,
+  pushDeleteByField,
+  pushUpsert,
+  subscribeCloudStatus
+} from './supabaseSync.js';
 
 const STORAGE_KEYS = {
   USERS: 'otwjek_db_users',
@@ -25,6 +36,13 @@ const STORAGE_KEYS = {
   CUSTOMER_USER: 'otwjek_db_customer_session',
   DRIVER_USER: 'otwjek_db_driver_session',
   ADMIN_SESSION: 'otwjek_db_admin_session'
+};
+
+const DOMAIN_TO_STORAGE_KEY = {
+  users: STORAGE_KEYS.USERS,
+  drivers: STORAGE_KEYS.DRIVERS,
+  driver_docs: STORAGE_KEYS.DRIVER_DOCS,
+  bookings: STORAGE_KEYS.BOOKINGS
 };
 
 /**
@@ -121,20 +139,61 @@ function setStoredArray(key, array) {
   }
 }
 
+function setStoredArrayFromCloud(key, array, notifyKey = null) {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(key, JSON.stringify(array));
+    if (typeof window !== 'undefined') {
+      const detail = {
+        key: notifyKey || key,
+        storageKey: key,
+        source: 'cloud',
+        timestamp: Date.now(),
+        length: array.length
+      };
+      window.dispatchEvent(new CustomEvent('otwjek_db_change', { detail }));
+      try {
+        if (typeof BroadcastChannel !== 'undefined') {
+          const bc = new BroadcastChannel('otwjek_broadcast');
+          bc.postMessage(detail);
+          bc.close();
+        }
+      } catch (_) {}
+    }
+  } catch (err) {
+    console.error(`Error applying cloud ${key} to storage:`, err);
+  }
+}
+
 export const DB_PURGE_VERSION_KEY = 'otwjek_db_purge_all_v4';
 
+function ensureSuperAdminInUsers(usersList = []) {
+  const list = Array.isArray(usersList) ? [...usersList] : [];
+  const hasAdmin = list.some(
+    (u) => u && (u.role === 'admin' || u.id === 'admin-master-01' || (ADMIN_EMAIL && u.email === ADMIN_EMAIL))
+  );
+  if (!hasAdmin && ADMIN_EMAIL && ADMIN_PASSWORD) {
+    list.unshift({
+      id: 'admin-master-01',
+      full_name: 'Admin Verifikasi OTWJek',
+      email: ADMIN_EMAIL,
+      phone: '+62882021942470',
+      gender: 'Perempuan',
+      role: 'admin',
+      status: 'active',
+      created_at: new Date().toISOString()
+    });
+  }
+  return list;
+}
+
 /**
- * Membersihkan seluruh database lokal:
- * - Menghapus seluruh data mitra driver
- * - Menghapus seluruh berkas dokumen
- * - Menghapus seluruh pengguna/pelanggan (hanya mempertahankan Super Admin)
- * - Menghapus seluruh riwayat pesanan & pengiriman
- * - Mengosongkan sesi aktif pengguna
+ * Membersihkan cache database lokal saja (tidak menghapus data Supabase).
+ * Dipakai saat inisialisasi browser baru untuk membuang data seed lawas.
  */
-export function clearEntireDatabase() {
+export function resetLocalDatabaseCache() {
   if (typeof localStorage === 'undefined') return;
 
-  // 1. Dapatkan atau buat akun superadmin
   const existingUsers = getStoredArray(STORAGE_KEYS.USERS, []);
   const superAdmin = existingUsers.find(
     (u) => u.role === 'admin' || u.id === 'admin-master-01' || (ADMIN_EMAIL && u.email === ADMIN_EMAIL)
@@ -149,20 +208,12 @@ export function clearEntireDatabase() {
     created_at: new Date().toISOString()
   };
 
-  // 2. Simpan hanya akun superadmin ke tabel USERS
   setStoredArray(STORAGE_KEYS.USERS, [superAdmin]);
-
-  // 3. Kosongkan tabel DRIVERS
   setStoredArray(STORAGE_KEYS.DRIVERS, []);
-
-  // 4. Kosongkan tabel DRIVER_DOCS
   setStoredArray(STORAGE_KEYS.DRIVER_DOCS, []);
-
-  // 5. Kosongkan tabel BOOKINGS & DELIVERIES
   setStoredArray(STORAGE_KEYS.BOOKINGS, []);
   setStoredArray(STORAGE_KEYS.DELIVERIES, []);
 
-  // 6. Bersihkan sesi user jika bukan admin
   try {
     const sessionStr = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
     if (sessionStr) {
@@ -175,7 +226,6 @@ export function clearEntireDatabase() {
     localStorage.removeItem(STORAGE_KEYS.DRIVER_USER);
   } catch (_) {}
 
-  // 7. Tandai versi purge
   try {
     localStorage.setItem(DB_PURGE_VERSION_KEY, 'done');
   } catch (_) {}
@@ -189,14 +239,28 @@ export function clearEntireDatabase() {
   }
 }
 
+/**
+ * Membersihkan seluruh database lokal & cloud (jika dipicu eksplisit dari Admin).
+ */
+export function clearEntireDatabase(syncToCloud = true) {
+  resetLocalDatabaseCache();
+  if (syncToCloud) {
+    pushClearTable('bookings');
+    pushClearTable('driver_docs');
+    pushClearTable('drivers');
+    pushClearTable('users', true);
+  }
+}
+
 // Inisialisasi awal database lokal & pembersihan data dummy bawaan
 export function initializeLocalDatabase() {
   if (typeof localStorage === 'undefined') return;
 
-  // Eksekusi pembersihan menyeluruh jika purge versi saat ini belum berjalan
+  // Eksekusi pembersihan cache lokal saja jika purge versi saat ini belum berjalan
+  // (JANGAN pernah menghapus data cloud saat perangkat baru pertama kali membuka aplikasi)
   const isPurged = localStorage.getItem(DB_PURGE_VERSION_KEY);
   if (isPurged !== 'done') {
-    clearEntireDatabase();
+    resetLocalDatabaseCache();
     return;
   }
 
@@ -318,6 +382,16 @@ try {
 
 export const dbService = {
   // ==========================================
+  // STATUS & KONTROL CLOUD SYNC (SUPABASE)
+  // ==========================================
+  cloud: {
+    isConfigured: isSupabaseConfigured,
+    getStatus: getCloudSyncStatus,
+    subscribeStatus: subscribeCloudStatus,
+    syncNow: () => hydrateAllFromCloud(true)
+  },
+
+  // ==========================================
   // REAL-TIME EVENT SUBSCRIPTION (INTRA & CROSS-TAB)
   // ==========================================
   subscribe(callback) {
@@ -427,6 +501,7 @@ export const dbService = {
           };
           users[existingIdx] = updated;
           setStoredArray(STORAGE_KEYS.USERS, users);
+          pushUpsert('users', updated);
           dbService.notifyChange('users');
           return updated;
         }
@@ -454,6 +529,7 @@ export const dbService = {
 
       users.push(newUser);
       setStoredArray(STORAGE_KEYS.USERS, users);
+      pushUpsert('users', newUser);
       dbService.notifyChange('users');
       return newUser;
     },
@@ -478,6 +554,7 @@ export const dbService = {
       };
       users[index] = updated;
       setStoredArray(STORAGE_KEYS.USERS, users);
+      pushUpsert('users', updated);
       dbService.notifyChange('users');
 
       // Sinkronisasi dengan sesi aktif jika user yang diubah adalah sesi yang sedang tersimpan
@@ -510,6 +587,7 @@ export const dbService = {
       let users = getStoredArray(STORAGE_KEYS.USERS, []);
       users = users.filter((u) => u.id !== id);
       setStoredArray(STORAGE_KEYS.USERS, users);
+      pushDelete('users', id);
       dbService.notifyChange('users');
       return true;
     }
@@ -646,10 +724,12 @@ export const dbService = {
       }
 
       setStoredArray(STORAGE_KEYS.DRIVERS, drivers);
+      pushUpsert('drivers', activeDriver);
 
       // 3. Simpan berkas dokumen (KTP, SIM C, SIM A, STNK Motor, STNK Mobil)
       if (documents && Object.keys(documents).length > 0) {
         const storedDocs = getStoredArray(STORAGE_KEYS.DRIVER_DOCS, []);
+        const touchedDocs = [];
         ['ktp', 'sim', 'simA', 'stnk', 'stnkCar'].forEach((docType) => {
           if (documents[docType]) {
             const docObj = documents[docType];
@@ -671,9 +751,13 @@ export const dbService = {
             } else {
               storedDocs.push(docEntry);
             }
+            touchedDocs.push(docEntry);
           }
         });
         setStoredArray(STORAGE_KEYS.DRIVER_DOCS, storedDocs);
+        if (touchedDocs.length > 0) {
+          pushUpsert('driver_docs', touchedDocs);
+        }
       }
 
       user.driver = activeDriver;
@@ -735,6 +819,7 @@ export const dbService = {
         updated_at: new Date().toISOString()
       };
       setStoredArray(STORAGE_KEYS.DRIVERS, drivers);
+      pushUpsert('drivers', drivers[idx]);
 
       // Sinkronisasi akun user jika ada perubahan nama/telepon/avatar
       if (drivers[idx].user_id) {
@@ -749,12 +834,14 @@ export const dbService = {
             updated_at: new Date().toISOString()
           };
           setStoredArray(STORAGE_KEYS.USERS, users);
+          pushUpsert('users', users[uIdx]);
         }
       }
 
       // Sinkronisasi dokumen (KTP, SIM C, SIM A, STNK Motor, STNK Mobil) jika diunggah atau diupdate
       if (documents && Object.keys(documents).length > 0) {
         const storedDocs = getStoredArray(STORAGE_KEYS.DRIVER_DOCS, []);
+        const touchedDocs = [];
         ['ktp', 'sim', 'simA', 'stnk', 'stnkCar'].forEach((docType) => {
           if (documents[docType]) {
             const docVal = documents[docType];
@@ -782,9 +869,13 @@ export const dbService = {
             } else {
               storedDocs.push(docEntry);
             }
+            touchedDocs.push(docEntry);
           }
         });
         setStoredArray(STORAGE_KEYS.DRIVER_DOCS, storedDocs);
+        if (touchedDocs.length > 0) {
+          pushUpsert('driver_docs', touchedDocs);
+        }
       }
 
       // Sinkronisasi session lokal jika sedang login sebagai driver tersebut
@@ -844,6 +935,7 @@ export const dbService = {
       driver.updated_at = new Date().toISOString();
       drivers[idx] = driver;
       setStoredArray(STORAGE_KEYS.DRIVERS, drivers);
+      pushUpsert('drivers', driver);
 
       // Sinkronkan sesi aktif jika driver tersebut sedang login
       const currentSession = dbService.session.getDriverUser();
@@ -884,6 +976,7 @@ export const dbService = {
       if (idx === -1) return null;
 
       const nextOnline = drivers[idx].is_online !== undefined ? Boolean(drivers[idx].is_online) : true;
+      const nowIso = new Date().toISOString();
       drivers[idx] = {
         ...drivers[idx],
         verification_status: 'approved',
@@ -891,27 +984,36 @@ export const dbService = {
         status: nextOnline ? 'Siap Terima Order' : 'Istirahat (Offline)',
         badge: 'Mitra Resmi 🌸',
         reviewed_by: reviewerName,
-        reviewed_at: new Date().toISOString(),
+        reviewed_at: nowIso,
+        updated_at: nowIso,
         rejection_reason: null
       };
 
       setStoredArray(STORAGE_KEYS.DRIVERS, drivers);
+      pushUpsert('drivers', drivers[idx]);
 
       // Update seluruh status dokumen driver menjadi approved
       const storedDocs = getStoredArray(STORAGE_KEYS.DRIVER_DOCS, []);
+      const touchedDocs = [];
       const updatedDocs = storedDocs.map((doc) => {
         if (doc.driver_id === driverId) {
-          return {
+          const updatedDoc = {
             ...doc,
             verification_status: 'approved',
             reviewed_by: reviewerName,
-            reviewed_at: new Date().toISOString(),
+            reviewed_at: nowIso,
+            updated_at: nowIso,
             rejection_reason: null
           };
+          touchedDocs.push(updatedDoc);
+          return updatedDoc;
         }
         return doc;
       });
       setStoredArray(STORAGE_KEYS.DRIVER_DOCS, updatedDocs);
+      if (touchedDocs.length > 0) {
+        pushUpsert('driver_docs', touchedDocs);
+      }
 
       // Update session jika sedang login
       const sessionUser = dbService.session.getDriverUser();
@@ -932,6 +1034,7 @@ export const dbService = {
       const idx = drivers.findIndex((d) => d.id === driverId);
       if (idx === -1) return null;
 
+      const nowIso = new Date().toISOString();
       drivers[idx] = {
         ...drivers[idx],
         verification_status: 'rejected',
@@ -939,26 +1042,35 @@ export const dbService = {
         status: 'Verifikasi Ditolak',
         rejection_reason: reason,
         reviewed_by: reviewerName,
-        reviewed_at: new Date().toISOString()
+        reviewed_at: nowIso,
+        updated_at: nowIso
       };
 
       setStoredArray(STORAGE_KEYS.DRIVERS, drivers);
+      pushUpsert('drivers', drivers[idx]);
 
       // Update status dokumen menjadi rejected
       const storedDocs = getStoredArray(STORAGE_KEYS.DRIVER_DOCS, []);
+      const touchedDocs = [];
       const updatedDocs = storedDocs.map((doc) => {
         if (doc.driver_id === driverId) {
-          return {
+          const updatedDoc = {
             ...doc,
             verification_status: 'rejected',
             rejection_reason: reason,
             reviewed_by: reviewerName,
-            reviewed_at: new Date().toISOString()
+            reviewed_at: nowIso,
+            updated_at: nowIso
           };
+          touchedDocs.push(updatedDoc);
+          return updatedDoc;
         }
         return doc;
       });
       setStoredArray(STORAGE_KEYS.DRIVER_DOCS, updatedDocs);
+      if (touchedDocs.length > 0) {
+        pushUpsert('driver_docs', touchedDocs);
+      }
 
       // Update session jika sedang login
       const sessionUser = dbService.session.getDriverUser();
@@ -979,6 +1091,7 @@ export const dbService = {
       const idx = drivers.findIndex((d) => d.id === driverId);
       if (idx === -1) return null;
 
+      const nowIso = new Date().toISOString();
       drivers[idx] = {
         ...drivers[idx],
         ...updatedVehicleData,
@@ -986,13 +1099,16 @@ export const dbService = {
         is_online: false,
         status: 'Menunggu Verifikasi',
         rejection_reason: null,
-        resubmitted_at: new Date().toISOString()
+        resubmitted_at: nowIso,
+        updated_at: nowIso
       };
 
       setStoredArray(STORAGE_KEYS.DRIVERS, drivers);
+      pushUpsert('drivers', drivers[idx]);
 
       // Perbarui atau tambahkan dokumen yang diunggah ulang
       const storedDocs = getStoredArray(STORAGE_KEYS.DRIVER_DOCS, []);
+      const touchedDocs = [];
       ['ktp', 'sim', 'stnk'].forEach((docType) => {
         if (updatedDocs[docType]) {
           const docObj = updatedDocs[docType];
@@ -1008,7 +1124,7 @@ export const dbService = {
             file_name: docObj.name || `${docType}_document.jpg`,
             verification_status: 'pending',
             rejection_reason: null,
-            updated_at: new Date().toISOString()
+            updated_at: nowIso
           };
 
           if (existingIdx !== -1) {
@@ -1016,9 +1132,13 @@ export const dbService = {
           } else {
             storedDocs.push(docEntry);
           }
+          touchedDocs.push(docEntry);
         }
       });
       setStoredArray(STORAGE_KEYS.DRIVER_DOCS, storedDocs);
+      if (touchedDocs.length > 0) {
+        pushUpsert('driver_docs', touchedDocs);
+      }
       dbService.notifyChange('drivers');
 
       return drivers[idx];
@@ -1036,6 +1156,7 @@ export const dbService = {
       };
 
       setStoredArray(STORAGE_KEYS.DRIVERS, drivers);
+      pushUpsert('drivers', drivers[idx]);
       dbService.notifyChange('drivers');
       return drivers[idx];
     },
@@ -1067,6 +1188,7 @@ export const dbService = {
       };
 
       setStoredArray(STORAGE_KEYS.DRIVERS, drivers);
+      pushUpsert('drivers', drivers[idx]);
 
       // Sinkronisasi session lokal jika sedang login sebagai driver tersebut
       const sessionUser = dbService.session.getDriverUser();
@@ -1101,12 +1223,15 @@ export const dbService = {
       let storedDocs = getStoredArray(STORAGE_KEYS.DRIVER_DOCS, []);
       storedDocs = storedDocs.filter((d) => d.driver_id !== driverId);
       setStoredArray(STORAGE_KEYS.DRIVER_DOCS, storedDocs);
+      pushDelete('drivers', driverId);
+      pushDeleteByField('driver_docs', 'driver_id', driverId);
 
       // Hapus user terkait jika ada
       if (targetDriver && targetDriver.user_id) {
         let users = getStoredArray(STORAGE_KEYS.USERS, []);
         users = users.filter((u) => u.id !== targetDriver.user_id);
         setStoredArray(STORAGE_KEYS.USERS, users);
+        pushDelete('users', targetDriver.user_id);
       }
 
       dbService.notifyChange('all');
@@ -1119,6 +1244,9 @@ export const dbService = {
       let users = getStoredArray(STORAGE_KEYS.USERS, []);
       users = users.filter((u) => u.role === 'admin' || u.id === 'admin-master-01');
       setStoredArray(STORAGE_KEYS.USERS, users);
+      pushClearTable('driver_docs');
+      pushClearTable('drivers');
+      pushClearTable('users', true);
       dbService.notifyChange('all');
       return true;
     }
@@ -1385,6 +1513,7 @@ export const dbService = {
         bookings.unshift(newBooking);
       }
       setStoredArray(STORAGE_KEYS.BOOKINGS, bookings);
+      pushUpsert('bookings', newBooking);
       dbService.notifyChange('bookings');
       return newBooking;
     },
@@ -1501,6 +1630,7 @@ export const dbService = {
 
       bookings[idx] = updatedBooking;
       setStoredArray(STORAGE_KEYS.BOOKINGS, bookings);
+      pushUpsert('bookings', updatedBooking);
 
       // Tambahkan jumlah perjalanan (tripsCount) pada profil driver jika baru ditugaskan
       if (prevDriverId !== driver.id) {
@@ -1514,6 +1644,7 @@ export const dbService = {
             updated_at: new Date().toISOString()
           };
           setStoredArray(STORAGE_KEYS.DRIVERS, drivers);
+          pushUpsert('drivers', drivers[dIdx]);
         }
       }
 
@@ -1564,6 +1695,7 @@ export const dbService = {
 
       bookings[idx] = updated;
       setStoredArray(STORAGE_KEYS.BOOKINGS, bookings);
+      pushUpsert('bookings', updated);
       dbService.notifyChange('bookings');
       return updated;
     },
@@ -1634,6 +1766,7 @@ export const dbService = {
 
       bookings[idx] = updated;
       setStoredArray(STORAGE_KEYS.BOOKINGS, bookings);
+      pushUpsert('bookings', updated);
       dbService.notifyChange('bookings');
       return updated;
     },
@@ -1787,23 +1920,26 @@ export const dbService = {
       if (!userBookings.length) return;
 
       const userBookingIds = new Set(userBookings.map((b) => b.id));
-      let hasChanges = false;
+      const changedBookings = [];
 
       const updatedBookings = rawBookings.map((b) => {
         if (!b || !userBookingIds.has(b.id)) return b;
         if (isDriver && !b.is_read_driver) {
-          hasChanges = true;
-          return { ...b, is_read_driver: true };
+          const nextBooking = { ...b, is_read_driver: true, updated_at: new Date().toISOString() };
+          changedBookings.push(nextBooking);
+          return nextBooking;
         }
         if (!isDriver && !b.is_read) {
-          hasChanges = true;
-          return { ...b, is_read: true };
+          const nextBooking = { ...b, is_read: true, updated_at: new Date().toISOString() };
+          changedBookings.push(nextBooking);
+          return nextBooking;
         }
         return b;
       });
 
-      if (hasChanges) {
+      if (changedBookings.length > 0) {
         setStoredArray(STORAGE_KEYS.BOOKINGS, updatedBookings);
+        pushUpsert('bookings', changedBookings);
       }
     },
 
@@ -1955,9 +2091,9 @@ export const dbService = {
     return FOOD_MERCHANTS;
   },
 
-  // Bersihkan data dummy bawaan secara manual dan sinkronisasi realtime
+  // Bersihkan data dummy bawaan lokal secara manual dan sinkronisasi realtime
   clearDummyData() {
-    clearEntireDatabase();
+    resetLocalDatabaseCache();
     return true;
   },
 
@@ -2158,5 +2294,19 @@ export const dbService = {
     }
   }
 };
+
+if (typeof window !== 'undefined') {
+  initCloudSync({
+    readDomainArray: (domain) => getStoredArray(DOMAIN_TO_STORAGE_KEY[domain], []),
+    writeDomainArray: (domain, items, notifyKey) => {
+      const key = DOMAIN_TO_STORAGE_KEY[domain];
+      if (key) {
+        setStoredArrayFromCloud(key, Array.isArray(items) ? items : [], notifyKey);
+      }
+    },
+    ensureAdminUser: ensureSuperAdminInUsers,
+    notifyChange: (key) => dbService.notifyChange(key)
+  });
+}
 
 export default dbService;

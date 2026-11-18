@@ -61,12 +61,14 @@ erDiagram
 
 ## 🚀 3. Cara Menggunakan & Menjalankan Script Database
 
-### Opsi A: Menggunakan Supabase (Direkomendasikan untuk React Vite)
+### Opsi A: Menggunakan Supabase Realtime Sync (Siap Pakai dengan Vercel)
 1. Buka dashboard [Supabase](https://supabase.com) dan buat proyek baru.
-2. Masuk ke menu **SQL Editor**.
-3. Buka file [`database/schema.sql`](file:///d:/FOLDER%20IPUL/CODE/gojek/database/schema.sql), salin seluruh isinya, tempel ke SQL Editor Supabase, lalu tekan tombol **Run**.
-4. Buka file [`database/seed.sql`](file:///d:/FOLDER%20IPUL/CODE/gojek/database/seed.sql), salin seluruh isinya, tempel ke SQL Editor Supabase, lalu tekan tombol **Run** untuk memasukkan data driver dan admin awal.
-5. Masuk ke **Settings > API**, ambil `SUPABASE_URL` dan `SUPABASE_ANON_KEY` untuk dihubungkan ke aplikasi.
+2. Masuk ke menu **SQL Editor** > **New query**.
+3. Salin seluruh isi file `database/supabase_setup.sql`, tempel ke SQL Editor, lalu tekan tombol **Run** (skrip ini otomatis membuat 4 tabel `otw_users`, `otw_drivers`, `otw_driver_documents`, `otw_bookings`, mengaktifkan `REPLICA IDENTITY FULL`, mendaftarkan ke publikasi `supabase_realtime`, serta mengatur RLS).
+4. Masuk ke **Project Settings > API** (atau **Connect**), salin **Project URL** (`VITE_SUPABASE_URL`) dan **anon public key** (`VITE_SUPABASE_ANON_KEY`).
+5. Masukkan keduanya ke file `.env.local` (untuk lokal) dan **Vercel Project Settings > Environment Variables** (`VITE_SUPABASE_URL` & `VITE_SUPABASE_ANON_KEY`), lalu **Redeploy** di Vercel.
+
+> Untuk skema relasional lengkap versi lanjutan (`users`, `drivers`, `ride_bookings`, `food_orders`, dst.), lihat `database/schema.sql` dan `database/seed.sql`.
 
 ### Opsi B: Menggunakan PostgreSQL Lokal / Docker
 ```bash

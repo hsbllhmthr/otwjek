@@ -397,6 +397,64 @@
   gap: 12px;
 }
 
+.topbar-sync-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1px solid #CBD5E1;
+  background-color: #F8FAFC;
+  color: #1E293B;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.topbar-sync-pill:hover {
+  background-color: #F1F5F9;
+}
+
+.topbar-sync-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #64748B;
+  flex-shrink: 0;
+}
+
+.topbar-sync-pill.is-live {
+  background-color: #ECFDF5;
+  border-color: #A7F3D0;
+  color: #065F46;
+}
+
+.topbar-sync-pill.is-live .topbar-sync-dot {
+  background-color: #059669;
+}
+
+.topbar-sync-pill.is-connecting {
+  background-color: #FFFBEB;
+  border-color: #FDE68A;
+  color: #92400E;
+}
+
+.topbar-sync-pill.is-connecting .topbar-sync-dot {
+  background-color: #D97706;
+}
+
+.topbar-sync-pill.is-error {
+  background-color: #FEF2F2;
+  border-color: #FECACA;
+  color: #991B1B;
+}
+
+.topbar-sync-pill.is-error .topbar-sync-dot {
+  background-color: #DC2626;
+}
+
 /* TailAdmin User Profile Dropdown Capsule */
 .topbar-user-profile {
   display: flex;
@@ -4352,6 +4410,110 @@
   cursor: not-allowed;
 }
 
+.admin-incoming-order-alert {
+  position: fixed;
+  top: 76px;
+  right: 24px;
+  max-width: 420px;
+  background-color: #FFFFFF;
+  color: #0F172A;
+  border: 1px solid #CBD5E1;
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 12px 28px -8px rgba(15, 23, 42, 0.16);
+  z-index: 100001;
+  animation: toastSlideUp 0.25s ease-out;
+}
+
+.incoming-order-icon-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background-color: #EFF6FF;
+  color: #1E40AF;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.incoming-order-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.incoming-order-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.incoming-order-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.incoming-order-code {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  font-variant-numeric: tabular-nums;
+}
+
+.incoming-order-meta {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #475569;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.incoming-order-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btn-incoming-order-view {
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid #111827;
+  background-color: #111827;
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-incoming-order-view:hover {
+  background-color: #1F2937;
+}
+
+.btn-incoming-order-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  border: 1px solid #E2E8F0;
+  background-color: #FFFFFF;
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.btn-incoming-order-close:hover {
+  background-color: #F8FAFC;
+}
+
 .admin-toast-banner {
   position: fixed;
   bottom: 24px;
@@ -5934,6 +6096,13 @@
 
   .cust-detail-value {
     word-break: break-word;
+  }
+
+  .admin-incoming-order-alert {
+    top: 72px;
+    left: 12px;
+    right: 12px;
+    max-width: none;
   }
 
   .admin-toast-banner {

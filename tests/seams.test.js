@@ -117,6 +117,10 @@ test('Seam 4: OTWJek Kirim Paket Booking Message Formatter', () => {
 });
 
 import dbService, { normalizePhone, formatStandardPhone } from '../src/services/dbService.js';
+import {
+  mergeCloudCollection,
+  applyRealtimeRecordChange
+} from '../src/services/supabaseSync.js';
 import { getPortalFromLocation, getPortalMeta } from '../src/utils/pwaPortal.js';
 import { readFileSync } from 'node:fs';
 
@@ -556,5 +560,114 @@ test('Seam 11: Cancelled or Completed Orders Cannot Be Assigned to a Driver', ()
     }
   }
 });
+
+test('Seam 12: Supabase Cloud Merge & Realtime Updates Preserve In-Flight Writes', () => {
+  // 1. Snapshot cloud awal digabung dengan pesanan baru lokal yang masih proses upsert
+  const pendingUpserts = new Map([
+    [
+      'b-local-new',
+      {
+        ts: 2000,
+        item: {
+          id: 'b-local-new',
+          order_code: '#LOC1',
+          booking_status: 'in_progress',
+          assignment_status: 'unassigned',
+          created_at: '2026-11-18T14:30:00.000Z'
+        }
+      }
+    ]
+  ]);
+  const pendingDeletes = new Map([['b-deleted', 2000]]);
+
+  const cloudRows = [
+    {
+      id: 'b-cloud-old',
+      created_at: '2026-11-18T14:00:00.000Z',
+      updated_at: '2026-11-18T14:00:00.000Z',
+      payload: {
+        id: 'b-cloud-old',
+        order_code: '#CLD1',
+        booking_status: 'in_progress',
+        assignment_status: 'unassigned',
+        created_at: '2026-11-18T14:00:00.000Z'
+      }
+    },
+    {
+      id: 'b-deleted',
+      created_at: '2026-11-18T13:00:00.000Z',
+      updated_at: '2026-11-18T13:00:00.000Z',
+      payload: { id: 'b-deleted', order_code: '#DEL1' }
+    }
+  ];
+
+  const merged = mergeCloudCollection({
+    domain: 'bookings',
+    cloudItems: cloudRows,
+    pendingUpsertsMap: pendingUpserts,
+    pendingDeletesMap: pendingDeletes
+  });
+
+  assert.equal(merged.length, 2);
+  assert.equal(merged[0].id, 'b-local-new');
+  assert.equal(merged[1].id, 'b-cloud-old');
+
+  // 2. Event Realtime INSERT dari pelanggan lain langsung masuk paling atas untuk Admin
+  const afterRemoteInsert = applyRealtimeRecordChange({
+    domain: 'bookings',
+    eventType: 'INSERT',
+    newRow: {
+      id: 'b-remote-cust',
+      created_at: '2026-11-18T14:35:00.000Z',
+      updated_at: '2026-11-18T14:35:00.000Z',
+      payload: {
+        id: 'b-remote-cust',
+        order_code: '#RMT9',
+        booking_status: 'in_progress',
+        assignment_status: 'unassigned',
+        created_at: '2026-11-18T14:35:00.000Z'
+      }
+    },
+    currentLocalItems: merged
+  });
+
+  assert.ok(Array.isArray(afterRemoteInsert));
+  assert.equal(afterRemoteInsert.length, 3);
+  assert.equal(afterRemoteInsert[0].id, 'b-remote-cust');
+
+  // 3. Stale UPDATE terhadap record lokal yang sedang in-flight lebih baru harus diabaikan
+  const staleEchoIgnored = applyRealtimeRecordChange({
+    domain: 'bookings',
+    eventType: 'UPDATE',
+    newRow: {
+      id: 'b-local-new',
+      created_at: '2026-11-18T14:30:00.000Z',
+      updated_at: new Date(1000).toISOString(),
+      payload: {
+        id: 'b-local-new',
+        order_code: '#STALE',
+        created_at: '2026-11-18T14:30:00.000Z'
+      }
+    },
+    currentLocalItems: afterRemoteInsert,
+    pendingUpsertsMap: pendingUpserts
+  });
+  assert.equal(staleEchoIgnored, null);
+
+  // 4. Event Realtime DELETE menghapus item secara sinkron
+  const afterDelete = applyRealtimeRecordChange({
+    domain: 'bookings',
+    eventType: 'DELETE',
+    oldRow: { id: 'b-cloud-old' },
+    currentLocalItems: afterRemoteInsert
+  });
+  assert.equal(afterDelete.length, 2);
+  assert.equal(afterDelete.some((b) => b.id === 'b-cloud-old'), false);
+
+  // 5. Mode lokal di environment tanpa env Supabase melaporkan status disabled
+  assert.equal(dbService.cloud.isConfigured(), false);
+  assert.equal(dbService.cloud.getStatus().status, 'disabled');
+});
+
 
 
